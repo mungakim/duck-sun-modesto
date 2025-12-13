@@ -1,0 +1,52 @@
+{
+  "timestamp": "2025-12-13T21:30:16.458254",
+  "location_key": "327145",
+  "ttl_hours": 1,
+  "data": [
+    {
+      "date": "2025-12-13",
+      "high_c": 7.22,
+      "low_c": 3.89,
+      "high_f": 45.0,
+      "low_f": 39.0,
+      "precip_prob": 25,
+      "condition": "Cloudy"
+    },
+    {
+      "date": "2025-12-14",
+      "high_c": 6.67,
+      "low_c": 2.78,
+      "high_f": 44.0,
+      "low_f": 37.0,
+      "precip_prob": 0,
+      "condition": "Cloudy"
+    },
+    {
+      "date": "2025-12-15",
+      "high_c": 12.22,
+      "low_c": 5.0,
+      "high_f": 54.0,
+      "low_f": 41.0,
+      "precip_prob": 0,
+      "condition": "Mostly cloudy"
+    },
+    {
+      "date": "2025-12-16",
+      "high_c": 13.89,
+      "low_c": 8.89,
+      "high_f": 57.0,
+      "low_f": 48.0,
+      "precip_prob": 18,
+      "condition": "Mostly cloudy"
+    },
+    {
+      "date": "2025-12-17",
+      "high_c": 15.56,
+      "low_c": 7.22,
+      "high_f": 60.0,
+      "low_f": 45.0,
+      "precip_prob": 55,
+      "condition": "Mostly cloudy"
+    }
+  ]
+}
