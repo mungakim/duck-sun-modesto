@@ -2,9 +2,10 @@ name: Daily Duck Sun Forecast
 
 on:
   schedule:
-    # 5:23 AM PST = 13:23 UTC (Standard Time)
-    # Note: During PDT (Daylight Savings), this will run at 6:23 AM local time
-    - cron: '23 13 * * *'
+    # 4:55 AM Pacific Time (adjusts for daylight saving)
+    # Both times trigger, but the job checks which one is valid
+    - cron: '55 12 * * *'  # 12:55 UTC = 4:55 AM PST (winter)
+    - cron: '55 11 * * *'  # 11:55 UTC = 4:55 AM PDT (summer)
   workflow_dispatch:
 
 permissions:
@@ -15,21 +16,41 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Check Pacific Time (skip if wrong DST trigger)
+      id: tz-check
+      run: |
+        # Get current hour in Pacific time
+        PACIFIC_HOUR=$(TZ='America/Los_Angeles' date +%H)
+        echo "Current Pacific hour: $PACIFIC_HOUR"
+        # Accept hour 04 or 05 (allows for GitHub delays up to ~65 min)
+        # The wrong DST trigger would be off by a full hour (03 or 06)
+        if [ "$PACIFIC_HOUR" == "04" ] || [ "$PACIFIC_HOUR" == "05" ]; then
+          echo "Correct schedule - proceeding (hour $PACIFIC_HOUR is valid)"
+          echo "should_run=true" >> $GITHUB_OUTPUT
+        else
+          echo "Skipping: wrong DST schedule triggered (hour is $PACIFIC_HOUR, expected 04-05)"
+          echo "should_run=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Check out code
+      if: steps.tz-check.outputs.should_run == 'true' || github.event_name == 'workflow_dispatch'
       uses: actions/checkout@v4
 
     - name: Set up Python
+      if: steps.tz-check.outputs.should_run == 'true' || github.event_name == 'workflow_dispatch'
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
 
     - name: Install dependencies
+      if: steps.tz-check.outputs.should_run == 'true' || github.event_name == 'workflow_dispatch'
       run: |
         pip install -r requirements.txt
         pip install fpdf2 pandas httpx python-dotenv colorama
 
     - name: Run Forecast (Silent Mode)
+      if: steps.tz-check.outputs.should_run == 'true' || github.event_name == 'workflow_dispatch'
       env:
         LOG_LEVEL: INFO
         # No API Key needed anymore!
@@ -37,6 +58,7 @@ jobs:
         python main.py
 
     - name: Save Results
+      if: steps.tz-check.outputs.should_run == 'true' || github.event_name == 'workflow_dispatch'
       run: |
         git config --global user.name "DuckSunBot"
         git config --global user.email "actions@github.com"

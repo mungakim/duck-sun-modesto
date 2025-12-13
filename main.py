@@ -1,10 +1,11 @@
 """
-Duck Sun Modesto: Uncanny Edition - Main Entry Point (Silent Edition)
+Duck Sun Modesto: Hybrid Architecture (Weighted Consensus)
 
-Triangulates weather data, runs physics model, logs verification stats,
-and outputs the PDF report. 
+Triangulates weather data from 4 sources, runs physics model with narrative override,
+logs verification stats, and outputs the PDF report.
 
-Decoupled from Claude Agent - pure deterministic Python.
+Sources: Open-Meteo + NWS + Met.no + AccuWeather
+Physics: Fog Guard + Smoke Guard + NWS Narrative Override
 """
 
 import asyncio
@@ -34,9 +35,10 @@ from duck_sun.providers.nws import NWSProvider
 from duck_sun.providers.met_no import MetNoProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.smoke import SmokeProvider
+from duck_sun.providers.accuweather import AccuWeatherProvider
 from duck_sun.uncanniness import UncannyEngine
 from duck_sun.pdf_report import generate_pdf_report
-from duck_sun.verification import TruthTracker, fetch_and_log_yesterday_actuals
+from duck_sun.verification import TruthTracker, fetch_yesterday_actuals
 
 # Load environment variables
 load_dotenv()
@@ -62,13 +64,13 @@ REPORT_DIR = Path("reports")
 
 def print_banner():
     """Print the system banner."""
-    print(f"\n{Fore.CYAN}{'=' * 58}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}   DUCK SUN MODESTO: SILENT EDITION{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}   Consensus Temperature Triangulation System{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}   + Fog Guard + Smoke Guard{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}{'=' * 58}{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}   [SOURCES] Open-Meteo + NWS + Met.no + METAR + AQI{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}   [MODE] Pure Deterministic (No AI/LLM){Style.RESET_ALL}")
+    print(f"\n{Fore.CYAN}{'=' * 60}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}   DUCK SUN MODESTO: HYBRID ARCHITECTURE{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}   Weighted Consensus Temperature System{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}   + Fog Guard + Smoke Guard + Narrative Override{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'=' * 60}{Style.RESET_ALL}")
+    print(f"{Fore.WHITE}   [SOURCES] Open-Meteo + NWS + Met.no + AccuWeather{Style.RESET_ALL}")
+    print(f"{Fore.WHITE}   [WEIGHTS] NWS(5x) > Accu(3x) = Met(3x) > OM(1x){Style.RESET_ALL}")
     print()
 
 
@@ -83,29 +85,37 @@ def ensure_directories():
 
 async def fetch_all_sources():
     """
-    Fetch data from all weather sources concurrently.
-
+    Fetch data from all weather sources.
+    
     Returns:
-        Tuple of (om_data, nws_data, met_data, metar_text, smoke_data)
+        Tuple of (om_data, nws_data, nws_text, met_data, metar_raw, accu_data, smoke_data)
     """
-    print(f"{Fore.YELLOW}[1/5]{Style.RESET_ALL} Polling Open-Meteo (GFS/ICON/GEM)...")
+    print(f"{Fore.YELLOW}[1/6]{Style.RESET_ALL} Polling Open-Meteo (GFS/ICON/GEM)...")
     logger.info("[fetch_all_sources] Fetching Open-Meteo data...")
     om_data = await fetch_open_meteo(days=8)
     print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(om_data['daily_summary'])} hourly records")
     logger.info(f"[fetch_all_sources] Open-Meteo returned {len(om_data['daily_summary'])} records")
 
-    print(f"{Fore.YELLOW}[2/5]{Style.RESET_ALL} Polling National Weather Service...")
+    print(f"{Fore.YELLOW}[2/6]{Style.RESET_ALL} Polling National Weather Service...")
     logger.info("[fetch_all_sources] Fetching NWS data...")
     nws_provider = NWSProvider()
     nws_data = await nws_provider.fetch_async()
+    nws_text = await nws_provider.fetch_text_forecast()
+    
     if nws_data:
         print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(nws_data)} temperature records")
         logger.info(f"[fetch_all_sources] NWS returned {len(nws_data)} records")
     else:
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL} - Using fallback")
         logger.warning("[fetch_all_sources] NWS data unavailable")
+    
+    if nws_text:
+        print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(nws_text)} text forecast periods (Narrative)")
+        logger.info(f"[fetch_all_sources] NWS text forecast: {len(nws_text)} periods")
+    else:
+        logger.warning("[fetch_all_sources] NWS text forecast unavailable")
 
-    print(f"{Fore.YELLOW}[3/5]{Style.RESET_ALL} Polling Met.no (European ECMWF)...")
+    print(f"{Fore.YELLOW}[3/6]{Style.RESET_ALL} Polling Met.no (European ECMWF)...")
     logger.info("[fetch_all_sources] Fetching Met.no data...")
     met_provider = MetNoProvider()
     met_data = await met_provider.fetch_async()
@@ -116,7 +126,18 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL} - Using fallback")
         logger.warning("[fetch_all_sources] Met.no data unavailable")
 
-    print(f"{Fore.YELLOW}[4/5]{Style.RESET_ALL} Fetching KMOD Ground Truth (METAR)...")
+    print(f"{Fore.YELLOW}[4/6]{Style.RESET_ALL} Polling AccuWeather (Commercial)...")
+    logger.info("[fetch_all_sources] Fetching AccuWeather data...")
+    accu_provider = AccuWeatherProvider()
+    accu_data = await accu_provider.fetch_forecast()
+    if accu_data:
+        print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(accu_data)} daily forecasts")
+        logger.info(f"[fetch_all_sources] AccuWeather returned {len(accu_data)} records")
+    else:
+        print(f"      {Fore.YELLOW}UNAVAILABLE{Style.RESET_ALL} - Quota exceeded or no API key")
+        logger.warning("[fetch_all_sources] AccuWeather data unavailable")
+
+    print(f"{Fore.YELLOW}[5/6]{Style.RESET_ALL} Fetching KMOD Ground Truth (METAR)...")
     logger.info("[fetch_all_sources] Fetching METAR data...")
     metar_provider = MetarProvider()
     metar_raw = await metar_provider.fetch_async()
@@ -128,7 +149,7 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL}")
         logger.warning("[fetch_all_sources] METAR data unavailable")
 
-    print(f"{Fore.YELLOW}[5/5]{Style.RESET_ALL} Polling Air Quality (Smoke/PM2.5)...")
+    print(f"{Fore.YELLOW}[6/6]{Style.RESET_ALL} Polling Air Quality (Smoke/PM2.5)...")
     logger.info("[fetch_all_sources] Fetching smoke/AQI data...")
     smoke_provider = SmokeProvider()
     smoke_data = await smoke_provider.fetch_async(days=5)
@@ -137,7 +158,6 @@ async def fetch_all_sources():
         print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(smoke_data)} records (Max PM2.5: {max_pm:.1f})")
         logger.info(f"[fetch_all_sources] Smoke data: {len(smoke_data)} records, max PM2.5: {max_pm:.1f}")
         
-        # Provide warning if smoke levels are elevated
         if max_pm > 100:
             print(f"      {Fore.RED}⚠ SMOKE ALERT: PM2.5 > 100 ug/m3{Style.RESET_ALL}")
             logger.warning(f"[fetch_all_sources] SMOKE ALERT: PM2.5 = {max_pm:.1f} ug/m3")
@@ -149,33 +169,34 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL}")
         logger.warning("[fetch_all_sources] Smoke data unavailable")
 
-    return om_data, nws_data, met_data, metar_raw, smoke_data
+    return om_data, nws_data, nws_text, met_data, metar_raw, accu_data, smoke_data
 
 
-def run_consensus_model(om_data, nws_data, met_data, smoke_data=None):
+def run_consensus_model(om_data, nws_data, met_data, smoke_data, nws_text):
     """
-    Run the Consensus Temperature Model, Fog Guard, and Smoke Guard analysis.
-
+    Run the Weighted Consensus Temperature Model with Narrative Override.
+    
     Args:
         om_data: Open-Meteo forecast data
         nws_data: NWS temperature data
         met_data: Met.no temperature data
-        smoke_data: Smoke/AQI data from SmokeProvider
-
+        smoke_data: Smoke/AQI data
+        nws_text: NWS text forecast for narrative override
+    
     Returns:
         Tuple of (analyzed_df, engine)
     """
-    print(f"\n{Fore.CYAN}Running Consensus Temperature Model...{Style.RESET_ALL}")
-    logger.info("[run_consensus_model] Starting consensus model...")
+    print(f"\n{Fore.CYAN}Running Weighted Consensus Model...{Style.RESET_ALL}")
+    logger.info("[run_consensus_model] Starting weighted consensus model...")
 
     engine = UncannyEngine()
 
-    # Normalize and merge temperatures (now includes smoke data)
-    logger.info("[run_consensus_model] Normalizing temperatures and merging smoke data...")
+    # Normalize and merge temperatures
+    logger.info("[run_consensus_model] Normalizing temperatures (NWS > Met.no > OM)...")
     df = engine.normalize_temps(om_data, nws_data, met_data, smoke_data)
 
     # Count sources
-    sources = 1  # Open-Meteo
+    sources = 1  # Open-Meteo always available
     if nws_data:
         sources += 1
     if met_data:
@@ -183,25 +204,17 @@ def run_consensus_model(om_data, nws_data, met_data, smoke_data=None):
 
     print(f"      Temperature sources contributing: {sources}/3")
     logger.info(f"[run_consensus_model] Using {sources}/3 temperature sources")
-    
-    if smoke_data:
-        print(f"      Smoke data: {Fore.GREEN}Available{Style.RESET_ALL}")
-        logger.info("[run_consensus_model] Smoke data integrated")
-    else:
-        print(f"      Smoke data: {Fore.YELLOW}Not available{Style.RESET_ALL}")
-        logger.info("[run_consensus_model] No smoke data available")
 
-    # Apply Fog Guard + Smoke Guard
-    print(f"{Fore.CYAN}Applying Fog Guard + Smoke Guard Analysis...{Style.RESET_ALL}")
-    logger.info("[run_consensus_model] Running Fog Guard + Smoke Guard analysis...")
-    df_analyzed = engine.analyze_duck_curve(df)
+    # Apply Fog Guard + Smoke Guard + Narrative Override
+    print(f"{Fore.CYAN}Applying Fog Guard + Smoke Guard + Narrative Override...{Style.RESET_ALL}")
+    logger.info("[run_consensus_model] Running physics engine with narrative override...")
+    df_analyzed = engine.analyze_duck_curve(df, nws_text_data=nws_text)
 
     # Count risk levels
     critical_fog = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
     smoke_risk = len(df_analyzed[df_analyzed['risk_level'].str.contains('SMOKE', na=False)])
     moderate = len(df_analyzed[df_analyzed['risk_level'].str.contains('MODERATE', na=False)])
 
-    # Report fog status
     if critical_fog > 0:
         print(f"      {Fore.RED}TULE FOG ALERT: {critical_fog} critical hours detected{Style.RESET_ALL}")
         logger.warning(f"[run_consensus_model] TULE FOG ALERT: {critical_fog} critical hours")
@@ -212,19 +225,10 @@ def run_consensus_model(om_data, nws_data, met_data, smoke_data=None):
         print(f"      {Fore.GREEN}No fog conditions detected{Style.RESET_ALL}")
         logger.info("[run_consensus_model] No fog conditions detected")
 
-    # Report smoke status
     if smoke_risk > 0:
         max_pm = df_analyzed['pm2_5'].max()
         print(f"      {Fore.RED}SMOKE IMPACT: {smoke_risk} hours with elevated PM2.5 (max: {max_pm:.1f}){Style.RESET_ALL}")
         logger.warning(f"[run_consensus_model] SMOKE IMPACT: {smoke_risk} hours, max PM2.5: {max_pm:.1f}")
-    elif smoke_data:
-        max_pm = df_analyzed['pm2_5'].max()
-        if max_pm > 25:
-            print(f"      {Fore.YELLOW}Light smoke present (max PM2.5: {max_pm:.1f}){Style.RESET_ALL}")
-            logger.info(f"[run_consensus_model] Light smoke: max PM2.5 = {max_pm:.1f}")
-        else:
-            print(f"      {Fore.GREEN}Air quality good (PM2.5 < 25){Style.RESET_ALL}")
-            logger.info("[run_consensus_model] Air quality good")
 
     return df_analyzed, engine
 
@@ -261,16 +265,13 @@ def print_duck_curve(engine, df_analyzed):
     print("-" * 50)
 
     for hour in duck_hours:
-        time_str = hour['time'][-5:]  # HH:MM
+        time_str = hour['time'][-5:]
         solar = hour['solar_adjusted']
         risk = hour['risk_level']
 
-        # Color code risk levels
         if "CRITICAL" in risk:
             risk_color = Fore.RED
-        elif "MODERATE" in risk:
-            risk_color = Fore.YELLOW
-        elif risk == "WATCH":
+        elif "MODERATE" in risk or "HIGH" in risk:
             risk_color = Fore.YELLOW
         else:
             risk_color = Fore.GREEN
@@ -293,7 +294,6 @@ def print_leaderboard(scores, best_source: str = None):
     
     for row in scores:
         source, count, hi_err, lo_err = row
-        # Highlight the winner
         color = Fore.GREEN if source == best_source else Fore.WHITE
         print(f"   {color}{source:<12} {hi_err:>5.1f}°C      {lo_err:>5.1f}°C      {count:>3}{Style.RESET_ALL}")
     
@@ -301,19 +301,18 @@ def print_leaderboard(scores, best_source: str = None):
         print(f"\n   Current Champion: {Fore.GREEN}{best_source}{Style.RESET_ALL}")
 
 
-async def save_outputs(timestamp: str, om_data, df_analyzed, engine, metar_raw, smoke_data=None):
-    """Save raw data and analysis to files, including smoke analysis."""
+async def save_outputs(timestamp: str, om_data, df_analyzed, engine, metar_raw, accu_data, smoke_data=None):
+    """Save raw data and analysis to files."""
     ensure_directories()
     logger.info(f"[save_outputs] Saving outputs with timestamp: {timestamp}")
 
-    # Save raw consensus data
     json_path = OUTPUT_DIR / f"solar_data_{timestamp}.json"
 
     # Calculate smoke summary
     smoke_summary = None
     if smoke_data:
-        max_pm = max(r['pm2_5'] for r in smoke_data) if smoke_data else 0
-        avg_pm = sum(r['pm2_5'] for r in smoke_data) / len(smoke_data) if smoke_data else 0
+        max_pm = max(r['pm2_5'] for r in smoke_data)
+        avg_pm = sum(r['pm2_5'] for r in smoke_data) / len(smoke_data)
         smoke_hours = len([r for r in smoke_data if r['pm2_5'] > 50])
         smoke_summary = {
             "max_pm2_5": round(max_pm, 1),
@@ -324,15 +323,17 @@ async def save_outputs(timestamp: str, om_data, df_analyzed, engine, metar_raw, 
         logger.info(f"[save_outputs] Smoke summary: max={max_pm:.1f}, avg={avg_pm:.1f}, hours>50={smoke_hours}")
     else:
         smoke_summary = {"data_available": False}
-        logger.info("[save_outputs] No smoke data to include")
 
     consensus_data = {
         "generated_at": om_data["generated_at"],
         "location": "Modesto, CA",
-        "sources": ["Open-Meteo", "NWS", "Met.no", "AQI"],
+        "architecture": "Hybrid (Weighted Consensus)",
+        "sources": ["Open-Meteo", "NWS", "Met.no", "AccuWeather", "AQI"],
+        "weights": {"NWS": 5, "AccuWeather": 3, "Met.no": 3, "Open-Meteo": 1},
         "8_day_outlook": engine.get_daily_summary(df_analyzed, days=8),
         "duck_curve_tomorrow": engine.get_duck_curve_hours(df_analyzed),
         "current_metar": metar_raw,
+        "accuweather_available": accu_data is not None,
         "smoke_analysis": smoke_summary
     }
 
@@ -346,49 +347,48 @@ async def save_outputs(timestamp: str, om_data, df_analyzed, engine, metar_raw, 
 
 
 async def main():
-    """Main entry point for Duck Sun Modesto: Silent Edition."""
+    """Main entry point for Duck Sun Modesto: Hybrid Architecture."""
     start_time = datetime.now()
     timestamp = start_time.strftime("%Y-%m-%d_%H-%M-%S")
 
     print_banner()
 
     logger.info("=" * 60)
-    logger.info(f"Duck Sun Modesto: Silent Edition - Run: {timestamp}")
+    logger.info(f"Duck Sun Modesto: Hybrid Architecture - Run: {timestamp}")
     logger.info("=" * 60)
 
     try:
         # Step 1: Fetch from all sources
-        print(f"{Fore.WHITE}STEP 1: Fetching Weather Data{Style.RESET_ALL}")
+        print(f"{Fore.WHITE}STEP 1: Fetching Weather Data (6 Sources){Style.RESET_ALL}")
         print("-" * 40)
         logger.info("[main] STEP 1: Fetching weather data from all sources...")
-        om_data, nws_data, met_data, metar_raw, smoke_data = await fetch_all_sources()
+        om_data, nws_data, nws_text, met_data, metar_raw, accu_data, smoke_data = await fetch_all_sources()
 
         if not om_data:
             print(f"{Fore.RED}CRITICAL ERROR: Primary data source failed.{Style.RESET_ALL}")
             logger.error("[main] CRITICAL: Open-Meteo data fetch failed")
             return 1
 
-        # Step 2: Run Consensus Model (now includes Smoke Guard)
-        print(f"\n{Fore.WHITE}STEP 2: Consensus & Fog/Smoke Analysis{Style.RESET_ALL}")
+        # Step 2: Run Consensus Model with Narrative Override
+        print(f"\n{Fore.WHITE}STEP 2: Weighted Consensus & Physics Analysis{Style.RESET_ALL}")
         print("-" * 40)
-        logger.info("[main] STEP 2: Running consensus model with Fog Guard + Smoke Guard...")
-        df_analyzed, engine = run_consensus_model(om_data, nws_data, met_data, smoke_data)
+        logger.info("[main] STEP 2: Running weighted consensus model...")
+        df_analyzed, engine = run_consensus_model(om_data, nws_data, met_data, smoke_data, nws_text)
 
-        # Step 3: Truth Tracker - Log forecasts and verify accuracy
+        # Step 3: Truth Tracker
         print(f"\n{Fore.WHITE}STEP 3: The Truth Tracker (Logging & Verification){Style.RESET_ALL}")
         print("-" * 40)
         logger.info("[main] STEP 3: Running Truth Tracker verification...")
         
         tracker = TruthTracker()
         
-        # 1. Log Open-Meteo Forecasts (already has daily high/low)
+        # Log forecasts from all sources
         count_om = 0
         if om_data.get('daily_forecast'):
-            for day in om_data['daily_forecast'][:5]:  # Next 5 days
+            for day in om_data['daily_forecast'][:5]:
                 if tracker.log_forecast("Open-Meteo", day['date'], day['high_c'], day['low_c']):
                     count_om += 1
         
-        # 2. Log NWS Forecasts (aggregate hourly to daily)
         count_nws = 0
         if nws_data:
             nws_daily = NWSProvider().process_daily_high_low(nws_data)
@@ -396,7 +396,6 @@ async def main():
                 if tracker.log_forecast("NWS", date_str, stats['high'], stats['low']):
                     count_nws += 1
         
-        # 3. Log Met.no Forecasts (aggregate hourly to daily)
         count_met = 0
         if met_data:
             met_daily = MetNoProvider().process_daily_high_low(met_data)
@@ -404,29 +403,63 @@ async def main():
                 if tracker.log_forecast("Met.no", date_str, stats['high'], stats['low']):
                     count_met += 1
         
-        print(f"   Logged predictions: OM:{count_om}, NWS:{count_nws}, Met:{count_met}")
-        logger.info(f"[main] Logged forecasts - OM:{count_om}, NWS:{count_nws}, Met:{count_met}")
+        # Log AccuWeather forecasts
+        count_accu = 0
+        if accu_data:
+            for day in accu_data:
+                if tracker.log_forecast("AccuWeather", day['date'], day['high_c'], day['low_c']):
+                    count_accu += 1
         
-        # 4. Fetch Yesterday's Ground Truth & Show Scoreboard
+        print(f"   Logged predictions: OM:{count_om}, NWS:{count_nws}, Met:{count_met}, Accu:{count_accu}")
+        logger.info(f"[main] Logged forecasts - OM:{count_om}, NWS:{count_nws}, Met:{count_met}, Accu:{count_accu}")
+        
+        # Fetch Ground Truth
         print(f"   Fetching yesterday's ground truth...")
-        success = await fetch_and_log_yesterday_actuals(tracker)
+        actuals = await fetch_yesterday_actuals()
         
-        if success:
-            print(f"   {Fore.GREEN}OK - Ground truth logged{Style.RESET_ALL}")
+        if actuals:
+            condition = "Clear"  # Default condition
+            tracker.ingest_actuals(
+                actuals['date'], 
+                actuals['high'], 
+                actuals['low'], 
+                condition,
+                actuals.get('precip', 0.0)
+            )
+            print(f"   {Fore.GREEN}OK - Ground truth logged ({actuals['date']}: Hi={actuals['high']:.1f}C, Lo={actuals['low']:.1f}C){Style.RESET_ALL}")
+            logger.info(f"[main] Logged actuals: {actuals['date']} Hi={actuals['high']}C Lo={actuals['low']}C")
         else:
             print(f"   {Fore.YELLOW}Could not fetch yesterday's actuals (API lag){Style.RESET_ALL}")
         
-        # 5. Display Leaderboard
-        scores = tracker.get_leaderboard(days_out=1)  # Next Day Accuracy
+        # Display Leaderboard
+        scores = tracker.get_leaderboard(days_back=10)
         print_leaderboard(scores)
         
-        # 6. Get Source Rankings (for PDF badges)
-        source_rankings = tracker.get_source_rankings(days_out=1, last_n_days=10)
+        # Get Source Rankings for PDF (derived from leaderboard)
+        source_rankings = {}
+        if scores:
+            for rank, (source, count, hi_err, lo_err) in enumerate(scores, 1):
+                source_rankings[source] = rank
         logger.info(f"[main] Source rankings (last 10 days): {source_rankings}")
         
-        # 7. Generate LEADERBOARD.md
-        leaderboard_md = tracker.generate_leaderboard_markdown(days_out=1, last_n_days=10)
+        # Generate LEADERBOARD.md
         leaderboard_path = Path("LEADERBOARD.md")
+        report = tracker.get_verification_report(days_back=10)
+        leaderboard_md = f"""# Duck Sun Modesto - Accuracy Leaderboard
+
+## 10-Day Performance Report
+
+| Rank | Source | High Error | Low Error | Samples |
+|------|--------|------------|-----------|---------|
+"""
+        for source, data in report.get('sources', {}).items():
+            leaderboard_md += f"| #{data.get('rank', '-')} | {source} | {data.get('high_mae', 0):.2f}°C | {data.get('low_mae', 0):.2f}°C | {data.get('comparisons', 0)} |\n"
+        
+        if not report.get('sources'):
+            leaderboard_md += "| - | No data yet | - | - | - |\n"
+        
+        leaderboard_md += f"\n---\n*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n"
+        
         with open(leaderboard_path, "w", encoding="utf-8") as f:
             f.write(leaderboard_md)
         print(f"   {Fore.GREEN}LEADERBOARD.md updated{Style.RESET_ALL}")
@@ -442,24 +475,20 @@ async def main():
         print(f"\n{Fore.WHITE}STEP 4: Saving Outputs{Style.RESET_ALL}")
         print("-" * 40)
         logger.info("[main] STEP 4: Saving outputs...")
-        json_path = await save_outputs(timestamp, om_data, df_analyzed, engine, metar_raw, smoke_data)
+        json_path = await save_outputs(timestamp, om_data, df_analyzed, engine, metar_raw, accu_data, smoke_data)
 
-        # Step 6: Generate PDF Report (The Gold Bar)
-        print(f"\n{Fore.WHITE}STEP 5: PDF Report (The Gold Bar){Style.RESET_ALL}")
+        # Step 6: Generate PDF Report
+        print(f"\n{Fore.WHITE}STEP 5: PDF Report (Weighted Consensus){Style.RESET_ALL}")
         print("-" * 40)
         logger.info("[main] STEP 5: Generating PDF report...")
         
-        # Count critical fog hours and smoke hours
         critical_hours = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
-        smoke_hours = len(df_analyzed[df_analyzed['risk_level'].str.contains('SMOKE', na=False)])
-        max_pm = df_analyzed['pm2_5'].max() if 'pm2_5' in df_analyzed.columns else 0
-        
-        logger.info(f"[main] PDF context: fog_critical={critical_hours}, smoke_hours={smoke_hours}, max_pm={max_pm:.1f}")
         
         pdf_path = generate_pdf_report(
             om_data=om_data,
             nws_data=nws_data,
             met_data=met_data,
+            accu_data=accu_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
             output_path=REPORT_DIR / f"daily_forecast_{timestamp}.pdf",
@@ -477,9 +506,9 @@ async def main():
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
 
-        print(f"\n{Fore.GREEN}{'=' * 58}{Style.RESET_ALL}")
+        print(f"\n{Fore.GREEN}{'=' * 60}{Style.RESET_ALL}")
         print(f"{Fore.GREEN}   SUCCESS!{Style.RESET_ALL}")
-        print(f"{Fore.GREEN}{'=' * 58}{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}{'=' * 60}{Style.RESET_ALL}")
         print(f"   Raw data: {json_path}")
         if pdf_path:
             print(f"   PDF: {pdf_path}")

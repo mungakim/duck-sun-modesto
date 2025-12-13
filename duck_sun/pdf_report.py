@@ -1,12 +1,6 @@
 """
 PDF Report Generator for Duck Sun Modesto
-
-Creates a compact half-page daily weather report for Modesto, CA with:
-- 8-day forecast grid from 3 data sources (Hi/Lo in one cell)
-- 3-day solar production forecast (HE09-16) - condensed
-- Bottom half left blank for handwritten notes
-
-Uses fpdf2 for PDF generation.
+Weights: NWS(5x), Accu(3x), Met(3x), OM(1x)
 """
 
 import logging
@@ -14,6 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from zoneinfo import ZoneInfo
+import pandas as pd
 
 try:
     from fpdf import FPDF
@@ -22,8 +17,6 @@ except ImportError:
     HAS_FPDF = False
     FPDF = None
 
-import pandas as pd
-
 logger = logging.getLogger(__name__)
 
 
@@ -31,8 +24,9 @@ class DuckSunPDF(FPDF):
     """Custom PDF class for Modesto Weather reports."""
     
     def __init__(self):
-        super().__init__(orientation='L', unit='mm', format='Letter')  # Landscape
-        self.set_auto_page_break(auto=False)  # No auto page break - we control layout
+        super().__init__(orientation='L', unit='mm', format='Letter')
+        self.set_auto_page_break(auto=False)
+        logger.debug("[DuckSunPDF] PDF instance created (Landscape Letter)")
         
     def header(self):
         pass
@@ -44,114 +38,62 @@ class DuckSunPDF(FPDF):
         self.cell(0, 4, f'Duck Sun Modesto | {datetime.now().strftime("%Y-%m-%d %H:%M")}', 0, 0, 'C')
 
 
-def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict[str, Dict]:
+def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
     """Calculate daily high/low from hourly data."""
+    logger.debug(f"[calculate_daily_stats] Processing {len(hourly_data) if hourly_data else 0} hourly records")
+    
     daily_stats = {}
     tz = ZoneInfo(timezone)
     
     for record in hourly_data:
-        time_str = record.get('time', '')
-        temp_c = record.get('temp_c', record.get('temperature_c', None))
-        
-        if temp_c is None:
-            continue
-            
         try:
-            if '+' in time_str or 'Z' in time_str:
-                dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-                dt = dt.astimezone(tz)
+            t = record.get('time', '')
+            val = record.get('temp_c', record.get('temperature_c'))
+            if val is None:
+                continue
+            
+            if '+' in t or 'Z' in t:
+                dt = datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(tz)
             else:
-                dt = datetime.fromisoformat(time_str)
+                dt = datetime.fromisoformat(t)
             
-            date_key = dt.strftime('%Y-%m-%d')
+            k = dt.strftime('%Y-%m-%d')
+            if k not in daily_stats:
+                daily_stats[k] = {'temps': [], 'day_name': dt.strftime('%a')}
+            daily_stats[k]['temps'].append(float(val))
             
-            if date_key not in daily_stats:
-                daily_stats[date_key] = {'temps': [], 'day_name': dt.strftime('%a')}
-            
-            daily_stats[date_key]['temps'].append(float(temp_c))
-            
-        except:
+        except Exception as e:
+            logger.debug(f"[calculate_daily_stats] Failed to parse record: {e}")
             continue
     
     result = {}
-    for date_key, data in daily_stats.items():
-        temps = data['temps']
-        if temps:
-            high_c = max(temps)
-            low_c = min(temps)
-            result[date_key] = {
-                'date': date_key,
-                'day_name': data['day_name'],
-                'high_f': round(high_c * 9/5 + 32),
-                'low_f': round(low_c * 9/5 + 32)
+    for k, d in daily_stats.items():
+        if d['temps']:
+            result[k] = {
+                'date': k,
+                'day_name': d['day_name'],
+                'high_f': round(max(d['temps']) * 1.8 + 32),
+                'low_f': round(min(d['temps']) * 1.8 + 32)
             }
     
+    logger.debug(f"[calculate_daily_stats] Calculated stats for {len(result)} days")
     return result
 
 
-def get_condition_color(condition: str) -> tuple:
-    """Get RGB color for weather condition."""
-    condition_lower = condition.lower()
+def calculate_weighted_average(values: List[Optional[float]], weights: List[float]) -> Optional[int]:
+    """Calculate weighted average from values with weights."""
+    total_val, total_weight = 0.0, 0.0
     
-    if 'clear' in condition_lower:
-        return (255, 248, 200)
-    elif 'partly' in condition_lower or 'mostly clear' in condition_lower:
-        return (200, 225, 255)
-    elif 'overcast' in condition_lower or 'mostly cloudy' in condition_lower:
-        return (200, 200, 200)
-    elif 'fog' in condition_lower:
-        return (220, 220, 220)
-    elif 'rain' in condition_lower or 'drizzle' in condition_lower or 'shower' in condition_lower:
-        return (180, 200, 230)
-    else:
-        return (235, 235, 235)
-
-
-def get_solar_condition_text(risk_level: str, solar_value: float) -> str:
-    """Convert risk level to intuitive short description."""
-    risk_upper = risk_level.upper()
+    for val, weight in zip(values, weights):
+        if val is not None:
+            total_val += val * weight
+            total_weight += weight
     
-    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
-        return "Fog"
-    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
-        return "Haze"
-    elif 'MODERATE' in risk_upper:
-        return "Clouds"
-    elif solar_value < 50:
-        return "Overcast"
-    elif solar_value < 150:
-        return "Partial"
-    else:
-        return "Clear"
-
-
-def get_solar_color(risk_level: str, solar_value: float) -> tuple:
-    """Get cell color based on solar conditions."""
-    risk_upper = risk_level.upper()
-    
-    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
-        return (255, 180, 180)  # Light red
-    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
-        return (255, 210, 160)  # Light orange
-    elif 'MODERATE' in risk_upper:
-        return (255, 255, 180)  # Light yellow
-    elif solar_value < 50:
-        return (220, 220, 220)  # Gray
-    elif solar_value < 150:
-        return (200, 230, 255)  # Light blue
-    else:
-        return (200, 255, 200)  # Light green
-
-
-def get_rank_display(rank: int) -> str:
-    """Get display string for rank (1st, 2nd, 3rd, or empty)."""
-    if rank == 1:
-        return "#1"
-    elif rank == 2:
-        return "#2"
-    elif rank == 3:
-        return "#3"
-    return ""
+    if total_weight > 0:
+        result = round(total_val / total_weight)
+        logger.debug(f"[weighted_average] values={values}, weights={weights}, result={result}")
+        return result
+    return None
 
 
 def get_rank_color(rank: int) -> tuple:
@@ -165,21 +107,68 @@ def get_rank_color(rank: int) -> tuple:
     return (240, 240, 240)      # Default gray
 
 
+def get_solar_color(risk_level: str, solar_value: float) -> tuple:
+    """Get cell color based on solar conditions."""
+    risk_upper = risk_level.upper()
+    
+    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
+        return (255, 180, 180)
+    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
+        return (255, 210, 160)
+    elif 'MODERATE' in risk_upper:
+        return (255, 255, 180)
+    elif solar_value < 50:
+        return (220, 220, 220)
+    elif solar_value < 150:
+        return (200, 230, 255)
+    else:
+        return (200, 255, 200)
+
+
+def get_descriptive_risk(risk_level: str) -> str:
+    """Convert risk codes to human-readable 3-7 word descriptions."""
+    risk_upper = risk_level.upper()
+    
+    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
+        return "Dense fog, minimal solar"
+    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
+        return "Stratus layer blocking"
+    elif 'MODERATE' in risk_upper:
+        return "Fog risk, reduced solar"
+    elif 'SMOKE' in risk_upper:
+        # Extract PM2.5 value if present
+        import re
+        match = re.search(r'(\d+)', risk_level)
+        if match:
+            pm_val = int(match.group(1))
+            if pm_val > 100:
+                return "Heavy smoke, poor air"
+            else:
+                return "Light smoke haze"
+        return "Smoke affecting solar"
+    else:
+        # LOW risk
+        return "Clear, good conditions"
+
+
 def generate_pdf_report(
-    om_data: Dict[str, Any],
-    nws_data: Optional[List[Dict]],
-    met_data: Optional[List[Dict]],
+    om_data: Dict,
+    nws_data: Optional[List],
+    met_data: Optional[List],
+    accu_data: Optional[List],
     df_analyzed: pd.DataFrame,
     fog_critical_hours: int = 0,
     output_path: Optional[Path] = None,
-    source_rankings: Optional[Dict[str, int]] = None
+    source_rankings: Optional[Dict] = None
 ) -> Optional[Path]:
-    """Generate a compact half-page PDF weather report for Modesto, CA.
+    """
+    Generate PDF report with 4-source temperature grid and weighted consensus.
     
     Args:
         om_data: Open-Meteo forecast data
         nws_data: NWS hourly data
         met_data: Met.no hourly data
+        accu_data: AccuWeather daily data (5-day forecast)
         df_analyzed: Analyzed dataframe with solar/fog data
         fog_critical_hours: Number of critical fog hours
         output_path: Output path for PDF
@@ -192,24 +181,41 @@ def generate_pdf_report(
     
     logger.info("[generate_pdf_report] Starting PDF generation...")
     logger.info(f"[generate_pdf_report] Source rankings: {source_rankings}")
+    logger.info(f"[generate_pdf_report] AccuWeather data: {len(accu_data) if accu_data else 0} days")
     
-    # Default rankings if not provided
-    if source_rankings is None:
-        source_rankings = {"Open-Meteo": 0, "NWS": 0, "Met.no": 0}
+    source_rankings = source_rankings or {}
     
+    # Process data sources
     om_daily = om_data.get('daily_forecast', [])[:8]
     nws_daily = calculate_daily_stats_from_hourly(nws_data) if nws_data else {}
     met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
     
+    # Process AccuWeather data
+    # Now uses native Fahrenheit values (no conversion rounding)
+    accu_daily = {}
+    if accu_data:
+        for d in accu_data:
+            # Use native F if available, else convert from C
+            if 'high_f' in d and 'low_f' in d:
+                accu_daily[d['date']] = {
+                    'high_f': int(d['high_f']),  # Native F from API
+                    'low_f': int(d['low_f'])     # Native F from API
+                }
+            else:
+                # Fallback for old cache format
+                accu_daily[d['date']] = {
+                    'high_f': round(d['high_c'] * 1.8 + 32),
+                    'low_f': round(d['low_c'] * 1.8 + 32)
+                }
+        logger.info(f"[generate_pdf_report] AccuWeather processed: {len(accu_daily)} days (native F)")
+
     pdf = DuckSunPDF()
     pdf.add_page()
-    
-    # Layout
     margin = 8
     usable_width = 279 - (2 * margin)
     
     # ===================
-    # HEADER (compact)
+    # HEADER
     # ===================
     pdf.set_font('Helvetica', 'B', 14)
     pdf.set_text_color(0, 60, 120)
@@ -219,197 +225,127 @@ def generate_pdf_report(
     pdf.set_font('Helvetica', '', 9)
     pdf.set_text_color(60, 60, 60)
     pdf.cell(0, 4, f'{today.strftime("%A, %B %d, %Y")}', 0, 1, 'C')
-    pdf.ln(2)
+    pdf.ln(4)
     
     # ===================
-    # 8-DAY FORECAST TABLE (Hi/Lo split into separate cells)
+    # TEMPERATURE GRID (4 Sources + Weighted Consensus)
     # ===================
-    rank_col = 8  # Width for rank badge column
-    source_label_col = 16  # Width for source name
-    label_col = rank_col + source_label_col  # Total label area width
-    day_col = (usable_width - label_col) / 8
-    half_col = day_col / 2  # Split each day into Hi and Lo columns
-    row_h = 6
+    rank_col, source_col = 8, 20
+    day_col = (usable_width - (rank_col + source_col)) / 8
+    half_col, row_h = day_col / 2, 6
     
-    # --- DAY ROW (spans 2 columns per day) ---
+    logger.info("[generate_pdf_report] Drawing temperature grid...")
+    
+    # Header Row (Day Names)
     pdf.set_fill_color(0, 60, 120)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Helvetica', 'B', 7)
-    # Rank header cell
-    pdf.cell(rank_col, row_h, 'RANK', 1, 0, 'C', fill=True)
-    pdf.cell(source_label_col, row_h, 'SOURCE', 1, 0, 'C', fill=True)
+    pdf.cell(rank_col, row_h, 'RNK', 1, 0, 'C', 1)
+    pdf.cell(source_col, row_h, 'SOURCE', 1, 0, 'C', 1)
     
     for i, day in enumerate(om_daily):
-        label = "TODAY" if i == 0 else day.get('day_name', '')
-        pdf.cell(day_col, row_h, label, 1, 0, 'C', fill=True)
+        label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
+        pdf.cell(day_col, row_h, label, 1, 0, 'C', 1)
     pdf.ln()
-    
-    # --- DATE ROW (spans 2 columns per day) ---
+
+    # Dates Row
     pdf.set_fill_color(70, 110, 160)
     pdf.set_font('Helvetica', '', 6)
-    pdf.cell(rank_col, row_h - 1, '', 1, 0, 'C', fill=True)
-    pdf.cell(source_label_col, row_h - 1, 'DATE', 1, 0, 'C', fill=True)
-    
+    pdf.cell(rank_col, row_h-1, '', 1, 0, 'C', 1)
+    pdf.cell(source_col, row_h-1, 'DATE', 1, 0, 'C', 1)
     for day in om_daily:
-        date_str = day.get('date', '')
-        try:
-            dt = datetime.fromisoformat(date_str)
-            date_short = dt.strftime('%m/%d')
-        except:
-            date_short = '--'
-        pdf.cell(day_col, row_h - 1, date_short, 1, 0, 'C', fill=True)
+        date_str = day.get('date', '')[5:]  # MM-DD
+        pdf.cell(day_col, row_h-1, date_str, 1, 0, 'C', 1)
     pdf.ln()
-    
-    # --- CONDITION ROW (spans 2 columns per day) ---
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font('Helvetica', '', 5)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(rank_col, row_h, '', 1, 0, 'C', fill=True)
-    pdf.cell(source_label_col, row_h, 'CONDITION', 1, 0, 'C', fill=True)
-    
-    for day in om_daily:
-        condition = day.get('condition', 'Unknown')
-        r, g, b = get_condition_color(condition)
-        pdf.set_fill_color(r, g, b)
-        pdf.cell(day_col, row_h, condition, 1, 0, 'C', fill=True)
-    pdf.ln()
-    
-    # ===================
-    # TEMPERATURE ROWS (Hi and Lo in separate half-width cells)
-    # With RANK badges on the left
-    # ===================
-    
-    def draw_source_row(source_key: str, label: str, fill_color: tuple, get_hi_lo_func):
+
+    def draw_row(label: str, fill: tuple, getter, rank_key: str = ""):
         """Draw a single row with rank badge + source name + Hi/Lo cells."""
-        # Get rank for this source
-        rank = source_rankings.get(source_key, 0)
-        
-        # Draw rank badge cell
-        r, g, b = get_rank_color(rank)
-        pdf.set_fill_color(r, g, b)
+        pdf.set_fill_color(*fill)
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font('Helvetica', 'B', 7)
-        rank_text = get_rank_display(rank)
-        pdf.cell(rank_col, row_h, rank_text, 1, 0, 'C', fill=True)
         
-        # Draw source label cell
-        pdf.set_fill_color(*fill_color)
+        # Rank badge
+        rank = source_rankings.get(rank_key, 0)
+        c = get_rank_color(rank)
+        pdf.set_fill_color(*c)
+        pdf.cell(rank_col, row_h, f"#{rank}" if rank else "", 1, 0, 'C', 1)
+        
+        # Source label
+        pdf.set_fill_color(*fill)
         pdf.set_font('Helvetica', 'B', 6)
-        pdf.cell(source_label_col, row_h, label, 1, 0, 'C', fill=True)
+        pdf.cell(source_col, row_h, label, 1, 0, 'C', 1)
         
-        # Draw temperature cells
+        # Temperature cells
         pdf.set_font('Helvetica', '', 7)
-        for day in om_daily:
-            date_key = day.get('date', '')
-            hi, lo = get_hi_lo_func(day, date_key)
-            
-            # High temp cell
-            if hi != 'N/A':
-                pdf.cell(half_col, row_h, str(hi), 1, 0, 'C', fill=True)
-            else:
-                pdf.cell(half_col, row_h, "--", 1, 0, 'C', fill=True)
-            
-            # Low temp cell
-            if lo != 'N/A':
-                pdf.cell(half_col, row_h, str(lo), 1, 0, 'C', fill=True)
-            else:
-                pdf.cell(half_col, row_h, "--", 1, 0, 'C', fill=True)
+        for d in om_daily:
+            v1, v2 = getter(d, d.get('date', ''))
+            pdf.cell(half_col, row_h, str(v1) if v1 else "--", 1, 0, 'C', 1)
+            pdf.cell(half_col, row_h, str(v2) if v2 else "--", 1, 0, 'C', 1)
         pdf.ln()
+
+    # Draw source rows
+    draw_row('OPEN-METEO', (255, 235, 235), 
+             lambda d, k: (d.get('high_f'), d.get('low_f')), "Open-Meteo")
     
-    # Open-Meteo (source_key must match TruthTracker source names)
-    draw_source_row('Open-Meteo', 'OPEN-METEO', (255, 235, 235),
-        lambda d, k: (d.get('high_f', 'N/A'), d.get('low_f', 'N/A')))
+    draw_row('NWS (GOV)', (235, 245, 255), 
+             lambda d, k: (nws_daily.get(k, {}).get('high_f'), nws_daily.get(k, {}).get('low_f')), "NWS")
     
-    # NWS
-    draw_source_row('NWS', 'NWS (US Gov)', (235, 245, 255),
-        lambda d, k: (nws_daily.get(k, {}).get('high_f', 'N/A'), 
-                      nws_daily.get(k, {}).get('low_f', 'N/A')))
+    draw_row('MET.NO (EU)', (235, 255, 235), 
+             lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), "Met.no")
     
-    # Met.no
-    draw_source_row('Met.no', 'MET.NO (EU)', (235, 255, 235),
-        lambda d, k: (met_daily.get(k, {}).get('high_f', 'N/A'),
-                      met_daily.get(k, {}).get('low_f', 'N/A')))
+    draw_row('ACCU (COM)', (255, 245, 235), 
+             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), "AccuWeather")
+
+    # ===================
+    # WEIGHTED CONSENSUS ROW
+    # Weights: OM(1), NWS(5), Met(3), Accu(3)
+    # ===================
+    logger.info("[generate_pdf_report] Calculating weighted consensus...")
     
-    # --- AVERAGES ROW ---
-    # Same border logic as source rows:
-    # - Hi cells: Right border (intraday separator) + first day also gets left border
-    # - Lo cells: No left/right borders (gap between days) + last day gets right border
     pdf.set_fill_color(255, 220, 100)
     pdf.set_font('Helvetica', 'B', 6)
-    # Empty rank cell for averages row
-    pdf.cell(rank_col, row_h, '', 1, 0, 'C', fill=True)
-    pdf.cell(source_label_col, row_h, 'AVERAGES', 1, 0, 'C', fill=True)
+    pdf.cell(rank_col, row_h, '', 1, 0, 'C', 1)
+    pdf.cell(source_col, row_h, 'CONSENSUS', 1, 0, 'C', 1)
     
-    pdf.set_font('Helvetica', 'B', 7)
-    num_days = len(om_daily)
-    for i, day in enumerate(om_daily):
-        date_key = day.get('date', '')
-        
-        highs = [day.get('high_f')]
-        lows = [day.get('low_f')]
-        
-        if nws_daily.get(date_key):
-            highs.append(nws_daily[date_key].get('high_f'))
-            lows.append(nws_daily[date_key].get('low_f'))
-        if met_daily.get(date_key):
-            highs.append(met_daily[date_key].get('high_f'))
-            lows.append(met_daily[date_key].get('low_f'))
-        
-        highs = [h for h in highs if h and h != 'N/A']
-        lows = [l for l in lows if l and l != 'N/A']
-        
-        # Hi cell borders: Right (intraday separator) + Top/Bottom
-        # First day also needs Left border (table edge)
-        if i == 0:
-            hi_border = 1  # All borders (LTRB) for first day's Hi
-        else:
-            hi_border = 'TBR'  # Top, Bottom, Right (no left = gap from previous day's Lo)
-        
-        # Lo cell borders: Top/Bottom only (no left/right = gap between days)
-        # Last day needs Right border (table edge)
-        if i == num_days - 1:
-            lo_border = 'TBR'  # Top, Bottom, Right (table edge)
-        else:
-            lo_border = 'TB'  # Top, Bottom only (no left/right = gap to next day)
-        
-        if highs and lows:
-            avg_hi = round(sum(highs) / len(highs))
-            avg_lo = round(sum(lows) / len(lows))
-            pdf.cell(half_col, row_h, str(avg_hi), hi_border, 0, 'C', fill=True)
-            pdf.cell(half_col, row_h, str(avg_lo), lo_border, 0, 'C', fill=True)
-        else:
-            pdf.cell(half_col, row_h, "--", hi_border, 0, 'C', fill=True)
-            pdf.cell(half_col, row_h, "--", lo_border, 0, 'C', fill=True)
-    pdf.ln()
+    weights = [1.0, 5.0, 3.0, 3.0]  # Weights: OM, NWS, Met, Accu
     
-    # --- PRECIP ROW (spans both Hi/Lo columns) ---
-    pdf.set_fill_color(200, 220, 255)
-    pdf.set_font('Helvetica', 'B', 6)
-    # Empty rank cell for precip row
-    pdf.cell(rank_col, row_h, '', 1, 0, 'C', fill=True)
-    pdf.cell(source_label_col, row_h, 'PRECIP %', 1, 0, 'C', fill=True)
-    
-    pdf.set_font('Helvetica', '', 7)
     for day in om_daily:
-        precip = day.get('precip_prob', 0)
-        # Span across both Hi and Lo columns
-        pdf.cell(day_col, row_h, f"{precip}%", 1, 0, 'C', fill=True)
+        k = day.get('date', '')
+        
+        hi_vals = [
+            day.get('high_f'),
+            nws_daily.get(k, {}).get('high_f'),
+            met_daily.get(k, {}).get('high_f'),
+            accu_daily.get(k, {}).get('high_f')
+        ]
+        lo_vals = [
+            day.get('low_f'),
+            nws_daily.get(k, {}).get('low_f'),
+            met_daily.get(k, {}).get('low_f'),
+            accu_daily.get(k, {}).get('low_f')
+        ]
+        
+        avg_hi = calculate_weighted_average(hi_vals, weights)
+        avg_lo = calculate_weighted_average(lo_vals, weights)
+        
+        logger.debug(f"[generate_pdf_report] {k}: hi_vals={hi_vals}, avg_hi={avg_hi}")
+        
+        pdf.cell(half_col, row_h, str(avg_hi) if avg_hi else "--", 1, 0, 'C', 1)
+        pdf.cell(half_col, row_h, str(avg_lo) if avg_lo else "--", 1, 0, 'C', 1)
     pdf.ln()
     
+    # ===================
+    # SOLAR FORECAST GRID (3-Day)
+    # ===================
     pdf.ln(3)
-    
-    # ===================
-    # COMPACT 3-DAY SOLAR FORECAST
-    # ===================
     pdf.set_font('Helvetica', 'B', 9)
     pdf.set_text_color(0, 60, 120)
     pdf.cell(0, 5, 'SOLAR FORECAST (9AM-4PM) - W/m² Irradiance', 0, 1, 'L')
     
-    # Get 3 future days
-    tz = ZoneInfo("America/Los_Angeles")
-    future_dates = [(today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(1, 4)]
+    logger.info("[generate_pdf_report] Drawing solar forecast grid...")
     
-    # Extract duck curve hours
+    tz = ZoneInfo("America/Los_Angeles")
+    future_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(1, 4)]
+    
     duck_data = {d: [] for d in future_dates}
     for _, row in df_analyzed.iterrows():
         try:
@@ -418,91 +354,89 @@ def generate_pdf_report(
             if row_date in future_dates and 9 <= row_hour <= 16:
                 duck_data[row_date].append({
                     'hour': row_hour,
-                    'solar': row.get('solar_adjusted', row.get('radiation', 0)),
+                    'solar': row.get('solar_adjusted', 0),
                     'risk': row.get('risk_level', 'LOW')
                 })
-        except:
+        except Exception as e:
+            logger.debug(f"[generate_pdf_report] Error processing row: {e}")
             continue
-    
-    # Compact table: 3 days across, 8 hours + labels
-    hour_labels = ['9AM', '10', '11', '12PM', '1', '2', '3', '4PM']
-    
-    # Calculate column widths for compact layout
-    date_label_col = 18
+
+    date_label_col = 22
     hour_col = (usable_width - date_label_col) / 8
     solar_row_h = 5
     
-    # Header row with hour labels
+    # Header row
     pdf.set_fill_color(0, 60, 120)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Helvetica', 'B', 6)
-    pdf.cell(date_label_col, solar_row_h, 'DATE', 1, 0, 'C', fill=True)
-    for hl in hour_labels:
-        pdf.cell(hour_col, solar_row_h, hl, 1, 0, 'C', fill=True)
+    pdf.cell(date_label_col, solar_row_h, 'DATE', 1, 0, 'C', 1)
+    for hl in ['9AM', '10', '11', '12PM', '1', '2', '3', '4PM']:
+        pdf.cell(hour_col, solar_row_h, hl, 1, 0, 'C', 1)
     pdf.ln()
-    
-    # Data rows for each day
-    for date_str in future_dates:
-        try:
-            dt = datetime.fromisoformat(date_str)
-            day_label = dt.strftime('%a %m/%d')
-        except:
-            day_label = date_str
+
+    # Data rows
+    for d in future_dates:
+        # Save starting position for this row
+        row_x_start = pdf.get_x()
+        row_y_start = pdf.get_y()
         
-        hours = duck_data.get(date_str, [])
-        hours_dict = {h['hour']: h for h in hours}
+        # Get day name for the date
+        date_obj = datetime.strptime(d, '%Y-%m-%d')
+        day_name = date_obj.strftime('%A')
+        logger.debug(f"[generate_pdf_report] Solar grid date: {d} -> {d[5:]} {day_name}")
         
-        # Row: Date label + solar values with condition colors
+        # Draw single date cell spanning both rows with border
         pdf.set_fill_color(240, 240, 240)
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font('Helvetica', 'B', 5)
-        pdf.cell(date_label_col, solar_row_h * 2, day_label, 1, 0, 'C', fill=True)
+        pdf.set_xy(row_x_start, row_y_start)
+        pdf.cell(date_label_col, solar_row_h * 2, '', 1, 0, 'C', 1)  # Draw border + fill only
         
-        # Solar values with colors
+        # Now draw the text inside (no borders) - date on top, day name below
+        # Use tight line height (3mm) and center both lines together in the 10mm cell
+        text_line_h = 3
+        text_block_h = text_line_h * 2  # Total height of both text lines
+        y_offset = (solar_row_h * 2 - text_block_h) / 2  # Center the text block vertically
+        
+        pdf.set_font('Helvetica', 'B', 6)
+        pdf.set_xy(row_x_start, row_y_start + y_offset)
+        pdf.cell(date_label_col, text_line_h, d[5:], 0, 0, 'C', 0)  # Date text, no border
+        pdf.set_xy(row_x_start, row_y_start + y_offset + text_line_h)
+        pdf.cell(date_label_col, text_line_h, day_name, 0, 0, 'C', 0)  # Day text, no border
+        
+        # Set position for hourly cells (to the right of date column, at row start y)
+        x_start = row_x_start + date_label_col
+        y_start = row_y_start
+        
         pdf.set_font('Helvetica', '', 6)
-        x_start = pdf.get_x()
-        y_start = pdf.get_y()
+        hours_dict = {h['hour']: h for h in duck_data.get(d, [])}
         
         for i in range(8):
-            hour_num = 9 + i
-            hour_data = hours_dict.get(hour_num, {'solar': 0, 'risk': 'LOW'})
-            solar_val = hour_data['solar']
-            risk = hour_data['risk']
-            
-            r, g, b = get_solar_color(risk, solar_val)
+            h_data = hours_dict.get(9+i, {'solar': 0, 'risk': 'LOW'})
+            r, g, b = get_solar_color(h_data['risk'], h_data['solar'])
             pdf.set_fill_color(r, g, b)
             
             # Solar value
             pdf.set_xy(x_start + i * hour_col, y_start)
-            pdf.cell(hour_col, solar_row_h, f"{solar_val:.0f}", 1, 0, 'C', fill=True)
+            pdf.cell(hour_col, solar_row_h, f"{h_data['solar']:.0f}", 1, 0, 'C', 1)
             
-            # Condition text below
-            condition_text = get_solar_condition_text(risk, solar_val)
+            # Risk label - use descriptive text instead of truncated codes
             pdf.set_xy(x_start + i * hour_col, y_start + solar_row_h)
-            pdf.set_font('Helvetica', 'I', 5)
-            pdf.cell(hour_col, solar_row_h, condition_text, 1, 0, 'C', fill=True)
+            pdf.set_font('Helvetica', 'I', 6)  # 6pt (2pts larger than original 4pt)
+            risk_desc = get_descriptive_risk(h_data['risk'])
+            pdf.cell(hour_col, solar_row_h, risk_desc, 1, 0, 'C', 1)
             pdf.set_font('Helvetica', '', 6)
         
-        pdf.ln(solar_row_h * 2)
-    
+        # Move to next row
+        pdf.set_xy(row_x_start, row_y_start + solar_row_h * 2)
+
     # ===================
-    # COMPACT LEGEND
+    # LEGEND
     # ===================
     pdf.ln(2)
     pdf.set_font('Helvetica', 'I', 6)
     pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 3, 'Temps: Hi/Lo °F | Solar: Fog=0-15% | Haze=40% | Clouds=70% | Clear=100% output | W/m²=Watts per sq meter sunlight', 0, 1, 'L')
+    pdf.cell(0, 3, 'Weights: NWS(5), Accu(3), Met(3), OM(1) | Temps: Hi/Lo °F | Solar: W/m² irradiance', 0, 1, 'L')
     
-    # ===================
-    # NOTES SECTION LINE
-    # ===================
-    pdf.ln(3)
-    pdf.set_draw_color(180, 180, 180)
-    pdf.line(margin, pdf.get_y(), 279 - margin, pdf.get_y())
-    pdf.ln(2)
-    pdf.set_font('Helvetica', 'I', 8)
-    pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 4, 'NOTES:', 0, 1, 'L')
     
     # ===================
     # SAVE PDF
@@ -518,7 +452,7 @@ def generate_pdf_report(
         logger.info(f"[generate_pdf_report] PDF saved to: {output_path}")
         return output_path
     except Exception as e:
-        logger.error(f"[generate_pdf_report] Failed to save PDF: {e}")
+        logger.error(f"[generate_pdf_report] Failed to save PDF: {e}", exc_info=True)
         return None
 
 
@@ -527,18 +461,26 @@ if __name__ == "__main__":
     from duck_sun.providers.open_meteo import fetch_open_meteo
     from duck_sun.providers.nws import NWSProvider
     from duck_sun.providers.met_no import MetNoProvider
+    from duck_sun.providers.accuweather import AccuWeatherProvider
     from duck_sun.uncanniness import UncannyEngine
+    from dotenv import load_dotenv
     
+    load_dotenv()
     logging.basicConfig(level=logging.INFO)
     
     async def test():
-        print("=== Testing PDF Report Generator ===\n")
+        print("=== Testing PDF Report Generator (Hybrid Architecture) ===\n")
         
         om_data = await fetch_open_meteo(days=8)
+        
         nws = NWSProvider()
         nws_data = await nws.fetch_async()
+        
         met = MetNoProvider()
         met_data = await met.fetch_async()
+        
+        accu = AccuWeatherProvider()
+        accu_data = await accu.fetch_forecast()
         
         engine = UncannyEngine()
         df = engine.normalize_temps(om_data, nws_data, met_data)
@@ -550,8 +492,10 @@ if __name__ == "__main__":
             om_data=om_data,
             nws_data=nws_data,
             met_data=met_data,
+            accu_data=accu_data,
             df_analyzed=df_analyzed,
-            fog_critical_hours=critical
+            fog_critical_hours=critical,
+            source_rankings={"Open-Meteo": 3, "NWS": 1, "Met.no": 2, "AccuWeather": 0}
         )
         
         if pdf_path:
