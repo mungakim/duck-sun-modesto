@@ -53,7 +53,7 @@ jobs:
       if: steps.tz-check.outputs.should_run == 'true' || github.event_name == 'workflow_dispatch'
       env:
         LOG_LEVEL: INFO
-        # No API Key needed anymore!
+        ACCUWEATHER_API_KEY: ${{ secrets.ACCUWEATHER_API_KEY }}
       run: |
         python main.py
 
