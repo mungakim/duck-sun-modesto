@@ -1,6 +1,6 @@
 # 🏆 Forecast Accuracy Leaderboard
 
-**Last Updated:** 2025-12-12 21:38 PST
+**Last Updated:** 2025-12-13 05:50 PST
 **Evaluation Period:** Last 10 days
 **Forecast Horizon:** Next-Day Predictions
 
