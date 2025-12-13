@@ -34,7 +34,7 @@ jobs:
         LOG_LEVEL: INFO
         # No API Key needed anymore!
       run: |
-        python -m duck_sun.main
+        python main.py
 
     - name: Save Results
       run: |
