@@ -92,10 +92,37 @@ class TruthTracker:
         logger.info("[TruthTracker] Database connection established")
 
     def _init_db(self):
-        """Create tables if they don't exist."""
+        """Create tables if they don't exist, with auto-migration for schema changes."""
         logger.debug("[TruthTracker] Creating database schema if needed...")
         
         cursor = self.conn.cursor()
+        
+        # Check if we need to migrate (old schema detection)
+        needs_migration = False
+        try:
+            # Check if forecasts table has run_timestamp column
+            cursor.execute("PRAGMA table_info(forecasts)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if columns and 'run_timestamp' not in columns:
+                logger.warning("[TruthTracker] Old schema detected (missing run_timestamp) - migrating...")
+                needs_migration = True
+            
+            # Check if observations table has actual_high column
+            cursor.execute("PRAGMA table_info(observations)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if columns and 'actual_high' not in columns:
+                logger.warning("[TruthTracker] Old schema detected (missing actual_high) - migrating...")
+                needs_migration = True
+        except Exception as e:
+            logger.debug(f"[TruthTracker] Schema check: {e}")
+        
+        # Drop old tables if migration needed
+        if needs_migration:
+            logger.info("[TruthTracker] Dropping old tables for schema migration...")
+            cursor.execute("DROP TABLE IF EXISTS forecasts")
+            cursor.execute("DROP TABLE IF EXISTS observations")
+            self.conn.commit()
+            logger.info("[TruthTracker] Old tables dropped - recreating with new schema")
         
         # Table 1: The Forecasts (What they guessed)
         # UNIQUE constraint prevents duplicate entries for same source/time/target
