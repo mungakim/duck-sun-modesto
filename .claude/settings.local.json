@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m duck_sun.scheduler:*)",
+      "Bash(python3:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(pip3 install:*)",
+      "Bash(python3.9:*)",
+      "Bash(python3.12 -m pip install:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(pip3.9 install:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,31 @@
+# Duck Sun Modesto Dependencies
+# ==============================
+# Install with: pip install -r requirements.txt
+
+# Anthropic SDK for Claude API
+anthropic>=0.75.0
+
+# Async HTTP client
+httpx>=0.28.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# IANA timezone database for Windows (required for ZoneInfo)
+tzdata>=2024.1
+
+# Data processing for consensus temperature model
+pandas>=2.0.0
+
+# Date utilities
+python-dateutil>=2.8.0
+
+# Colored terminal output
+colorama>=0.4.6
+
+# PDF report generation
+fpdf2>=2.7.0
+
+# Testing (Truth Tracker verification system)
+pytest>=9.0.0
+pytest-asyncio>=1.3.0

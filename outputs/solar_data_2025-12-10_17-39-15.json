@@ -1,0 +1,678 @@
+{
+  "generated_at": "2025-12-10T17:39:16.387432",
+  "location": "Modesto, CA",
+  "daily_summary": [
+    {
+      "time": "2025-12-10T00:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T01:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T02:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T03:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T04:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T05:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T06:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T07:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T08:00",
+      "solar_factor": 0.003,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 7.5
+    },
+    {
+      "time": "2025-12-10T09:00",
+      "solar_factor": 0.014,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 41.2
+    },
+    {
+      "time": "2025-12-10T10:00",
+      "solar_factor": 0.032,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 95.2
+    },
+    {
+      "time": "2025-12-10T11:00",
+      "solar_factor": 0.04,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 119.0
+    },
+    {
+      "time": "2025-12-10T12:00",
+      "solar_factor": 0.065,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 195.5
+    },
+    {
+      "time": "2025-12-10T13:00",
+      "solar_factor": 0.069,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 208.0
+    },
+    {
+      "time": "2025-12-10T14:00",
+      "solar_factor": 0.049,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 146.2
+    },
+    {
+      "time": "2025-12-10T15:00",
+      "solar_factor": 0.031,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 93.0
+    },
+    {
+      "time": "2025-12-10T16:00",
+      "solar_factor": 0.02,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 59.0
+    },
+    {
+      "time": "2025-12-10T17:00",
+      "solar_factor": 0.002,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 5.5
+    },
+    {
+      "time": "2025-12-10T18:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T19:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T20:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T21:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T22:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-10T23:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T00:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T01:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T02:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T03:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T04:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T05:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T06:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T07:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T08:00",
+      "solar_factor": 0.003,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 9.2
+    },
+    {
+      "time": "2025-12-11T09:00",
+      "solar_factor": 0.016,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 47.4
+    },
+    {
+      "time": "2025-12-11T10:00",
+      "solar_factor": 0.043,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 128.8
+    },
+    {
+      "time": "2025-12-11T11:00",
+      "solar_factor": 0.067,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 200.0
+    },
+    {
+      "time": "2025-12-11T12:00",
+      "solar_factor": 0.089,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 267.0
+    },
+    {
+      "time": "2025-12-11T13:00",
+      "solar_factor": 0.112,
+      "is_duck_hour": true,
+      "cloud_cover": 100,
+      "radiation": 336.0
+    },
+    {
+      "time": "2025-12-11T14:00",
+      "solar_factor": 0.113,
+      "is_duck_hour": true,
+      "cloud_cover": 77,
+      "radiation": 220.0
+    },
+    {
+      "time": "2025-12-11T15:00",
+      "solar_factor": 0.097,
+      "is_duck_hour": true,
+      "cloud_cover": 65,
+      "radiation": 161.0
+    },
+    {
+      "time": "2025-12-11T16:00",
+      "solar_factor": 0.09,
+      "is_duck_hour": true,
+      "cloud_cover": 47,
+      "radiation": 121.0
+    },
+    {
+      "time": "2025-12-11T17:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 22,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T18:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 12,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T19:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 10,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T20:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 12,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T21:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T22:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-11T23:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T00:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T01:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T02:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T03:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T04:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T05:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T06:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T07:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 100,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T08:00",
+      "solar_factor": 0.01,
+      "is_duck_hour": false,
+      "cloud_cover": 75,
+      "radiation": 18.5
+    },
+    {
+      "time": "2025-12-12T09:00",
+      "solar_factor": 0.087,
+      "is_duck_hour": true,
+      "cloud_cover": 50,
+      "radiation": 120.0
+    },
+    {
+      "time": "2025-12-12T10:00",
+      "solar_factor": 0.255,
+      "is_duck_hour": true,
+      "cloud_cover": 25,
+      "radiation": 278.0
+    },
+    {
+      "time": "2025-12-12T11:00",
+      "solar_factor": 0.486,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 437.0
+    },
+    {
+      "time": "2025-12-12T12:00",
+      "solar_factor": 0.55,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 495.0
+    },
+    {
+      "time": "2025-12-12T13:00",
+      "solar_factor": 0.548,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 493.0
+    },
+    {
+      "time": "2025-12-12T14:00",
+      "solar_factor": 0.481,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 433.0
+    },
+    {
+      "time": "2025-12-12T15:00",
+      "solar_factor": 0.354,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 319.0
+    },
+    {
+      "time": "2025-12-12T16:00",
+      "solar_factor": 0.184,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 166.0
+    },
+    {
+      "time": "2025-12-12T17:00",
+      "solar_factor": 0.027,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 24.0
+    },
+    {
+      "time": "2025-12-12T18:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T19:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T20:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T21:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T22:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-12T23:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T00:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T01:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T02:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T03:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T04:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T05:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T06:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T07:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T08:00",
+      "solar_factor": 0.03,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 27.0
+    },
+    {
+      "time": "2025-12-13T09:00",
+      "solar_factor": 0.193,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 174.0
+    },
+    {
+      "time": "2025-12-13T10:00",
+      "solar_factor": 0.362,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 326.0
+    },
+    {
+      "time": "2025-12-13T11:00",
+      "solar_factor": 0.486,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 437.0
+    },
+    {
+      "time": "2025-12-13T12:00",
+      "solar_factor": 0.55,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 495.0
+    },
+    {
+      "time": "2025-12-13T13:00",
+      "solar_factor": 0.549,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 494.0
+    },
+    {
+      "time": "2025-12-13T14:00",
+      "solar_factor": 0.481,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 433.0
+    },
+    {
+      "time": "2025-12-13T15:00",
+      "solar_factor": 0.354,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 319.0
+    },
+    {
+      "time": "2025-12-13T16:00",
+      "solar_factor": 0.186,
+      "is_duck_hour": true,
+      "cloud_cover": 0,
+      "radiation": 167.0
+    },
+    {
+      "time": "2025-12-13T17:00",
+      "solar_factor": 0.027,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 24.0
+    },
+    {
+      "time": "2025-12-13T18:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T19:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T20:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T21:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T22:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    },
+    {
+      "time": "2025-12-13T23:00",
+      "solar_factor": 0.0,
+      "is_duck_hour": false,
+      "cloud_cover": 0,
+      "radiation": 0.0
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+name: Daily Duck Sun Forecast
+
+on:
+  schedule:
+    # 5:23 AM PST = 13:23 UTC (Standard Time)
+    # Note: During PDT (Daylight Savings), this will run at 6:23 AM local time
+    - cron: '23 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-forecast:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install fpdf2 pandas httpx python-dotenv colorama
+
+    - name: Run Forecast (Silent Mode)
+      env:
+        LOG_LEVEL: INFO
+        # No API Key needed anymore!
+      run: |
+        python -m duck_sun.main
+
+    - name: Save Results
+      run: |
+        git config --global user.name "DuckSunBot"
+        git config --global user.email "actions@github.com"
+        
+        git add verification.db || true
+        git add reports/*.pdf || true
+        git add outputs/*.json || true
+        
+        git commit -m "☀️ Forecast: $(date +'%Y-%m-%d')" || exit 0
+        git push
