@@ -143,21 +143,59 @@ def get_solar_color(risk_level: str, solar_value: float) -> tuple:
         return (200, 255, 200)  # Light green
 
 
+def get_rank_display(rank: int) -> str:
+    """Get display string for rank (1st, 2nd, 3rd, or empty)."""
+    if rank == 1:
+        return "#1"
+    elif rank == 2:
+        return "#2"
+    elif rank == 3:
+        return "#3"
+    return ""
+
+
+def get_rank_color(rank: int) -> tuple:
+    """Get RGB color for rank badge."""
+    if rank == 1:
+        return (255, 215, 0)    # Gold
+    elif rank == 2:
+        return (192, 192, 192)  # Silver
+    elif rank == 3:
+        return (205, 127, 50)   # Bronze
+    return (240, 240, 240)      # Default gray
+
+
 def generate_pdf_report(
     om_data: Dict[str, Any],
     nws_data: Optional[List[Dict]],
     met_data: Optional[List[Dict]],
     df_analyzed: pd.DataFrame,
     fog_critical_hours: int = 0,
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    source_rankings: Optional[Dict[str, int]] = None
 ) -> Optional[Path]:
-    """Generate a compact half-page PDF weather report for Modesto, CA."""
+    """Generate a compact half-page PDF weather report for Modesto, CA.
+    
+    Args:
+        om_data: Open-Meteo forecast data
+        nws_data: NWS hourly data
+        met_data: Met.no hourly data
+        df_analyzed: Analyzed dataframe with solar/fog data
+        fog_critical_hours: Number of critical fog hours
+        output_path: Output path for PDF
+        source_rankings: Dict mapping source name to rank (1-3, 0=unranked)
+    """
     
     if not HAS_FPDF:
         logger.error("[generate_pdf_report] fpdf2 not installed")
         return None
     
     logger.info("[generate_pdf_report] Starting PDF generation...")
+    logger.info(f"[generate_pdf_report] Source rankings: {source_rankings}")
+    
+    # Default rankings if not provided
+    if source_rankings is None:
+        source_rankings = {"Open-Meteo": 0, "NWS": 0, "Met.no": 0}
     
     om_daily = om_data.get('daily_forecast', [])[:8]
     nws_daily = calculate_daily_stats_from_hourly(nws_data) if nws_data else {}
@@ -186,7 +224,9 @@ def generate_pdf_report(
     # ===================
     # 8-DAY FORECAST TABLE (Hi/Lo split into separate cells)
     # ===================
-    label_col = 24
+    rank_col = 8  # Width for rank badge column
+    source_label_col = 16  # Width for source name
+    label_col = rank_col + source_label_col  # Total label area width
     day_col = (usable_width - label_col) / 8
     half_col = day_col / 2  # Split each day into Hi and Lo columns
     row_h = 6
@@ -195,7 +235,9 @@ def generate_pdf_report(
     pdf.set_fill_color(0, 60, 120)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Helvetica', 'B', 7)
-    pdf.cell(label_col, row_h, 'DAY', 1, 0, 'C', fill=True)
+    # Rank header cell
+    pdf.cell(rank_col, row_h, 'RANK', 1, 0, 'C', fill=True)
+    pdf.cell(source_label_col, row_h, 'SOURCE', 1, 0, 'C', fill=True)
     
     for i, day in enumerate(om_daily):
         label = "TODAY" if i == 0 else day.get('day_name', '')
@@ -205,7 +247,8 @@ def generate_pdf_report(
     # --- DATE ROW (spans 2 columns per day) ---
     pdf.set_fill_color(70, 110, 160)
     pdf.set_font('Helvetica', '', 6)
-    pdf.cell(label_col, row_h - 1, 'DATE', 1, 0, 'C', fill=True)
+    pdf.cell(rank_col, row_h - 1, '', 1, 0, 'C', fill=True)
+    pdf.cell(source_label_col, row_h - 1, 'DATE', 1, 0, 'C', fill=True)
     
     for day in om_daily:
         date_str = day.get('date', '')
@@ -221,7 +264,8 @@ def generate_pdf_report(
     pdf.set_text_color(0, 0, 0)
     pdf.set_font('Helvetica', '', 5)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(label_col, row_h, 'CONDITION', 1, 0, 'C', fill=True)
+    pdf.cell(rank_col, row_h, '', 1, 0, 'C', fill=True)
+    pdf.cell(source_label_col, row_h, 'CONDITION', 1, 0, 'C', fill=True)
     
     for day in om_daily:
         condition = day.get('condition', 'Unknown')
@@ -232,15 +276,28 @@ def generate_pdf_report(
     
     # ===================
     # TEMPERATURE ROWS (Hi and Lo in separate half-width cells)
+    # With RANK badges on the left
     # ===================
     
-    def draw_source_row(label: str, fill_color: tuple, get_hi_lo_func):
-        """Draw a single row with separate Hi and Lo cells."""
-        pdf.set_fill_color(*fill_color)
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font('Helvetica', 'B', 6)
-        pdf.cell(label_col, row_h, label, 1, 0, 'C', fill=True)
+    def draw_source_row(source_key: str, label: str, fill_color: tuple, get_hi_lo_func):
+        """Draw a single row with rank badge + source name + Hi/Lo cells."""
+        # Get rank for this source
+        rank = source_rankings.get(source_key, 0)
         
+        # Draw rank badge cell
+        r, g, b = get_rank_color(rank)
+        pdf.set_fill_color(r, g, b)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font('Helvetica', 'B', 7)
+        rank_text = get_rank_display(rank)
+        pdf.cell(rank_col, row_h, rank_text, 1, 0, 'C', fill=True)
+        
+        # Draw source label cell
+        pdf.set_fill_color(*fill_color)
+        pdf.set_font('Helvetica', 'B', 6)
+        pdf.cell(source_label_col, row_h, label, 1, 0, 'C', fill=True)
+        
+        # Draw temperature cells
         pdf.set_font('Helvetica', '', 7)
         for day in om_daily:
             date_key = day.get('date', '')
@@ -259,17 +316,17 @@ def generate_pdf_report(
                 pdf.cell(half_col, row_h, "--", 1, 0, 'C', fill=True)
         pdf.ln()
     
-    # Open-Meteo
-    draw_source_row('OPEN-METEO', (255, 235, 235),
+    # Open-Meteo (source_key must match TruthTracker source names)
+    draw_source_row('Open-Meteo', 'OPEN-METEO', (255, 235, 235),
         lambda d, k: (d.get('high_f', 'N/A'), d.get('low_f', 'N/A')))
     
     # NWS
-    draw_source_row('NWS (US Gov)', (235, 245, 255),
+    draw_source_row('NWS', 'NWS (US Gov)', (235, 245, 255),
         lambda d, k: (nws_daily.get(k, {}).get('high_f', 'N/A'), 
                       nws_daily.get(k, {}).get('low_f', 'N/A')))
     
     # Met.no
-    draw_source_row('MET.NO (EU)', (235, 255, 235),
+    draw_source_row('Met.no', 'MET.NO (EU)', (235, 255, 235),
         lambda d, k: (met_daily.get(k, {}).get('high_f', 'N/A'),
                       met_daily.get(k, {}).get('low_f', 'N/A')))
     
@@ -279,7 +336,9 @@ def generate_pdf_report(
     # - Lo cells: No left/right borders (gap between days) + last day gets right border
     pdf.set_fill_color(255, 220, 100)
     pdf.set_font('Helvetica', 'B', 6)
-    pdf.cell(label_col, row_h, 'AVERAGES', 1, 0, 'C', fill=True)
+    # Empty rank cell for averages row
+    pdf.cell(rank_col, row_h, '', 1, 0, 'C', fill=True)
+    pdf.cell(source_label_col, row_h, 'AVERAGES', 1, 0, 'C', fill=True)
     
     pdf.set_font('Helvetica', 'B', 7)
     num_days = len(om_daily)
@@ -326,7 +385,9 @@ def generate_pdf_report(
     # --- PRECIP ROW (spans both Hi/Lo columns) ---
     pdf.set_fill_color(200, 220, 255)
     pdf.set_font('Helvetica', 'B', 6)
-    pdf.cell(label_col, row_h, 'PRECIP %', 1, 0, 'C', fill=True)
+    # Empty rank cell for precip row
+    pdf.cell(rank_col, row_h, '', 1, 0, 'C', fill=True)
+    pdf.cell(source_label_col, row_h, 'PRECIP %', 1, 0, 'C', fill=True)
     
     pdf.set_font('Helvetica', '', 7)
     for day in om_daily:

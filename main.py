@@ -420,6 +420,18 @@ async def main():
         scores = tracker.get_leaderboard(days_out=1)  # Next Day Accuracy
         print_leaderboard(scores)
         
+        # 6. Get Source Rankings (for PDF badges)
+        source_rankings = tracker.get_source_rankings(days_out=1, last_n_days=10)
+        logger.info(f"[main] Source rankings (last 10 days): {source_rankings}")
+        
+        # 7. Generate LEADERBOARD.md
+        leaderboard_md = tracker.generate_leaderboard_markdown(days_out=1, last_n_days=10)
+        leaderboard_path = Path("LEADERBOARD.md")
+        with open(leaderboard_path, "w", encoding="utf-8") as f:
+            f.write(leaderboard_md)
+        print(f"   {Fore.GREEN}LEADERBOARD.md updated{Style.RESET_ALL}")
+        logger.info(f"[main] LEADERBOARD.md saved to: {leaderboard_path}")
+        
         tracker.close()
 
         # Step 4: Display Results
@@ -450,7 +462,8 @@ async def main():
             met_data=met_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
-            output_path=REPORT_DIR / f"daily_forecast_{timestamp}.pdf"
+            output_path=REPORT_DIR / f"daily_forecast_{timestamp}.pdf",
+            source_rankings=source_rankings
         )
         
         if pdf_path:

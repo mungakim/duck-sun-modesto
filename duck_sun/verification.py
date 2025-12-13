@@ -325,6 +325,132 @@ class TruthTracker:
         
         return report
 
+    def get_source_rankings(self, days_out: int = 1, last_n_days: int = 10) -> Dict[str, int]:
+        """
+        Get source rankings based on accuracy over the last N days.
+        
+        Returns a dictionary mapping source name to rank (1 = best, 2 = second, 3 = third).
+        Sources without enough data get rank 0 (unranked).
+        
+        Args:
+            days_out: Filter for specific forecast horizon (1 = Next Day Forecasts)
+            last_n_days: Only consider data from the last N days
+            
+        Returns:
+            Dict mapping source name to rank (1-3, or 0 if unranked)
+        """
+        logger.info(f"[TruthTracker] Calculating source rankings (last {last_n_days} days)...")
+        
+        cursor = self.conn.cursor()
+        
+        # Get date cutoff for last N days
+        cutoff_date = (datetime.now() - timedelta(days=last_n_days)).strftime("%Y-%m-%d")
+        
+        # Calculate Mean Absolute Error (MAE) for last N days only
+        query = '''
+            SELECT 
+                f.source,
+                COUNT(*) as count,
+                ROUND(AVG(ABS(f.pred_high_c - o.actual_high_c)), 2) as high_mae,
+                ROUND(AVG(ABS(f.pred_low_c - o.actual_low_c)), 2) as low_mae
+            FROM forecasts f
+            JOIN observations o ON f.target_date = o.date
+            WHERE f.days_out = ?
+              AND o.date >= ?
+            GROUP BY f.source
+            HAVING COUNT(*) >= 2
+            ORDER BY (AVG(ABS(f.pred_high_c - o.actual_high_c)) + AVG(ABS(f.pred_low_c - o.actual_low_c))) ASC
+        '''
+        
+        results = cursor.execute(query, (days_out, cutoff_date)).fetchall()
+        
+        rankings: Dict[str, int] = {}
+        
+        # Assign ranks 1-3 based on accuracy (lower MAE = better rank)
+        for rank, row in enumerate(results[:3], 1):
+            source = row[0]
+            rankings[source] = rank
+            logger.info(f"[TruthTracker] Rank {rank}: {source} (Hi MAE: {row[2]}°C, Lo MAE: {row[3]}°C)")
+        
+        # Set unranked sources to 0
+        for source in ["Open-Meteo", "NWS", "Met.no"]:
+            if source not in rankings:
+                rankings[source] = 0
+                logger.info(f"[TruthTracker] {source}: Not enough data for ranking")
+        
+        return rankings
+
+    def generate_leaderboard_markdown(self, days_out: int = 1, last_n_days: int = 10) -> str:
+        """
+        Generate a markdown file with the current leaderboard.
+        
+        Args:
+            days_out: Filter for specific forecast horizon
+            last_n_days: Only consider data from the last N days
+            
+        Returns:
+            Markdown string with leaderboard
+        """
+        logger.info("[TruthTracker] Generating LEADERBOARD.md content...")
+        
+        rankings = self.get_source_rankings(days_out, last_n_days)
+        leaderboard = self.get_leaderboard(days_out)
+        
+        # Build markdown
+        lines = [
+            "# 🏆 Forecast Accuracy Leaderboard",
+            "",
+            f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M')} PST",
+            f"**Evaluation Period:** Last {last_n_days} days",
+            f"**Forecast Horizon:** Next-Day Predictions",
+            "",
+            "## Rankings",
+            "",
+            "| Rank | Source | High Temp Error | Low Temp Error | Samples |",
+            "|------|--------|-----------------|----------------|---------|",
+        ]
+        
+        # Sort by rank for display
+        ranked_sources = sorted(rankings.items(), key=lambda x: (x[1] == 0, x[1]))
+        
+        for source, rank in ranked_sources:
+            # Find the source in leaderboard data
+            source_data = None
+            for row in leaderboard:
+                if row[0] == source:
+                    source_data = row
+                    break
+            
+            if rank == 1:
+                rank_display = "🥇 1st"
+            elif rank == 2:
+                rank_display = "🥈 2nd"
+            elif rank == 3:
+                rank_display = "🥉 3rd"
+            else:
+                rank_display = "—"
+            
+            if source_data:
+                _, count, high_err, low_err = source_data
+                lines.append(f"| {rank_display} | {source} | ±{high_err}°C | ±{low_err}°C | {count} |")
+            else:
+                lines.append(f"| {rank_display} | {source} | — | — | 0 |")
+        
+        lines.extend([
+            "",
+            "## How Rankings Work",
+            "",
+            "- Rankings are based on **Mean Absolute Error (MAE)** - lower is better",
+            "- Only next-day forecasts from the last 10 days are evaluated",
+            "- Sources need at least 2 verified predictions to be ranked",
+            "- Ground truth comes from Open-Meteo Archive API (station + reanalysis data)",
+            "",
+            "---",
+            "*Generated by Duck Sun Modesto 🦆☀️*"
+        ])
+        
+        return "\n".join(lines)
+
     def get_forecast_history(self, source: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Get recent forecast history for a specific source.
