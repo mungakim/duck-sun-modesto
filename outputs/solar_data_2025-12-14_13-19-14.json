@@ -1,0 +1,158 @@
+{
+  "generated_at": "2025-12-14T13:19:14.919562",
+  "location": "Modesto, CA",
+  "architecture": "Hybrid (Weighted Consensus)",
+  "sources": [
+    "Open-Meteo",
+    "NWS",
+    "Met.no",
+    "AccuWeather",
+    "AQI"
+  ],
+  "weights": {
+    "NWS": 5,
+    "AccuWeather": 3,
+    "Met.no": 3,
+    "Open-Meteo": 1
+  },
+  "8_day_outlook": [
+    {
+      "date": "2025-12-14",
+      "temp_consensus_c": 5.3,
+      "avg_solar_raw": 44.0,
+      "avg_solar_adjusted": 25.0,
+      "avg_cloud_cover": 100.0,
+      "max_pm2_5": 32.7
+    },
+    {
+      "date": "2025-12-15",
+      "temp_consensus_c": 6.4,
+      "avg_solar_raw": 60.0,
+      "avg_solar_adjusted": 35.0,
+      "avg_cloud_cover": 91.0,
+      "max_pm2_5": 31.9
+    },
+    {
+      "date": "2025-12-16",
+      "temp_consensus_c": 9.9,
+      "avg_solar_raw": 107.0,
+      "avg_solar_adjusted": 107.0,
+      "avg_cloud_cover": 64.0,
+      "max_pm2_5": 30.3
+    },
+    {
+      "date": "2025-12-17",
+      "temp_consensus_c": 14.1,
+      "avg_solar_raw": 105.0,
+      "avg_solar_adjusted": 105.0,
+      "avg_cloud_cover": 62.0,
+      "max_pm2_5": 18.4
+    },
+    {
+      "date": "2025-12-18",
+      "temp_consensus_c": 11.9,
+      "avg_solar_raw": 101.0,
+      "avg_solar_adjusted": 101.0,
+      "avg_cloud_cover": 80.0,
+      "max_pm2_5": 13.5
+    },
+    {
+      "date": "2025-12-19",
+      "temp_consensus_c": 12.8,
+      "avg_solar_raw": 96.0,
+      "avg_solar_adjusted": 96.0,
+      "avg_cloud_cover": 92.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-20",
+      "temp_consensus_c": 13.4,
+      "avg_solar_raw": 95.0,
+      "avg_solar_adjusted": 95.0,
+      "avg_cloud_cover": 66.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-21",
+      "temp_consensus_c": 13.2,
+      "avg_solar_raw": 28.0,
+      "avg_solar_adjusted": 28.0,
+      "avg_cloud_cover": 96.0,
+      "max_pm2_5": 0.0
+    }
+  ],
+  "duck_curve_tomorrow": [
+    {
+      "time": "2025-12-15T09:00",
+      "temp_consensus": 6.111111111111111,
+      "solar_adjusted": 23.200000000000003,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.61,
+      "pm2_5": 27.4
+    },
+    {
+      "time": "2025-12-15T10:00",
+      "temp_consensus": 5.555555555555555,
+      "solar_adjusted": 18.9,
+      "risk_level": "CRITICAL (ACTIVE FOG)",
+      "fog_probability": 0.9099999999999999,
+      "pm2_5": 26.2
+    },
+    {
+      "time": "2025-12-15T11:00",
+      "temp_consensus": 6.666666666666667,
+      "solar_adjusted": 78.4,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.75,
+      "pm2_5": 26.4
+    },
+    {
+      "time": "2025-12-15T12:00",
+      "temp_consensus": 7.777777777777778,
+      "solar_adjusted": 96.4,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.15,
+      "pm2_5": 27.1
+    },
+    {
+      "time": "2025-12-15T13:00",
+      "temp_consensus": 8.88888888888889,
+      "solar_adjusted": 108.0,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.0,
+      "pm2_5": 26.9
+    },
+    {
+      "time": "2025-12-15T14:00",
+      "temp_consensus": 9.444444444444445,
+      "solar_adjusted": 253.64999999999998,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 25.7
+    },
+    {
+      "time": "2025-12-15T15:00",
+      "temp_consensus": 11.1,
+      "solar_adjusted": 178.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 24.9
+    },
+    {
+      "time": "2025-12-15T16:00",
+      "temp_consensus": 10.6,
+      "solar_adjusted": 80.75,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 26.0
+    }
+  ],
+  "current_metar": "2025/12/14 12:53\nKMOD 141253Z AUTO 00000KT 1 3/4SM BR OVC002 04/04 A3014 RMK AO2 SLP206 T00440039",
+  "accuweather_available": true,
+  "smoke_analysis": {
+    "max_pm2_5": 32.7,
+    "avg_pm2_5": 18.6,
+    "hours_above_50": 0,
+    "data_available": true
+  }
+}
