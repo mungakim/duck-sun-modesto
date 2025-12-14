@@ -7,7 +7,7 @@ Source: https://www.accuweather.com/en/us/modesto/95354/weather-forecast/327145
 
 RATE LIMITING:
 - Free Tier: 50 calls/day
-- Cache TTL: 1 hour (prevents redundant API calls)
+- Safety Limit: 42 calls/day (then cache locks until next day)
 - Cache Location: outputs/accuweather_cache.json
 """
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Cache configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "accuweather_cache.json"
-CACHE_TTL_HOURS = 1  # Cache valid for 1 hour
+DAILY_CALL_LIMIT = 42  # Stop making API calls after 42/day (safety margin under 50)
 
 
 class AccuWeatherDay(TypedDict):
@@ -41,13 +41,14 @@ class AccuWeatherProvider:
     """
     Provider for AccuWeather data.
     Restricted to 50 calls/day (Free Tier).
-    
-    CACHE GUARDRAIL:
-    - Caches forecast data for 1 hour to prevent quota exhaustion
+
+    CACHE GUARDRAIL (42-call daily limit):
+    - Allows up to 42 API calls per day
+    - After 42nd call, cache locks until next day (uses cached data)
+    - Resets at midnight local time
     - Cache stored in outputs/accuweather_cache.json
-    - Automatically serves cached data if fetched within TTL
     """
-    
+
     # CORRECT Modesto, CA Location Key
     # Source: https://www.accuweather.com/en/us/modesto/95354/weather-forecast/327145
     LOCATION_KEY = "327145"
@@ -60,75 +61,116 @@ class AccuWeatherProvider:
             logger.warning("[AccuWeatherProvider] No API Key found in env!")
         else:
             logger.info("[AccuWeatherProvider] API key loaded successfully")
-        
+
         # Ensure cache directory exists
         CACHE_DIR.mkdir(exist_ok=True)
         logger.debug(f"[AccuWeatherProvider] Cache directory: {CACHE_DIR.absolute()}")
     
     def _load_cache(self) -> Optional[dict]:
         """
-        Load cached data if it exists and is within TTL.
-        
+        Load cached data if it exists.
+
         Returns:
-            dict with 'timestamp' and 'data' keys, or None if cache invalid/missing
+            dict with 'timestamp', 'data', 'call_count', 'call_date' keys, or None if missing
         """
         if not CACHE_FILE.exists():
             logger.info("[AccuWeatherProvider] No cache file found")
             return None
-        
+
         try:
             with open(CACHE_FILE, 'r', encoding='utf-8') as f:
                 cache = json.load(f)
-            
+
             cached_time_str = cache.get('timestamp')
             if not cached_time_str:
                 logger.warning("[AccuWeatherProvider] Cache missing timestamp, invalidating")
                 return None
-            
+
             cached_time = datetime.fromisoformat(cached_time_str)
             age = datetime.now() - cached_time
             age_minutes = age.total_seconds() / 60
-            
+
             logger.info(f"[AccuWeatherProvider] Cache age: {age_minutes:.1f} minutes")
-            
-            if age <= timedelta(hours=CACHE_TTL_HOURS):
-                logger.info(f"[AccuWeatherProvider] [OK] Cache VALID (TTL: {CACHE_TTL_HOURS}h, Age: {age_minutes:.1f}m)")
-                return cache
-            else:
-                logger.info(f"[AccuWeatherProvider] Cache EXPIRED (TTL: {CACHE_TTL_HOURS}h, Age: {age_minutes:.1f}m)")
-                return None
-                
+            return cache
+
         except json.JSONDecodeError as e:
             logger.warning(f"[AccuWeatherProvider] Cache corrupted: {e}")
             return None
         except Exception as e:
             logger.error(f"[AccuWeatherProvider] Cache load error: {e}")
             return None
-    
-    def _save_cache(self, data: List[AccuWeatherDay]) -> bool:
+
+    def _is_daily_limit_reached(self, cache: Optional[dict]) -> bool:
         """
-        Save forecast data to cache with timestamp.
-        
+        Check if we've hit the 42 call/day limit.
+
+        Returns:
+            True if limit reached for today, False if we can still make calls
+        """
+        if not cache:
+            return False
+
+        call_date = cache.get('call_date')
+        call_count = cache.get('call_count', 0)
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # If call_date is from a previous day, reset counter
+        if call_date != today:
+            logger.info(f"[AccuWeatherProvider] New day detected ({today}), call counter reset")
+            return False
+
+        # Check if we've hit the limit
+        if call_count >= DAILY_CALL_LIMIT:
+            logger.warning(f"[AccuWeatherProvider] DAILY LIMIT REACHED ({call_count}/{DAILY_CALL_LIMIT} calls today)")
+            logger.info("[AccuWeatherProvider] Using cached data until tomorrow")
+            return True
+
+        logger.info(f"[AccuWeatherProvider] Daily calls: {call_count}/{DAILY_CALL_LIMIT}")
+        return False
+    
+    def _save_cache(self, data: List[AccuWeatherDay], increment_call: bool = True) -> bool:
+        """
+        Save forecast data to cache with timestamp and call counter.
+
         Args:
             data: List of forecast day dictionaries
-            
+            increment_call: If True, increment the daily call counter
+
         Returns:
             True if saved successfully, False otherwise
         """
         try:
+            today = datetime.now().strftime('%Y-%m-%d')
+
+            # Load existing cache to get call count
+            existing_cache = self._load_cache()
+            call_count = 0
+
+            if existing_cache:
+                existing_date = existing_cache.get('call_date')
+                if existing_date == today:
+                    # Same day, keep the count
+                    call_count = existing_cache.get('call_count', 0)
+
+            # Increment if this was a new API call
+            if increment_call:
+                call_count += 1
+
             cache = {
                 'timestamp': datetime.now().isoformat(),
                 'location_key': self.LOCATION_KEY,
-                'ttl_hours': CACHE_TTL_HOURS,
+                'call_date': today,
+                'call_count': call_count,
+                'daily_limit': DAILY_CALL_LIMIT,
                 'data': data
             }
-            
+
             with open(CACHE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, indent=2)
-            
-            logger.info(f"[AccuWeatherProvider] Cache saved: {len(data)} days -> {CACHE_FILE}")
+
+            logger.info(f"[AccuWeatherProvider] Cache saved: {len(data)} days, call #{call_count}/{DAILY_CALL_LIMIT} today")
             return True
-            
+
         except Exception as e:
             logger.error(f"[AccuWeatherProvider] Cache save failed: {e}")
             return False
@@ -136,66 +178,75 @@ class AccuWeatherProvider:
     def get_cache_info(self) -> dict:
         """
         Get information about the current cache state.
-        
+
         Returns:
-            dict with cache status, age, and expiration info
+            dict with cache status, age, call count, and limit info
         """
         if not CACHE_FILE.exists():
             return {'exists': False, 'valid': False, 'age_minutes': None}
-        
+
         try:
             with open(CACHE_FILE, 'r', encoding='utf-8') as f:
                 cache = json.load(f)
-            
+
             cached_time = datetime.fromisoformat(cache.get('timestamp', ''))
             age = datetime.now() - cached_time
             age_minutes = age.total_seconds() / 60
-            is_valid = age <= timedelta(hours=CACHE_TTL_HOURS)
-            expires_in = (timedelta(hours=CACHE_TTL_HOURS) - age).total_seconds() / 60 if is_valid else 0
-            
+
+            today = datetime.now().strftime('%Y-%m-%d')
+            call_date = cache.get('call_date', '')
+            call_count = cache.get('call_count', 0) if call_date == today else 0
+            limit_reached = call_count >= DAILY_CALL_LIMIT
+
             return {
                 'exists': True,
-                'valid': is_valid,
+                'valid': True,  # Cache is always valid if it exists (no TTL anymore)
                 'age_minutes': round(age_minutes, 1),
-                'expires_in_minutes': round(max(0, expires_in), 1),
                 'cached_at': cache.get('timestamp'),
-                'record_count': len(cache.get('data', []))
+                'record_count': len(cache.get('data', [])),
+                'call_count': call_count,
+                'daily_limit': DAILY_CALL_LIMIT,
+                'limit_reached': limit_reached,
+                'calls_remaining': max(0, DAILY_CALL_LIMIT - call_count)
             }
         except Exception:
             return {'exists': True, 'valid': False, 'age_minutes': None, 'error': 'Parse failed'}
 
     async def fetch_forecast(self, force_refresh: bool = False) -> Optional[List[AccuWeatherDay]]:
         """
-        Fetch 5-Day Daily Forecast with 1-hour cache guardrail.
-        
+        Fetch 5-Day Daily Forecast with 42-call daily limit guardrail.
+
         Args:
             force_refresh: If True, bypass cache and fetch fresh data (use sparingly!)
-            
+
         Returns:
             List of AccuWeatherDay dicts, or None on failure
-            
+
         CACHE BEHAVIOR:
-        - Checks cache first (unless force_refresh=True)
-        - If cache valid (< 1 hour old), returns cached data WITHOUT API call
-        - If cache expired/missing, fetches from API and updates cache
-        - Protects against 50 calls/day quota exhaustion
+        - Allows up to 42 API calls per day
+        - After 42nd call, returns cached data until next day
+        - Resets at midnight local time
         """
-        # STEP 1: Check cache first (unless forced refresh)
-        if not force_refresh:
-            cache = self._load_cache()
+        cache = self._load_cache()
+
+        # STEP 1: Check if daily limit reached (unless forced refresh)
+        if not force_refresh and self._is_daily_limit_reached(cache):
             if cache and cache.get('data'):
-                cache_info = self.get_cache_info()
-                logger.info(f"[AccuWeatherProvider] CACHE HIT - Returning cached data "
-                           f"(Age: {cache_info.get('age_minutes', '?')}m, "
-                           f"Expires in: {cache_info.get('expires_in_minutes', '?')}m)")
-                logger.info(f"[AccuWeatherProvider] API call AVOIDED - Quota protected!")
+                logger.info("[AccuWeatherProvider] CACHE LOCKED - Daily limit reached, using cached data")
                 return cache['data']
             else:
-                logger.info("[AccuWeatherProvider] Cache miss - will fetch from API")
+                logger.warning("[AccuWeatherProvider] Daily limit reached but no cache available!")
+                return None
+
+        # STEP 2: Log what we're doing
+        if force_refresh:
+            logger.warning("[AccuWeatherProvider] [!] FORCE REFRESH - Bypassing daily limit check!")
         else:
-            logger.warning("[AccuWeatherProvider] [!] FORCE REFRESH - Bypassing cache (quota impact!)")
-        
-        # STEP 2: Check API key
+            cache_info = self.get_cache_info()
+            logger.info(f"[AccuWeatherProvider] Fetching fresh data "
+                       f"(Calls today: {cache_info.get('call_count', 0)}/{DAILY_CALL_LIMIT})")
+
+        # STEP 3: Check API key
         if not self.api_key:
             logger.warning("[AccuWeatherProvider] Cannot fetch - no API key")
             # Try to return stale cache as fallback

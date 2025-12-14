@@ -1,6 +1,8 @@
 """
 PDF Report Generator for Duck Sun Modesto
-Weights: NWS(5x), Accu(3x), Met(3x), OM(1x)
+Weights: NWS(5x), Accu(3x), Weather.com(2x), OM(1x)
+
+WEIGHTED ENSEMBLE ARCHITECTURE - Reliability is King
 """
 
 import logging
@@ -32,10 +34,11 @@ class DuckSunPDF(FPDF):
         pass
     
     def footer(self):
+        # Simplified footer
         self.set_y(-8)
         self.set_font('Helvetica', 'I', 7)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 4, f'Duck Sun Modesto | {datetime.now().strftime("%Y-%m-%d %H:%M")}', 0, 0, 'C')
+        self.cell(0, 4, 'Duck Sun Modesto', 0, 0, 'C')
 
 
 def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
@@ -159,20 +162,28 @@ def generate_pdf_report(
     df_analyzed: pd.DataFrame,
     fog_critical_hours: int = 0,
     output_path: Optional[Path] = None,
-    source_rankings: Optional[Dict] = None
+    source_rankings: Optional[Dict] = None,
+    weathercom_data: Optional[List] = None,
+    mid_data: Optional[Dict] = None,
+    hrrr_data: Optional[Dict] = None,
+    precip_data: Optional[Dict] = None
 ) -> Optional[Path]:
     """
     Generate PDF report with 4-source temperature grid and weighted consensus.
-    
+
     Args:
         om_data: Open-Meteo forecast data
         nws_data: NWS hourly data
-        met_data: Met.no hourly data
+        met_data: Met.no hourly data (kept for backward compat, not displayed)
         accu_data: AccuWeather daily data (5-day forecast)
         df_analyzed: Analyzed dataframe with solar/fog data
         fog_critical_hours: Number of critical fog hours
         output_path: Output path for PDF
         source_rankings: Dict mapping source name to rank (1-3, 0=unranked)
+        weathercom_data: Weather.com daily data (replaces Met.no in display)
+        mid_data: MID.org 48-hour summary data
+        hrrr_data: HRRR model data (48-hour, 3km resolution)
+        precip_data: Aggregated precipitation probabilities by date
     """
     
     if not HAS_FPDF:
@@ -189,7 +200,30 @@ def generate_pdf_report(
     om_daily = om_data.get('daily_forecast', [])[:8]
     nws_daily = calculate_daily_stats_from_hourly(nws_data) if nws_data else {}
     met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
-    
+
+    # Process Weather.com data (replaces Met.no in display)
+    weathercom_daily = {}
+    if weathercom_data:
+        for d in weathercom_data:
+            high_f = d.get('high_f')
+            low_f = d.get('low_f')
+            high_c = d.get('high_c')
+            low_c = d.get('low_c')
+            # Skip entries without valid high temp (e.g., "Tonight" forecast)
+            if high_f is None and high_c is None:
+                continue
+            if high_f is not None and low_f is not None:
+                weathercom_daily[d['date']] = {
+                    'high_f': int(high_f),
+                    'low_f': int(low_f)
+                }
+            elif high_c is not None and low_c is not None:
+                weathercom_daily[d['date']] = {
+                    'high_f': round(high_c * 1.8 + 32),
+                    'low_f': round(low_c * 1.8 + 32)
+                }
+        logger.info(f"[generate_pdf_report] Weather.com processed: {len(weathercom_daily)} days")
+
     # Process AccuWeather data
     # Now uses native Fahrenheit values (no conversion rounding)
     accu_daily = {}
@@ -213,124 +247,334 @@ def generate_pdf_report(
     pdf.add_page()
     margin = 8
     usable_width = 279 - (2 * margin)
-    
+
+    # Capture exact timestamp for report
+    report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
+    timestamp_str = report_time.strftime("%A, %B %d, %Y %H:%M:%S")
+
     # ===================
-    # HEADER
+    # HEADER with timestamp
     # ===================
     pdf.set_font('Helvetica', 'B', 14)
     pdf.set_text_color(0, 60, 120)
     pdf.cell(0, 6, 'MODESTO, CA - DAILY WEATHER FORECAST', 0, 1, 'C')
-    
-    today = datetime.now(ZoneInfo("America/Los_Angeles"))
-    pdf.set_font('Helvetica', '', 9)
-    pdf.set_text_color(60, 60, 60)
-    pdf.cell(0, 4, f'{today.strftime("%A, %B %d, %Y")}', 0, 1, 'C')
-    pdf.ln(4)
+
+    # Date and timestamp (bigger, more prominent)
+    pdf.set_font('Helvetica', 'B', 11)
+    pdf.set_text_color(40, 40, 40)
+    pdf.cell(0, 5, timestamp_str, 0, 1, 'C')
+    pdf.ln(2)
+
+    # ===================
+    # TOP ROW: Manual Entry Fields (left) + MID Weather 48-Hour Summary (right)
+    # ===================
+    top_row_y = pdf.get_y()
+
+    # LEFT SIDE: MID GAS BURN - 3 rows of blank cells (Date | MMBtu)
+    pdf.set_xy(margin, top_row_y)
+    pdf.set_font('Helvetica', 'B', 8)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(55, 4, 'MID GAS BURN:', 0, 1, 'L')
+
+    # Draw 3 rows of cells: Date (1/3 width) | MMBtu value (2/3 width)
+    cell_start_y = pdf.get_y()
+    date_width = 18  # 1/3 of total
+    value_width = 36  # 2/3 of total
+    cell_height = 5
+
+    pdf.set_font('Helvetica', '', 7)
+    pdf.set_draw_color(100, 100, 100)
+
+    for i in range(3):
+        row_y = cell_start_y + (i * cell_height)
+        # Date cell (left 1/3)
+        pdf.set_xy(margin, row_y)
+        pdf.cell(date_width, cell_height, '', 1, 0, 'C')  # Empty bordered cell
+        # MMBtu value cell (right 2/3)
+        pdf.set_xy(margin + date_width, row_y)
+        pdf.cell(value_width, cell_height, '', 1, 0, 'C')  # Empty bordered cell
+
+    # PGE CITYGATE with blank space for price
+    citygate_y = cell_start_y + (3 * cell_height) + 2
+    pdf.set_xy(margin, citygate_y)
+    pdf.set_font('Helvetica', 'B', 8)
+    pdf.cell(35, 5, 'PGE CITYGATE:', 0, 0, 'L')
+    # Blank box for price entry (fits ~6 chars like "4.305")
+    pdf.set_xy(margin + 35, citygate_y)
+    pdf.set_font('Helvetica', '', 8)
+    pdf.cell(20, 5, '', 1, 0, 'C')  # Empty bordered cell for price
+
+    # RIGHT SIDE: MID Weather 48-Hour Summary box with color-coded High/Low cells
+    mid_box_x = usable_width - 70 + margin
+    mid_box_width = 78
+    mid_box_height = 26
+
+    pdf.set_xy(mid_box_x, top_row_y)
+    pdf.set_fill_color(240, 248, 255)  # Light blue background
+    pdf.set_draw_color(0, 60, 120)
+    pdf.rect(mid_box_x, top_row_y, mid_box_width, mid_box_height, 'DF')
+
+    pdf.set_xy(mid_box_x + 2, top_row_y + 1)
+    pdf.set_font('Helvetica', 'B', 8)
+    pdf.set_text_color(0, 60, 120)
+    pdf.cell(mid_box_width - 4, 4, 'MID WEATHER 48-HOUR SUMMARY', 0, 1, 'C')
+
+    # MID data display with color-coded High/Low cells
+    pdf.set_font('Helvetica', '', 7)
+    pdf.set_text_color(0, 0, 0)
+
+    if mid_data:
+        today_data = mid_data.get('today', {})
+        yest_data = mid_data.get('yesterday', {})
+
+        today_hi = today_data.get('high', '--')
+        today_lo = today_data.get('low', '--')
+        today_rain = today_data.get('rain', '0.00')
+        yest_hi = yest_data.get('high', '--')
+        yest_lo = yest_data.get('low', '--')
+        yest_rain = yest_data.get('rain', '0.00')
+
+        # Column headers: Label | High | Low | Rain
+        header_y = top_row_y + 6
+        label_x = mid_box_x + 2
+        hi_x = mid_box_x + 22
+        lo_x = mid_box_x + 34
+        rain_x = mid_box_x + 46
+        cell_w = 12
+        cell_h = 4
+
+        # Header row
+        pdf.set_font('Helvetica', 'B', 6)
+        pdf.set_xy(label_x, header_y)
+        pdf.cell(20, cell_h, '', 0, 0, 'L')  # Empty label column header
+        pdf.set_xy(hi_x, header_y)
+        pdf.cell(cell_w, cell_h, 'High', 0, 0, 'C')
+        pdf.set_xy(lo_x, header_y)
+        pdf.cell(cell_w, cell_h, 'Low', 0, 0, 'C')
+        pdf.set_xy(rain_x, header_y)
+        pdf.cell(cell_w + 8, cell_h, 'Rain', 0, 0, 'C')
+
+        # TODAY row
+        row1_y = header_y + cell_h
+        pdf.set_font('Helvetica', 'B', 7)
+        pdf.set_xy(label_x, row1_y)
+        pdf.cell(20, cell_h, 'TODAY', 0, 0, 'L')
+
+        pdf.set_font('Helvetica', '', 7)
+        # High cell - warm red/orange background
+        pdf.set_fill_color(255, 200, 180)
+        pdf.set_xy(hi_x, row1_y)
+        pdf.cell(cell_w, cell_h, f'{today_hi}F', 1, 0, 'C', fill=True)
+        # Low cell - cool blue background
+        pdf.set_fill_color(180, 210, 255)
+        pdf.set_xy(lo_x, row1_y)
+        pdf.cell(cell_w, cell_h, f'{today_lo}F', 1, 0, 'C', fill=True)
+        # Rain
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_xy(rain_x, row1_y)
+        pdf.cell(cell_w + 8, cell_h, f'{today_rain}"', 0, 0, 'C')
+
+        # YESTERDAY row
+        row2_y = row1_y + cell_h
+        pdf.set_font('Helvetica', 'B', 7)
+        pdf.set_xy(label_x, row2_y)
+        pdf.cell(20, cell_h, 'YEST', 0, 0, 'L')
+
+        pdf.set_font('Helvetica', '', 7)
+        # High cell - warm red/orange background
+        pdf.set_fill_color(255, 200, 180)
+        pdf.set_xy(hi_x, row2_y)
+        pdf.cell(cell_w, cell_h, f'{yest_hi}F', 1, 0, 'C', fill=True)
+        # Low cell - cool blue background
+        pdf.set_fill_color(180, 210, 255)
+        pdf.set_xy(lo_x, row2_y)
+        pdf.cell(cell_w, cell_h, f'{yest_lo}F', 1, 0, 'C', fill=True)
+        # Rain
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_xy(rain_x, row2_y)
+        pdf.cell(cell_w + 8, cell_h, f'{yest_rain}"', 0, 0, 'C')
+
+        # Historical records row (if available)
+        if 'record_high_temp' in mid_data:
+            row3_y = row2_y + cell_h + 1
+            pdf.set_xy(mid_box_x + 2, row3_y)
+            pdf.set_font('Helvetica', 'I', 6)
+            rec_hi = mid_data.get('record_high_temp', '--')
+            rec_hi_yr = mid_data.get('record_high_year', '')
+            rec_lo = mid_data.get('record_low_temp', '--')
+            rec_lo_yr = mid_data.get('record_low_year', '')
+            pdf.cell(74, 3, f'Records: Hi {rec_hi}F({rec_hi_yr}) Lo {rec_lo}F({rec_lo_yr})', 0, 0, 'L')
+    else:
+        pdf.set_xy(mid_box_x + 2, top_row_y + 10)
+        pdf.cell(74, 4, 'Data unavailable', 0, 0, 'C')
+
+    # Move below the top row
+    pdf.set_y(top_row_y + mid_box_height + 2)
+    pdf.ln(2)
     
     # ===================
     # TEMPERATURE GRID (4 Sources + Weighted Consensus)
+    # Color-coded day columns for easy reading
     # ===================
     rank_col, source_col = 8, 20
     day_col = (usable_width - (rank_col + source_col)) / 8
     half_col, row_h = day_col / 2, 6
-    
+
+    # Define alternating day column colors (pastels for readability)
+    DAY_COLORS = [
+        (255, 240, 240),  # Day 0: Light pink
+        (240, 255, 240),  # Day 1: Light green
+        (240, 248, 255),  # Day 2: Light blue
+        (255, 255, 240),  # Day 3: Light yellow
+        (255, 245, 238),  # Day 4: Light peach
+        (245, 255, 250),  # Day 5: Mint cream
+        (248, 248, 255),  # Day 6: Ghost white
+        (255, 250, 240),  # Day 7: Floral white
+    ]
+
     logger.info("[generate_pdf_report] Drawing temperature grid...")
-    
-    # Header Row (Day Names)
-    pdf.set_fill_color(0, 60, 120)
+
+    # Header Row (Day Names) - Color coded by day
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Helvetica', 'B', 7)
-    pdf.cell(rank_col, row_h, 'RNK', 1, 0, 'C', 1)
+    pdf.set_fill_color(0, 60, 120)
+    pdf.cell(rank_col, row_h, 'RANK', 1, 0, 'C', 1)
     pdf.cell(source_col, row_h, 'SOURCE', 1, 0, 'C', 1)
-    
+
     for i, day in enumerate(om_daily):
         label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
+        # Darker version of day color for header
+        base_color = DAY_COLORS[i % len(DAY_COLORS)]
+        dark_color = (max(0, base_color[0] - 100), max(0, base_color[1] - 80), max(0, base_color[2] - 60))
+        pdf.set_fill_color(*dark_color)
         pdf.cell(day_col, row_h, label, 1, 0, 'C', 1)
     pdf.ln()
 
-    # Dates Row
-    pdf.set_fill_color(70, 110, 160)
+    # Dates Row - Color coded
     pdf.set_font('Helvetica', '', 6)
+    pdf.set_fill_color(70, 110, 160)
+    pdf.set_text_color(255, 255, 255)
     pdf.cell(rank_col, row_h-1, '', 1, 0, 'C', 1)
     pdf.cell(source_col, row_h-1, 'DATE', 1, 0, 'C', 1)
-    for day in om_daily:
+    for i, day in enumerate(om_daily):
         date_str = day.get('date', '')[5:]  # MM-DD
+        base_color = DAY_COLORS[i % len(DAY_COLORS)]
+        dark_color = (max(0, base_color[0] - 70), max(0, base_color[1] - 50), max(0, base_color[2] - 30))
+        pdf.set_fill_color(*dark_color)
         pdf.cell(day_col, row_h-1, date_str, 1, 0, 'C', 1)
     pdf.ln()
 
-    def draw_row(label: str, fill: tuple, getter, rank_key: str = ""):
-        """Draw a single row with rank badge + source name + Hi/Lo cells."""
-        pdf.set_fill_color(*fill)
+    def draw_row_colored(label: str, getter, rank_key: str = ""):
+        """Draw a single row with rank badge + source name + color-coded Hi/Lo cells."""
         pdf.set_text_color(0, 0, 0)
-        
+
         # Rank badge
         rank = source_rankings.get(rank_key, 0)
         c = get_rank_color(rank)
         pdf.set_fill_color(*c)
         pdf.cell(rank_col, row_h, f"#{rank}" if rank else "", 1, 0, 'C', 1)
-        
-        # Source label
-        pdf.set_fill_color(*fill)
+
+        # Source label (neutral gray)
+        pdf.set_fill_color(245, 245, 245)
         pdf.set_font('Helvetica', 'B', 6)
         pdf.cell(source_col, row_h, label, 1, 0, 'C', 1)
-        
-        # Temperature cells
+
+        # Temperature cells - COLOR CODED BY DAY
         pdf.set_font('Helvetica', '', 7)
-        for d in om_daily:
+        for i, d in enumerate(om_daily):
+            day_color = DAY_COLORS[i % len(DAY_COLORS)]
+            pdf.set_fill_color(*day_color)
             v1, v2 = getter(d, d.get('date', ''))
             pdf.cell(half_col, row_h, str(v1) if v1 else "--", 1, 0, 'C', 1)
             pdf.cell(half_col, row_h, str(v2) if v2 else "--", 1, 0, 'C', 1)
         pdf.ln()
 
-    # Draw source rows
-    draw_row('OPEN-METEO', (255, 235, 235), 
+    # Draw source rows with day-colored columns
+    draw_row_colored('OPEN-METEO',
              lambda d, k: (d.get('high_f'), d.get('low_f')), "Open-Meteo")
-    
-    draw_row('NWS (GOV)', (235, 245, 255), 
+
+    draw_row_colored('NWS (GOV)',
              lambda d, k: (nws_daily.get(k, {}).get('high_f'), nws_daily.get(k, {}).get('low_f')), "NWS")
-    
-    draw_row('MET.NO (EU)', (235, 255, 235), 
-             lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), "Met.no")
-    
-    draw_row('ACCU (COM)', (255, 245, 235), 
+
+    draw_row_colored('WEATHER.COM',
+             lambda d, k: (weathercom_daily.get(k, {}).get('high_f'), weathercom_daily.get(k, {}).get('low_f')), "Weather.com")
+
+    draw_row_colored('ACCU (COM)',
              lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), "AccuWeather")
 
     # ===================
-    # WEIGHTED CONSENSUS ROW
-    # Weights: OM(1), NWS(5), Met(3), Accu(3)
+    # WEIGHTED AVERAGES ROW
+    # Weights: OM(1), NWS(5), Weather.com(2), Accu(3)
     # ===================
-    logger.info("[generate_pdf_report] Calculating weighted consensus...")
-    
-    pdf.set_fill_color(255, 220, 100)
+    logger.info("[generate_pdf_report] Calculating weighted averages...")
+
     pdf.set_font('Helvetica', 'B', 6)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_fill_color(255, 220, 100)
     pdf.cell(rank_col, row_h, '', 1, 0, 'C', 1)
-    pdf.cell(source_col, row_h, 'CONSENSUS', 1, 0, 'C', 1)
-    
-    weights = [1.0, 5.0, 3.0, 3.0]  # Weights: OM, NWS, Met, Accu
-    
-    for day in om_daily:
+    pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
+
+    weights = [1.0, 5.0, 2.0, 3.0]  # Weights: OM, NWS, Weather.com, Accu
+
+    for i, day in enumerate(om_daily):
         k = day.get('date', '')
-        
+        # Slightly golden tint on day colors for averages row
+        day_color = DAY_COLORS[i % len(DAY_COLORS)]
+        avg_color = (min(255, day_color[0] + 10), min(255, day_color[1] - 10), max(0, day_color[2] - 40))
+        pdf.set_fill_color(*avg_color)
+
         hi_vals = [
             day.get('high_f'),
             nws_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
+            weathercom_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f')
         ]
         lo_vals = [
             day.get('low_f'),
             nws_daily.get(k, {}).get('low_f'),
-            met_daily.get(k, {}).get('low_f'),
+            weathercom_daily.get(k, {}).get('low_f'),
             accu_daily.get(k, {}).get('low_f')
         ]
-        
+
         avg_hi = calculate_weighted_average(hi_vals, weights)
         avg_lo = calculate_weighted_average(lo_vals, weights)
-        
+
         logger.debug(f"[generate_pdf_report] {k}: hi_vals={hi_vals}, avg_hi={avg_hi}")
-        
+
         pdf.cell(half_col, row_h, str(avg_hi) if avg_hi else "--", 1, 0, 'C', 1)
         pdf.cell(half_col, row_h, str(avg_lo) if avg_lo else "--", 1, 0, 'C', 1)
+    pdf.ln()
+
+    # ===================
+    # PRECIPITATION ROW (below Wtd. Averages)
+    # Uses HRRR + Weather.com + Accu consensus
+    # ===================
+    pdf.set_font('Helvetica', 'B', 6)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_fill_color(180, 210, 255)  # Light blue for precip
+    pdf.cell(rank_col, row_h, '', 1, 0, 'C', 1)
+    pdf.cell(source_col, row_h, 'PRECIP %', 1, 0, 'C', 1)
+
+    for i, day in enumerate(om_daily):
+        k = day.get('date', '')
+        # Get consensus precip or fallback to Open-Meteo
+        precip_pct = 0
+        if precip_data and k in precip_data:
+            precip_pct = precip_data[k].get('consensus', 0)
+        else:
+            precip_pct = day.get('precip_prob', 0)
+
+        # Color based on precip probability
+        if precip_pct >= 50:
+            pdf.set_fill_color(100, 150, 255)  # Blue (rainy)
+        elif precip_pct >= 25:
+            pdf.set_fill_color(180, 210, 255)  # Light blue
+        else:
+            day_color = DAY_COLORS[i % len(DAY_COLORS)]
+            pdf.set_fill_color(*day_color)
+
+        pdf.set_font('Helvetica', '', 7)
+        pdf.cell(day_col, row_h, f"{precip_pct}%", 1, 0, 'C', 1)
     pdf.ln()
     
     # ===================
@@ -435,7 +679,7 @@ def generate_pdf_report(
     pdf.ln(2)
     pdf.set_font('Helvetica', 'I', 6)
     pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 3, 'Weights: NWS(5), Accu(3), Met(3), OM(1) | Temps: Hi/Lo °F | Solar: W/m² irradiance', 0, 1, 'L')
+    pdf.cell(0, 3, 'Weights: NWS(5), Accu(3), Weather.com(2), OM(1) | Temps: Hi/Lo F | Solar: W/m2 irradiance', 0, 1, 'L')
     
     
     # ===================

@@ -1,11 +1,105 @@
-# Duck Sun Modesto (Silent Edition)
+# Duck Sun Modesto
 
-A physics-based solar forecasting engine for Modesto, CA. It triangulates data from 3 global weather models, applies local "Fog Guard" physics, and generates a condensed PDF report for grid schedulers.
+A weighted ensemble solar forecasting engine for Modesto, CA. Triangulates data from 9 weather sources, applies Fog Guard + Smoke Guard physics, and generates a PDF report for grid schedulers.
 
-## Prerequisites
+## How It Works
 
-- Python 3.9+
-- No API keys required (All data sources are open/free)
+### Data Flow
+```
+run_duck_sun.bat (or GitHub Action at 4:55 AM)
+         │
+         ▼
+    python main.py
+         │
+         ▼
+┌────────────────────────────────────┐
+│  Fetch from 9 Weather Sources      │
+│  (concurrent async requests)       │
+└────────────────────────────────────┘
+         │
+    ┌────┴────┬────────┬────────┬────────┬────────┬────────┬────────┐
+    ▼         ▼        ▼        ▼        ▼        ▼        ▼        ▼
+ Open-     HRRR      NWS    Met.no   Accu    Weather  MID.org  Smoke
+ Meteo    (3km)    (govt)  (ECMWF)  Weather   .com    (local)   AQI
+(fresh)  (1hr     (fresh) (fresh)  (42/day (6hr    (cached)  (fresh)
+         cache)                    limit)   cache)
+         │
+         ▼
+┌────────────────────────────────────┐
+│  Weighted Ensemble Consensus       │
+│  NWS(5x) > Accu(3x) > WC(2x) > OM  │
+│  + Fog Guard + Smoke Guard         │
+└────────────────────────────────────┘
+         │
+    ┌────┴────┬────────────┐
+    ▼         ▼            ▼
+  JSON      PDF         Console
+ Output    Report       Summary
+```
+
+### Data Sources & Caching
+
+| Source | Rate Limit | Cache Strategy | Notes |
+|--------|-----------|----------------|-------|
+| Open-Meteo | Unlimited | Fresh every run | Primary model (GFS/ICON/GEM) |
+| HRRR | Unlimited | 1 hour cache | High-res 3km, 15-min updates |
+| NWS | Unlimited | Fresh every run | US govt official forecast |
+| Met.no | Unlimited | Fresh every run | European ECMWF model |
+| AccuWeather | **50/day** | **42 calls/day then locks** | After 42nd call, uses cache until midnight |
+| Weather.com | N/A | 6 hours | JS-rendered, manual cache |
+| MID.org | Unknown | Cached | Local Modesto microclimate |
+| METAR | Unlimited | Fresh every run | KMOD airport ground truth |
+| Smoke/AQI | Unlimited | Fresh every run | PM2.5 wildfire detection |
+
+**Fresh Data Policy:** Every run fetches fresh data from unlimited sources. AccuWeather allows up to 42 calls/day (safety margin under 50 limit), then locks to cached data until midnight reset.
+
+## Usage
+
+### Manual Run (Windows)
+Double-click `run_duck_sun.bat` - fetches fresh data and generates PDF.
+
+### Command Line
+```bash
+python main.py
+```
+
+### Outputs
+- `reports/daily_forecast_YYYY-MM-DD_HH-MM-SS.pdf` - Grid scheduler report
+- `outputs/solar_data_YYYY-MM-DD_HH-MM-SS.json` - Raw consensus data
+- `LEADERBOARD.md` - 10-day accuracy rankings
+
+## Automated Scheduling
+
+### GitHub Actions (Primary)
+Runs daily at **4:55 AM Pacific** with DST handling:
+```yaml
+schedule:
+  - cron: '55 12 * * *'  # 4:55 AM PST (winter)
+  - cron: '55 11 * * *'  # 4:55 AM PDT (summer)
+```
+
+PDF is committed to repo and available by ~5:00 AM for the scheduler.
+
+### Windows Task Scheduler (Backup)
+Use `run_duck_sun.bat` for local automated runs.
+
+## PDF Report Features
+
+- **8-Day Temperature Grid**: 4 sources + weighted consensus
+- **MID GAS BURN**: 3 blank cells for manual entry (date | MMBtu)
+- **PGE CITYGATE**: Blank cell for price entry
+- **MID WEATHER 48-Hour Summary**: Color-coded High (orange) / Low (blue) cells
+- **Duck Curve Forecast**: Solar irradiance HE09-HE16
+- **Precipitation Consensus**: Rain probability from all sources
+
+Manual fields can be filled in with pen after printing, or add text boxes in Acrobat before saving/emailing.
+
+## Key Concepts
+
+- **Solar Factor (0-1)**: Normalized solar production potential
+- **Duck Curve Hours (HE09-HE16)**: 9 AM - 4 PM when solar ramps dramatically
+- **Tule Fog**: Dense ground fog (dewpoint depression < 2.5°C, wind < 8 km/h)
+- **Smoke Shade**: PM2.5 > 35 µg/m³ reduces solar output
 
 ## Installation
 
@@ -13,84 +107,4 @@ A physics-based solar forecasting engine for Modesto, CA. It triangulates data f
 pip install -r requirements.txt
 ```
 
-## Usage
-
-Generate the daily forecast PDF:
-
-```bash
-python -m duck_sun.main
-```
-
-Or run via the scheduler module:
-
-```bash
-python -m duck_sun.scheduler
-```
-
-This creates:
-- `outputs/solar_data_YYYY-MM-DD_HH-MM-SS.json` - Raw consensus data
-- `reports/daily_forecast_YYYY-MM-DD_HH-MM-SS.pdf` - The "Gold Bar" PDF report
-
-## Key Components
-
-- **Uncanny Engine**: Physics model that detects inversion layers and fog lock-in.
-- **Truth Tracker**: SQLite database that logs predictions and verifies them 24h later.
-- **PDF Generator**: Creates the "Gold Bar" report for grid ops.
-- **Fog Guard**: Tule Fog detection using dewpoint depression and wind stagnation.
-- **Smoke Guard**: PM2.5 analysis for wildfire smoke impact on solar.
-
-## Data Sources (All Free/Open)
-
-1. **Open-Meteo** - Global ensemble (GFS/ICON/GEM models)
-2. **NWS** - US National Weather Service official forecast
-3. **Met.no** - Norwegian Meteorological Institute (ECMWF model)
-4. **METAR** - KMOD Airport ground truth observations
-5. **Air Quality API** - PM2.5/smoke detection
-
-## Example Output
-
-```
-============================================================
-   DUCK SUN MODESTO: SILENT EDITION
-   Consensus Temperature Triangulation System
-   + Fog Guard + Smoke Guard
-============================================================
-   [SOURCES] Open-Meteo + NWS + Met.no + METAR + AQI
-   [MODE] Pure Deterministic (No AI/LLM)
-
-STEP 1: Fetching Weather Data
-----------------------------------------
-[1/5] Polling Open-Meteo (GFS/ICON/GEM)...
-      OK - 192 hourly records
-...
-
-SUCCESS!
-   Raw data: outputs/solar_data_2025-12-12_05-23-00.json
-   PDF: reports/daily_forecast_2025-12-12_05-23-00.pdf
-   Duration: 8.42 seconds
-```
-
-## Automated Scheduling
-
-The project includes a GitHub Actions workflow that runs daily at 5:23 AM PST:
-
-```yaml
-# .github/workflows/daily_forecast.yml
-on:
-  schedule:
-    - cron: '23 13 * * *'  # 5:23 AM PST = 13:23 UTC
-```
-
-For local scheduling, use Task Scheduler (Windows) or cron (Linux/Mac):
-
-```bash
-# Linux/Mac crontab
-23 5 * * * cd /path/to/duck-sun-modesto && python -m duck_sun.main >> cron.log 2>&1
-```
-
-## Key Concepts
-
-- **Solar Factor (0-1)**: Normalized solar production potential. 1.0 = perfect conditions, 0.0 = no production.
-- **Duck Curve Hours (HE09-HE16)**: 9 AM to 4 PM local time, when solar ramps dramatically.
-- **Tule Fog**: Dense ground fog that forms when dewpoint depression < 2.5°C and wind < 8 km/h.
-- **Smoke Shade**: Wildfire smoke reduces solar differently than clouds (steady reduction vs. intermittent).
+Required: `ACCUWEATHER_API_KEY` in `.env` (optional but recommended for commercial accuracy).
