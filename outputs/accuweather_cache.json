@@ -1,19 +1,10 @@
 {
-  "timestamp": "2025-12-15T05:19:55.029340",
+  "timestamp": "2025-12-15T13:32:45.568623",
   "location_key": "327145",
   "call_date": "2025-12-15",
-  "call_count": 6,
+  "call_count": 7,
   "daily_limit": 42,
   "data": [
-    {
-      "date": "2025-12-14",
-      "high_c": 6.11,
-      "low_c": 2.78,
-      "high_f": 43.0,
-      "low_f": 37.0,
-      "precip_prob": 25,
-      "condition": "Cloudy"
-    },
     {
       "date": "2025-12-15",
       "high_c": 10.56,
@@ -26,10 +17,10 @@
     {
       "date": "2025-12-16",
       "high_c": 10.56,
-      "low_c": 8.89,
+      "low_c": 8.33,
       "high_f": 51.0,
-      "low_f": 48.0,
-      "precip_prob": 17,
+      "low_f": 47.0,
+      "precip_prob": 4,
       "condition": "Dreary"
     },
     {
@@ -47,8 +38,17 @@
       "low_c": 7.78,
       "high_f": 57.0,
       "low_f": 46.0,
-      "precip_prob": 7,
+      "precip_prob": 5,
       "condition": "Partly sunny"
+    },
+    {
+      "date": "2025-12-19",
+      "high_c": 14.44,
+      "low_c": 10.0,
+      "high_f": 58.0,
+      "low_f": 50.0,
+      "precip_prob": 62,
+      "condition": "Showers"
     }
   ]
 }
