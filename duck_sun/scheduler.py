@@ -371,7 +371,7 @@ async def main():
             nws_daily_organic=nws_daily_organic if nws_daily_organic else None
         )
 
-        duration = (datetime.now() - start_time).total_seconds()
+        duration = (datetime.now(pacific) - start_time).total_seconds()
 
         # --- STEP 4: Summary ---
         logger.info("")

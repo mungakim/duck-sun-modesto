@@ -622,7 +622,7 @@ async def main(args=None):
             logger.warning("[main] PDF generation skipped")
 
         # Success summary
-        end_time = datetime.now()
+        end_time = datetime.now(pacific)
         duration = (end_time - start_time).total_seconds()
 
         print(f"\n{Fore.GREEN}{'=' * 60}{Style.RESET_ALL}")
