@@ -67,7 +67,7 @@ The system uses **Source Replication** rather than Model Approximation:
 | **Weather.com** | Manual ground truth | Matches weather.com 10-day |
 | **Open-Meteo** | Hourly physics model | Independent (Duck Curve) |
 
-**Key Insight:** NWS uses the human-curated Period forecast (`/forecast`) instead of raw hourly gridpoint data (`/gridpoints`). This ensures organic alignment with the official NWS website without any hardcoding.
+**Key Insight:** NWS uses the human-curated Period forecast (`/forecast`) instead of raw hourly gridpoint data (`/gridpoints`). This ensures alignment with the official NWS website without any hardcoding.
 
 ## Usage
 
@@ -80,7 +80,7 @@ python main.py
 ```
 
 ### Outputs
-- `reports/daily_forecast_YYYY-MM-DD_HH-MM-SS.pdf` - Grid scheduler report
+- `reports/YYYY-MM/YYYY-MM-DD/daily_forecast_*.pdf` - Grid scheduler report (organized by date)
 - `outputs/solar_data_YYYY-MM-DD_HH-MM-SS.json` - Raw consensus data
 - `LEADERBOARD.md` - 10-day accuracy rankings
 
@@ -117,6 +117,23 @@ Manual fields can be filled in with pen after printing, or add text boxes in Acr
 - **Duck Curve Hours (HE09-HE16)**: 9 AM - 4 PM when solar ramps dramatically
 - **Tule Fog**: Dense ground fog (dewpoint depression < 2.5°C, wind < 8 km/h)
 - **Smoke Shade**: PM2.5 > 35 µg/m³ reduces solar output
+
+### Fog Guard Physics
+
+The system models Central Valley fog dynamics with **pre-dawn lock-in detection**:
+
+- **24/7 Monitoring**: Fog probability calculated continuously, not just during sun hours
+- **Pre-Dawn Lock (4-8 AM)**: If fog probability exceeds 80% during this window, an inversion layer has formed
+- **Persistent Stratus**: Once locked in, fog persists until afternoon solar heating breaks the inversion
+
+**Three-Tier Risk Assessment:**
+| Risk Level | Condition | Solar Penalty |
+|------------|-----------|---------------|
+| CRITICAL | Active fog (saturated + stagnant) | 85% |
+| HIGH | Persistent stratus (locked in from pre-dawn) | 60% |
+| MODERATE | Elevated fog probability (>50%) | 30% |
+
+The "Modesto Bowl" topography traps cold air, creating inversions that standard weather models miss.
 
 ## Installation
 

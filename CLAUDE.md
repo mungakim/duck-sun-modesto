@@ -63,7 +63,7 @@ Required in `.env`:
 ## Output Files
 
 - `outputs/solar_data_YYYY-MM-DD_HH-MM-SS.json` - Raw solar metrics and consensus data
-- `reports/daily_forecast_YYYY-MM-DD_HH-MM-SS.pdf` - PDF one-pager for grid schedulers
+- `reports/YYYY-MM/YYYY-MM-DD/daily_forecast_*.pdf` - PDF one-pager for grid schedulers (organized by date)
 
 ## PDF Report Structure
 
