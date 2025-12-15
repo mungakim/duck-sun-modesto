@@ -155,14 +155,14 @@ def generate_pdf_report(
     hrrr_data: Optional[Dict] = None,
     precip_data: Optional[Dict] = None,
     degraded_sources: Optional[List[str]] = None,
-    nws_daily_organic: Optional[Dict] = None
+    nws_daily_periods: Optional[Dict] = None
 ) -> Optional[Path]:
     """
     Generate PDF report with 4-source temperature grid and weighted consensus.
 
     Args:
         om_data: Open-Meteo forecast data
-        nws_data: NWS hourly data (fallback if organic unavailable)
+        nws_data: NWS hourly data (fallback if period data unavailable)
         met_data: Met.no hourly data (kept for backward compat, not displayed)
         accu_data: AccuWeather daily data (5-day forecast)
         df_analyzed: Analyzed dataframe with solar/fog data
@@ -173,7 +173,7 @@ def generate_pdf_report(
         hrrr_data: HRRR model data (48-hour, 3km resolution)
         precip_data: Aggregated precipitation probabilities by date
         degraded_sources: List of providers using cached/stale data
-        nws_daily_organic: PRIORITY - NWS Period-based daily stats (matches website)
+        nws_daily_periods: PRIORITY - NWS Period-based daily stats (matches website)
     """
 
     if not HAS_FPDF:
@@ -187,10 +187,10 @@ def generate_pdf_report(
     om_daily = om_data.get('daily_forecast', [])[:8]
     met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
 
-    # PRIORITY: Use Organic NWS Period Data if available (matches website)
-    if nws_daily_organic:
-        logger.info("[generate_pdf_report] Using Organic NWS Period Data (Website Match)")
-        nws_daily = nws_daily_organic
+    # PRIORITY: Use NWS Period Data if available (matches website)
+    if nws_daily_periods:
+        logger.info("[generate_pdf_report] Using NWS Period Data (Website Match)")
+        nws_daily = nws_daily_periods
     else:
         # Fallback to calculating from hourly grid (Legacy/Risk of mismatch)
         logger.info("[generate_pdf_report] Falling back to NWS hourly aggregation")
