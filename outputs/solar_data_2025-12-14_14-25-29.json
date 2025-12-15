@@ -1,0 +1,141 @@
+{
+  "generated_at": "2025-12-14T14:25:30.100099",
+  "location": "Modesto, CA",
+  "sources": [
+    "Open-Meteo",
+    "NWS",
+    "Met.no"
+  ],
+  "8_day_outlook": [
+    {
+      "date": "2025-12-14",
+      "temp_consensus_c": 4.9,
+      "avg_solar_raw": 30.0,
+      "avg_solar_adjusted": 20.0,
+      "avg_cloud_cover": 100.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-15",
+      "temp_consensus_c": 6.8,
+      "avg_solar_raw": 56.0,
+      "avg_solar_adjusted": 56.0,
+      "avg_cloud_cover": 91.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-16",
+      "temp_consensus_c": 9.7,
+      "avg_solar_raw": 82.0,
+      "avg_solar_adjusted": 82.0,
+      "avg_cloud_cover": 88.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-17",
+      "temp_consensus_c": 14.0,
+      "avg_solar_raw": 112.0,
+      "avg_solar_adjusted": 112.0,
+      "avg_cloud_cover": 45.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-18",
+      "temp_consensus_c": 12.5,
+      "avg_solar_raw": 109.0,
+      "avg_solar_adjusted": 109.0,
+      "avg_cloud_cover": 72.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-19",
+      "temp_consensus_c": 13.4,
+      "avg_solar_raw": 95.0,
+      "avg_solar_adjusted": 60.0,
+      "avg_cloud_cover": 84.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-20",
+      "temp_consensus_c": 13.3,
+      "avg_solar_raw": 73.0,
+      "avg_solar_adjusted": 73.0,
+      "avg_cloud_cover": 92.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2025-12-21",
+      "temp_consensus_c": 13.4,
+      "avg_solar_raw": 32.0,
+      "avg_solar_adjusted": 32.0,
+      "avg_cloud_cover": 87.0,
+      "max_pm2_5": 0.0
+    }
+  ],
+  "duck_curve_tomorrow": [
+    {
+      "time": "2025-12-15T09:00",
+      "temp_consensus": 5.555555555555555,
+      "solar_adjusted": 56.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.33,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T10:00",
+      "temp_consensus": 7.0,
+      "solar_adjusted": 120.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T11:00",
+      "temp_consensus": 6.666666666666667,
+      "solar_adjusted": 158.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.21,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T12:00",
+      "temp_consensus": 8.333333333333334,
+      "solar_adjusted": 201.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T13:00",
+      "temp_consensus": 8.88888888888889,
+      "solar_adjusted": 230.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T14:00",
+      "temp_consensus": 9.444444444444445,
+      "solar_adjusted": 232.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T15:00",
+      "temp_consensus": 10.555555555555555,
+      "solar_adjusted": 193.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2025-12-15T16:00",
+      "temp_consensus": 10.0,
+      "solar_adjusted": 140.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    }
+  ]
+}
