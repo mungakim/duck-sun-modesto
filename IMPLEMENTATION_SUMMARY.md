@@ -505,10 +505,52 @@ IMPLEMENTATION_SUMMARY.md
 
 ---
 
-**The Duck Sun Modesto system is now ready for autonomous operation.** 🎯
+## Source Replication Update (Dec 14, 2025)
+
+### The Final Calibration Step
+
+**Problem Identified:** NWS temperatures in PDF didn't match weather.gov website.
+- Old approach: Fetch hourly gridpoint data → calculate daily Hi/Lo
+- Result: 51°F on website vs 58°F in PDF (off by 7°F)
+
+**Solution Implemented:** Source Replication
+- New approach: Fetch Period forecast API (same data as website)
+- Result: Exact match with weather.gov
+
+### Technical Change in `nws.py`:
+
+```python
+# OLD: Model Approximation
+GRIDPOINT_URL = "https://api.weather.gov/gridpoints/STO/45,63"
+# Fetched hourly temps, calculated daily from min/max
+
+# NEW: Source Replication
+FORECAST_URL = "https://api.weather.gov/gridpoints/STO/45,63/forecast"
+# Fetches Period data: "Monday: High 51°F" directly
+```
+
+### Current Provider Alignment:
+
+| Provider | Approach | Website Match |
+|----------|----------|---------------|
+| **NWS** | `/forecast` Period API | ✅ Exact |
+| **AccuWeather** | Official 5-day API | ✅ Exact |
+| **Weather.com** | Manual ground truth | ✅ Exact |
+| **Open-Meteo** | Physics model | N/A (independent) |
+
+### What This Means:
+
+1. **Reliability:** NWS column can now be trusted to match official government forecast
+2. **Consistency:** All columns match their source websites
+3. **Physics:** Open-Meteo provides independent "second opinion" for Duck Curve calculations
 
 ---
 
-*Implementation completed: December 12, 2025*  
-*System version: Uncanny Edition v1.0*  
-*Status: Production Ready*
+**The Duck Sun Modesto system is now CALIBRATED and ready for 7-day verification.**
+
+---
+
+*Implementation completed: December 12, 2025*
+*Calibration completed: December 14, 2025*
+*System version: Uncanny Edition v1.2 (Source Replication)*
+*Status: Calibrated - Verification Ready*

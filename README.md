@@ -2,6 +2,9 @@
 
 A weighted ensemble solar forecasting engine for Modesto, CA. Triangulates data from 9 weather sources, applies Fog Guard + Smoke Guard physics, and generates a PDF report for grid schedulers.
 
+**Status:** Calibrated & Verification Ready (Dec 14, 2025)
+**Version:** Uncanny Edition v1.2 (Source Replication)
+
 ## How It Works
 
 ### Data Flow
@@ -52,6 +55,19 @@ run_duck_sun.bat (or GitHub Action at 4:55 AM)
 | Smoke/AQI | Unlimited | Fresh every run | PM2.5 wildfire detection |
 
 **Fresh Data Policy:** Every run fetches fresh data from unlimited sources. AccuWeather allows up to 42 calls/day (safety margin under 50 limit), then locks to cached data until midnight reset.
+
+### Source Replication (Dec 14, 2025)
+
+The system uses **Source Replication** rather than Model Approximation:
+
+| Provider | API Endpoint | Alignment |
+|----------|-------------|-----------|
+| **NWS** | `/forecast` (Period API) | Matches weather.gov exactly |
+| **AccuWeather** | Official 5-day API | Matches accuweather.com |
+| **Weather.com** | Manual ground truth | Matches weather.com 10-day |
+| **Open-Meteo** | Hourly physics model | Independent (Duck Curve) |
+
+**Key Insight:** NWS uses the human-curated Period forecast (`/forecast`) instead of raw hourly gridpoint data (`/gridpoints`). This ensures organic alignment with the official NWS website without any hardcoding.
 
 ## Usage
 
