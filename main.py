@@ -132,9 +132,9 @@ async def fetch_all_sources():
     nws_data = await nws_provider.fetch_async()
     nws_text = await nws_provider.fetch_text_forecast()
 
-    # Fetch organic NWS Period data (matches website exactly)
+    # Fetch NWS Period data (matches website exactly)
     await nws_provider.fetch_forecast_periods()
-    nws_daily_organic = nws_provider.get_daily_high_low()
+    nws_daily_periods = nws_provider.get_daily_high_low()
 
     if nws_data:
         print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(nws_data)} temperature records")
@@ -143,11 +143,11 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL} - Using fallback")
         logger.warning("[fetch_all_sources] NWS data unavailable")
 
-    if nws_daily_organic:
-        print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(nws_daily_organic)} days organic (Website Match)")
-        logger.info(f"[fetch_all_sources] NWS organic daily stats: {len(nws_daily_organic)} days")
+    if nws_daily_periods:
+        print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(nws_daily_periods)} days period data (Website Match)")
+        logger.info(f"[fetch_all_sources] NWS period daily stats: {len(nws_daily_periods)} days")
     else:
-        logger.warning("[fetch_all_sources] NWS organic data unavailable")
+        logger.warning("[fetch_all_sources] NWS period data unavailable")
 
     if nws_text:
         print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(nws_text)} text forecast periods (Narrative)")
@@ -231,7 +231,7 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL}")
         logger.warning("[fetch_all_sources] Smoke data unavailable")
 
-    return om_data, nws_data, nws_text, met_data, metar_raw, accu_data, smoke_data, weathercom_data, mid_data, hrrr_data, nws_daily_organic
+    return om_data, nws_data, nws_text, met_data, metar_raw, accu_data, smoke_data, weathercom_data, mid_data, hrrr_data, nws_daily_periods
 
 
 def run_consensus_model(om_data, nws_data, met_data, accu_data, weathercom_data, mid_data, smoke_data, nws_text):
@@ -462,7 +462,7 @@ async def main(args=None):
         print("-" * 40)
         logger.info("[main] STEP 1: Fetching weather data from all sources...")
         (om_data, nws_data, nws_text, met_data, metar_raw,
-         accu_data, smoke_data, weathercom_data, mid_data, hrrr_data, nws_daily_organic) = await fetch_all_sources()
+         accu_data, smoke_data, weathercom_data, mid_data, hrrr_data, nws_daily_periods) = await fetch_all_sources()
 
         if not om_data:
             print(f"{Fore.RED}CRITICAL ERROR: Primary data source failed.{Style.RESET_ALL}")
@@ -611,7 +611,7 @@ async def main(args=None):
             mid_data=mid_data,
             hrrr_data=hrrr_data,
             precip_data=precip_data,
-            nws_daily_organic=nws_daily_organic
+            nws_daily_periods=nws_daily_periods
         )
         
         if pdf_path:
