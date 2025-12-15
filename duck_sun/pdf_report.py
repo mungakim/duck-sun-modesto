@@ -96,15 +96,6 @@ def calculate_weighted_average(values: List[Optional[float]], weights: List[floa
     return None
 
 
-def get_rank_color(rank: int) -> tuple:
-    """Get RGB color for rank badge."""
-    if rank == 1:
-        return (255, 215, 0)    # Gold
-    elif rank == 2:
-        return (192, 192, 192)  # Silver
-    elif rank == 3:
-        return (205, 127, 50)   # Bronze
-    return (240, 240, 240)      # Default gray
 
 
 def get_solar_color(risk_level: str, solar_value: float) -> tuple:
@@ -159,7 +150,6 @@ def generate_pdf_report(
     df_analyzed: pd.DataFrame,
     fog_critical_hours: int = 0,
     output_path: Optional[Path] = None,
-    source_rankings: Optional[Dict] = None,
     weathercom_data: Optional[List] = None,
     mid_data: Optional[Dict] = None,
     hrrr_data: Optional[Dict] = None,
@@ -178,7 +168,6 @@ def generate_pdf_report(
         df_analyzed: Analyzed dataframe with solar/fog data
         fog_critical_hours: Number of critical fog hours
         output_path: Output path for PDF
-        source_rankings: Dict mapping source name to rank (1-3, 0=unranked)
         weathercom_data: Weather.com daily data (replaces Met.no in display)
         mid_data: MID.org 48-hour summary data
         hrrr_data: HRRR model data (48-hour, 3km resolution)
@@ -186,16 +175,13 @@ def generate_pdf_report(
         degraded_sources: List of providers using cached/stale data
         nws_daily_organic: PRIORITY - NWS Period-based daily stats (matches website)
     """
-    
+
     if not HAS_FPDF:
         logger.error("[generate_pdf_report] fpdf2 not installed")
         return None
-    
+
     logger.info("[generate_pdf_report] Starting PDF generation...")
-    logger.info(f"[generate_pdf_report] Source rankings: {source_rankings}")
     logger.info(f"[generate_pdf_report] AccuWeather data: {len(accu_data) if accu_data else 0} days")
-    
-    source_rankings = source_rankings or {}
     
     # Process data sources
     om_daily = om_data.get('daily_forecast', [])[:8]
@@ -438,8 +424,8 @@ def generate_pdf_report(
     # TEMPERATURE GRID (4 Sources + Weighted Consensus)
     # Color-coded day columns for easy reading
     # ===================
-    rank_col, source_col = 8, 20
-    day_col = (usable_width - (rank_col + source_col)) / 8
+    source_col = 22
+    day_col = (usable_width - source_col) / 8
     half_col, row_h = day_col / 2, 6
 
     # Define alternating day column colors (pastels for readability)
@@ -460,7 +446,6 @@ def generate_pdf_report(
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Helvetica', 'B', 7)
     pdf.set_fill_color(0, 60, 120)
-    pdf.cell(rank_col, row_h, 'RANK', 1, 0, 'C', 1)
     pdf.cell(source_col, row_h, 'SOURCE', 1, 0, 'C', 1)
 
     for i, day in enumerate(om_daily):
@@ -476,7 +461,6 @@ def generate_pdf_report(
     pdf.set_font('Helvetica', '', 6)
     pdf.set_fill_color(70, 110, 160)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(rank_col, row_h-1, '', 1, 0, 'C', 1)
     pdf.cell(source_col, row_h-1, 'DATE', 1, 0, 'C', 1)
     for i, day in enumerate(om_daily):
         date_str = day.get('date', '')[5:]  # MM-DD
@@ -486,15 +470,9 @@ def generate_pdf_report(
         pdf.cell(day_col, row_h-1, date_str, 1, 0, 'C', 1)
     pdf.ln()
 
-    def draw_row_colored(label: str, getter, rank_key: str = ""):
-        """Draw a single row with rank badge + source name + color-coded Hi/Lo cells."""
+    def draw_row_colored(label: str, getter):
+        """Draw a single row with source name + color-coded Hi/Lo cells."""
         pdf.set_text_color(0, 0, 0)
-
-        # Rank badge
-        rank = source_rankings.get(rank_key, 0)
-        c = get_rank_color(rank)
-        pdf.set_fill_color(*c)
-        pdf.cell(rank_col, row_h, f"#{rank}" if rank else "", 1, 0, 'C', 1)
 
         # Source label (neutral gray)
         pdf.set_fill_color(245, 245, 245)
@@ -513,16 +491,16 @@ def generate_pdf_report(
 
     # Draw source rows with day-colored columns
     draw_row_colored('OPEN-METEO',
-             lambda d, k: (d.get('high_f'), d.get('low_f')), "Open-Meteo")
+             lambda d, k: (d.get('high_f'), d.get('low_f')))
 
     draw_row_colored('NWS (GOV)',
-             lambda d, k: (nws_daily.get(k, {}).get('high_f'), nws_daily.get(k, {}).get('low_f')), "NWS")
+             lambda d, k: (nws_daily.get(k, {}).get('high_f'), nws_daily.get(k, {}).get('low_f')))
 
     draw_row_colored('WEATHER.COM',
-             lambda d, k: (weathercom_daily.get(k, {}).get('high_f'), weathercom_daily.get(k, {}).get('low_f')), "Weather.com")
+             lambda d, k: (weathercom_daily.get(k, {}).get('high_f'), weathercom_daily.get(k, {}).get('low_f')))
 
     draw_row_colored('ACCU (COM)',
-             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), "AccuWeather")
+             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')))
 
     # ===================
     # WEIGHTED AVERAGES ROW
@@ -533,7 +511,6 @@ def generate_pdf_report(
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(255, 220, 100)
-    pdf.cell(rank_col, row_h, '', 1, 0, 'C', 1)
     pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
 
     weights = [1.0, 5.0, 2.0, 3.0]  # Weights: OM, NWS, Weather.com, Accu
@@ -574,7 +551,6 @@ def generate_pdf_report(
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(180, 210, 255)  # Light blue for precip
-    pdf.cell(rank_col, row_h, '', 1, 0, 'C', 1)
     pdf.cell(source_col, row_h, 'PRECIP %', 1, 0, 'C', 1)
 
     for i, day in enumerate(om_daily):
@@ -796,8 +772,7 @@ if __name__ == "__main__":
             met_data=met_data,
             accu_data=accu_data,
             df_analyzed=df_analyzed,
-            fog_critical_hours=critical,
-            source_rankings={"Open-Meteo": 3, "NWS": 1, "Met.no": 2, "AccuWeather": 0}
+            fog_critical_hours=critical
         )
         
         if pdf_path:

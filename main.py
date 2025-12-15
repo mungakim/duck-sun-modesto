@@ -540,12 +540,6 @@ async def main(args=None):
         scores = tracker.get_leaderboard(days_back=10)
         print_leaderboard(scores)
         
-        # Get Source Rankings for PDF (derived from leaderboard)
-        source_rankings = {}
-        if scores:
-            for rank, (source, count, hi_err, lo_err) in enumerate(scores, 1):
-                source_rankings[source] = rank
-        logger.info(f"[main] Source rankings (last 10 days): {source_rankings}")
         
         # Generate LEADERBOARD.md
         leaderboard_path = Path("LEADERBOARD.md")
@@ -601,7 +595,6 @@ async def main(args=None):
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
             output_path=REPORT_DIR / f"daily_forecast_{timestamp}.pdf",
-            source_rankings=source_rankings,
             weathercom_data=weathercom_data,
             mid_data=mid_data,
             hrrr_data=hrrr_data,
