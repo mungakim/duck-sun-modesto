@@ -721,10 +721,11 @@ def generate_pdf_report(
     # ===================
     if output_path is None:
         pacific = ZoneInfo("America/Los_Angeles")
-        timestamp = datetime.now(pacific).strftime("%Y-%m-%d_%H-%M-%S")
-        output_path = Path("reports") / f"daily_forecast_{timestamp}.pdf"
-    
-    output_path.parent.mkdir(exist_ok=True)
+        now = datetime.now(pacific)
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        output_path = Path("reports") / now.strftime("%Y-%m") / now.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.pdf"
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     try:
         pdf.output(str(output_path))

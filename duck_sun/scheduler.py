@@ -276,18 +276,18 @@ async def main():
             logger.error("CRITICAL: Open-Meteo data unavailable - cannot continue")
             return 1
 
-        # --- SPECIAL HANDLING FOR NWS ORGANIC DATA ---
-        # Fetch the Period-based forecast for organic website alignment
-        nws_daily_organic = {}
+        # --- SPECIAL HANDLING FOR NWS PERIOD DATA ---
+        # Fetch the Period-based forecast for website alignment
+        nws_daily_periods = {}
         try:
-            nws_organic_provider = NWSProvider()
-            await nws_organic_provider.fetch_forecast_periods()
-            nws_daily_organic = nws_organic_provider.get_daily_high_low()
-            logger.info(f"[main] NWS Organic Daily Stats: {len(nws_daily_organic)} days")
-            for date_key, stats in list(nws_daily_organic.items())[:3]:
+            nws_periods_provider = NWSProvider()
+            await nws_periods_provider.fetch_forecast_periods()
+            nws_daily_periods = nws_periods_provider.get_daily_high_low()
+            logger.info(f"[main] NWS Period Daily Stats: {len(nws_daily_periods)} days")
+            for date_key, stats in list(nws_daily_periods.items())[:3]:
                 logger.info(f"[main]   {date_key}: Hi={stats.get('high_f')}F, Lo={stats.get('low_f')}F")
         except Exception as e:
-            logger.warning(f"[main] NWS organic fetch failed: {e}")
+            logger.warning(f"[main] NWS period fetch failed: {e}")
 
         # --- STEP 2: Run Physics Engine ---
         logger.info("")
@@ -363,12 +363,12 @@ async def main():
             accu_data=accu_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
-            output_path=REPORT_DIR / f"daily_forecast_{timestamp}.pdf",
+            output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.pdf",
             weathercom_data=weathercom_data,
             mid_data=mid_data,
             hrrr_data=hrrr_data,
             degraded_sources=degraded if degraded else None,
-            nws_daily_organic=nws_daily_organic if nws_daily_organic else None
+            nws_daily_periods=nws_daily_periods if nws_daily_periods else None
         )
 
         duration = (datetime.now(pacific) - start_time).total_seconds()
