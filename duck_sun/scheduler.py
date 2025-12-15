@@ -4,7 +4,7 @@ Duck Sun Modesto Scheduler - Full Provider Edition
 Orchestrates the daily solar forecasting workflow:
 1. Fetch weather data from ALL 9 providers with retry + fallback
 2. Run physics engine for solar/fog analysis
-3. Generate the PDF Report (The Gold Bar) for grid schedulers
+3. Generate the PDF Report (The Gold Bar) for Power System Schedulers
 
 Features:
 - Resilient fetching with 2 retries per provider

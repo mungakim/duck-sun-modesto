@@ -1,6 +1,6 @@
 # Duck Sun Modesto
 
-A weighted ensemble solar forecasting engine for Modesto, CA. Triangulates data from 9 weather sources, applies Fog Guard + Smoke Guard physics, and generates a PDF report for grid schedulers.
+A weighted ensemble solar forecasting engine for Modesto, CA. Triangulates data from 9 weather sources, applies Fog Guard + Smoke Guard physics, and generates a PDF report for Power System Schedulers.
 
 **Status:** Calibrated & Verification Ready (Dec 14, 2025)
 **Version:** Uncanny Edition v1.2 (Source Replication)
@@ -80,7 +80,7 @@ python main.py
 ```
 
 ### Outputs
-- `reports/YYYY-MM/YYYY-MM-DD/daily_forecast_*.pdf` - Grid scheduler report (organized by date)
+- `reports/YYYY-MM/YYYY-MM-DD/daily_forecast_*.pdf` - Power System Scheduler report (organized by date)
 - `outputs/solar_data_YYYY-MM-DD_HH-MM-SS.json` - Raw consensus data
 - `LEADERBOARD.md` - 10-day accuracy rankings
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA grid scheduling. It fetches weather data from 9 sources, computes deterministic solar factors, and generates PDF reports for grid schedulers.
+Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 9 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
 
 **Current Status:** Production Ready - Calibrated for 7-Day Verification Test (Dec 14, 2025)
 
@@ -13,7 +13,7 @@ Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA grid schedul
 The project follows a **Source Replication** approach (not Model Approximation):
 - **providers/** - Data fetching with organic API sourcing (matches official websites)
 - **scheduler.py** - Orchestration for the daily workflow (fetch data → save JSON → generate PDF)
-- **pdf_report.py** - ReportLab-based PDF generation for grid schedulers
+- **pdf_report.py** - ReportLab-based PDF generation for Power System Schedulers
 
 ### Key Design Principles
 
@@ -63,7 +63,7 @@ Required in `.env`:
 ## Output Files
 
 - `outputs/solar_data_YYYY-MM-DD_HH-MM-SS.json` - Raw solar metrics and consensus data
-- `reports/YYYY-MM/YYYY-MM-DD/daily_forecast_*.pdf` - PDF one-pager for grid schedulers (organized by date)
+- `reports/YYYY-MM/YYYY-MM-DD/daily_forecast_*.pdf` - PDF one-pager for Power System Schedulers (organized by date)
 
 ## PDF Report Structure
 

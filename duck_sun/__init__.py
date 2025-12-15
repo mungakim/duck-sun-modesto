@@ -1,7 +1,7 @@
 """
 Duck Sun Modesto: Uncanny Edition
 
-A robust daily solar agent for Modesto, CA grid scheduling using the
+A robust daily solar agent for Modesto, CA power system scheduling using the
 Consensus Temperature Model that triangulates data from the world's
 three most reliable public weather authorities.
 
