@@ -720,7 +720,8 @@ def generate_pdf_report(
     # SAVE PDF
     # ===================
     if output_path is None:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        pacific = ZoneInfo("America/Los_Angeles")
+        timestamp = datetime.now(pacific).strftime("%Y-%m-%d_%H-%M-%S")
         output_path = Path("reports") / f"daily_forecast_{timestamp}.pdf"
     
     output_path.parent.mkdir(exist_ok=True)

@@ -21,6 +21,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -237,7 +238,8 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
 async def main():
     """Main scheduler entry point - Full Provider Edition."""
-    start_time = datetime.now()
+    pacific = ZoneInfo("America/Los_Angeles")
+    start_time = datetime.now(pacific)
     timestamp = start_time.strftime("%Y-%m-%d_%H-%M-%S")
 
     logger.info("=" * 60)

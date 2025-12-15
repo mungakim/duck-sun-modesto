@@ -21,6 +21,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -435,7 +436,8 @@ async def save_outputs(timestamp: str, om_data, df_analyzed, engine, metar_raw, 
 
 async def main(args=None):
     """Main entry point for Duck Sun Modesto: WEIGHTED ENSEMBLE Architecture."""
-    start_time = datetime.now()
+    pacific = ZoneInfo("America/Los_Angeles")
+    start_time = datetime.now(pacific)
     timestamp = start_time.strftime("%Y-%m-%d_%H-%M-%S")
 
     print_banner()
