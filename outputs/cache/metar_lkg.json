@@ -1,0 +1,16 @@
+{
+  "provider": "metar",
+  "timestamp": "2025-12-14T17:06:26.345250",
+  "api_success": true,
+  "data": {
+    "raw": "KMOD 150053Z 23003KT 6SM BR OVC006 06/04 A3017 RMK AO2 SLP217 T00560044",
+    "station": "KMOD",
+    "observation_time": "2025/12/15 00:53",
+    "temp_c": 6,
+    "dewpoint_c": 4,
+    "wind_speed_kt": 3,
+    "wind_dir": 230,
+    "visibility_sm": 6.0,
+    "sky_condition": "MIST - Overcast"
+  }
+}

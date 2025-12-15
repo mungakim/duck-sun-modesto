@@ -34,11 +34,8 @@ class DuckSunPDF(FPDF):
         pass
     
     def footer(self):
-        # Simplified footer
-        self.set_y(-8)
-        self.set_font('Helvetica', 'I', 7)
-        self.set_text_color(100, 100, 100)
-        self.cell(0, 4, 'Duck Sun Modesto', 0, 0, 'C')
+        # No footer - removed per user request
+        pass
 
 
 def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
@@ -166,14 +163,16 @@ def generate_pdf_report(
     weathercom_data: Optional[List] = None,
     mid_data: Optional[Dict] = None,
     hrrr_data: Optional[Dict] = None,
-    precip_data: Optional[Dict] = None
+    precip_data: Optional[Dict] = None,
+    degraded_sources: Optional[List[str]] = None,
+    nws_daily_organic: Optional[Dict] = None
 ) -> Optional[Path]:
     """
     Generate PDF report with 4-source temperature grid and weighted consensus.
 
     Args:
         om_data: Open-Meteo forecast data
-        nws_data: NWS hourly data
+        nws_data: NWS hourly data (fallback if organic unavailable)
         met_data: Met.no hourly data (kept for backward compat, not displayed)
         accu_data: AccuWeather daily data (5-day forecast)
         df_analyzed: Analyzed dataframe with solar/fog data
@@ -184,6 +183,8 @@ def generate_pdf_report(
         mid_data: MID.org 48-hour summary data
         hrrr_data: HRRR model data (48-hour, 3km resolution)
         precip_data: Aggregated precipitation probabilities by date
+        degraded_sources: List of providers using cached/stale data
+        nws_daily_organic: PRIORITY - NWS Period-based daily stats (matches website)
     """
     
     if not HAS_FPDF:
@@ -198,8 +199,16 @@ def generate_pdf_report(
     
     # Process data sources
     om_daily = om_data.get('daily_forecast', [])[:8]
-    nws_daily = calculate_daily_stats_from_hourly(nws_data) if nws_data else {}
     met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
+
+    # PRIORITY: Use Organic NWS Period Data if available (matches website)
+    if nws_daily_organic:
+        logger.info("[generate_pdf_report] Using Organic NWS Period Data (Website Match)")
+        nws_daily = nws_daily_organic
+    else:
+        # Fallback to calculating from hourly grid (Legacy/Risk of mismatch)
+        logger.info("[generate_pdf_report] Falling back to NWS hourly aggregation")
+        nws_daily = calculate_daily_stats_from_hourly(nws_data) if nws_data else {}
 
     # Process Weather.com data (replaces Met.no in display)
     weathercom_daily = {}
@@ -264,6 +273,19 @@ def generate_pdf_report(
     pdf.set_text_color(40, 40, 40)
     pdf.cell(0, 5, timestamp_str, 0, 1, 'C')
     pdf.ln(2)
+
+    # ===================
+    # DATA QUALITY WARNING BANNER (if degraded sources)
+    # ===================
+    if degraded_sources:
+        pdf.set_fill_color(255, 230, 230)  # Light red background
+        pdf.set_draw_color(200, 100, 100)
+        pdf.set_text_color(139, 0, 0)  # Dark red text
+        pdf.set_font('Helvetica', 'B', 7)
+        warning_text = f"DATA QUALITY: {', '.join(degraded_sources)} using cached/stale data"
+        pdf.cell(0, 5, warning_text, 1, 1, 'C', fill=True)
+        pdf.set_text_color(0, 0, 0)  # Reset text color
+        pdf.ln(1)
 
     # ===================
     # TOP ROW: Manual Entry Fields (left) + MID Weather 48-Hour Summary (right)
@@ -576,11 +598,16 @@ def generate_pdf_report(
         pdf.set_font('Helvetica', '', 7)
         pdf.cell(day_col, row_h, f"{precip_pct}%", 1, 0, 'C', 1)
     pdf.ln()
-    
+
+    # Precip sources note - right-aligned below temperature matrix
+    pdf.set_font('Helvetica', 'I', 5)
+    pdf.set_text_color(80, 80, 80)
+    pdf.cell(0, 3, 'PRECIP = Avg of NOAA HRRR (3km), Open-Meteo, Weather.com, AccuWeather  ', 0, 1, 'R')
+
     # ===================
     # SOLAR FORECAST GRID (3-Day)
     # ===================
-    pdf.ln(3)
+    pdf.ln(1)
     pdf.set_font('Helvetica', 'B', 9)
     pdf.set_text_color(0, 60, 120)
     pdf.cell(0, 5, 'SOLAR FORECAST (9AM-4PM) - W/m² Irradiance', 0, 1, 'L')
@@ -674,12 +701,43 @@ def generate_pdf_report(
         pdf.set_xy(row_x_start, row_y_start + solar_row_h * 2)
 
     # ===================
-    # LEGEND
+    # SOLAR IRRADIANCE LEGEND (directly below solar grid)
     # ===================
-    pdf.ln(2)
-    pdf.set_font('Helvetica', 'I', 6)
+    pdf.ln(1)
+    pdf.set_font('Helvetica', '', 6)
     pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 3, 'Weights: NWS(5), Accu(3), Weather.com(2), OM(1) | Temps: Hi/Lo F | Solar: W/m2 irradiance', 0, 1, 'L')
+
+    # Draw legend items inline, positioned below solar grid (shifted 1" / 25.4mm to the right)
+    legend_y = pdf.get_y()
+    legend_x = margin + date_label_col + 25.4  # Start 1 inch to the right of hour columns
+    box_w, box_h = 4, 3
+
+    # <50 W/m² - Minimal
+    pdf.set_fill_color(220, 220, 220)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 1, legend_y)
+    pdf.cell(38, box_h, '<50 W/m² = Minimal', 0, 0, 'L')
+
+    # 50-150 W/m² - Low
+    legend_x += 44
+    pdf.set_fill_color(200, 230, 255)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 1, legend_y)
+    pdf.cell(42, box_h, '50-150 W/m² = Low-Moderate', 0, 0, 'L')
+
+    # 150-400 W/m² - Good
+    legend_x += 48
+    pdf.set_fill_color(200, 255, 200)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 1, legend_y)
+    pdf.cell(48, box_h, '150-400 W/m² = Good Production', 0, 0, 'L')
+
+    # >400 W/m² - Peak
+    legend_x += 54
+    pdf.set_fill_color(144, 238, 144)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 1, legend_y)
+    pdf.cell(48, box_h, '>400 W/m² = Peak Production', 0, 0, 'L')
     
     
     # ===================

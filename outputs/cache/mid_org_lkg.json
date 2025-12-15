@@ -1,0 +1,25 @@
+{
+  "provider": "mid_org",
+  "timestamp": "2025-12-14T17:06:25.834628",
+  "api_success": true,
+  "data": {
+    "today": {
+      "rain": "0.00",
+      "high": "43",
+      "low": "40",
+      "datestring": "Sunday December  14,  2025"
+    },
+    "yesterday": {
+      "rain": "0.00",
+      "high": "44",
+      "low": "38",
+      "datestring": "Saturday December  13,  2025"
+    },
+    "record_high_temp": 71,
+    "record_high_year": 1958,
+    "record_low_temp": 22,
+    "record_low_year": 1940,
+    "avg_high_temp": 54,
+    "avg_low_temp": 38
+  }
+}

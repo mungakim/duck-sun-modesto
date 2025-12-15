@@ -1,0 +1,133 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-12-14T17:06:27.323348",
+  "total_runs": 3,
+  "providers": {
+    "open_meteo": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "hrrr": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "nws": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "met_no": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "accuweather": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "weathercom": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "mid_org": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "metar": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    },
+    "smoke": {
+      "total_fetches": 3,
+      "api_successes": 3,
+      "cache_hits": 0,
+      "default_fallbacks": 0,
+      "error_types": {},
+      "staleness_distribution": {
+        "FRESH": 3,
+        "ACCEPTABLE": 0,
+        "STALE_WARN": 0,
+        "STALE_ERROR": 0,
+        "DEFAULT": 0
+      }
+    }
+  }
+}

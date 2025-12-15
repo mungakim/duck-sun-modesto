@@ -85,12 +85,13 @@ Use `run_duck_sun.bat` for local automated runs.
 
 ## PDF Report Features
 
-- **8-Day Temperature Grid**: 4 sources + weighted consensus
+- **8-Day Temperature Grid**: 4 sources (Open-Meteo, NWS, Weather.com, AccuWeather) + weighted consensus
 - **MID GAS BURN**: 3 blank cells for manual entry (date | MMBtu)
 - **PGE CITYGATE**: Blank cell for price entry
-- **MID WEATHER 48-Hour Summary**: Color-coded High (orange) / Low (blue) cells
-- **Duck Curve Forecast**: Solar irradiance HE09-HE16
-- **Precipitation Consensus**: Rain probability from all sources
+- **MID WEATHER 48-Hour Summary**: Color-coded High (orange) / Low (blue) cells with historical records
+- **Precipitation Consensus**: Rain probability from NOAA HRRR (3km), Open-Meteo, Weather.com, AccuWeather
+- **3-Day Solar Forecast (HE09-HE16)**: Hourly W/m² irradiance with condition descriptions
+- **Solar Irradiance Legend**: Color-coded production levels (<50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak)
 
 Manual fields can be filled in with pen after printing, or add text boxes in Acrobat before saving/emailing.
 

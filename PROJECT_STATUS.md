@@ -1,8 +1,8 @@
 # ✅ PROJECT STATUS - Duck Sun Modesto
 
-**Date:** December 12, 2025 @ 5:35 PM PST  
-**Status:** 🎯 **PRODUCTION READY**  
-**Version:** Uncanny Edition v1.0
+**Date:** December 14, 2025
+**Status:** 🎯 **PRODUCTION READY**
+**Version:** Uncanny Edition v1.1
 
 ---
 
@@ -247,10 +247,16 @@ if is_fog_locked_in:
 - **Test coverage:** Manual validation only (no unit tests yet)
 
 ### Data Output:
-- **Reports generated:** 17 (since Dec 7)
-- **Latest report:** `daily_brief_2025-12-12_17-35-01.md` (3.8 KB)
-- **Memory file:** `duck_sun_agent_memory.json` (2 runs tracked)
-- **JSON outputs:** 17 files in `outputs/`
+- **PDF Reports generated:** 50+ (since Dec 7)
+- **Latest report:** `daily_forecast_2025-12-14_16-15-03.pdf`
+- **JSON outputs:** 50+ files in `outputs/`
+
+### PDF Report Features (v1.1):
+- 8-day temperature grid with 4 sources + weighted consensus
+- MID Weather 48-hour summary with historical records
+- Precipitation % from ensemble (NOAA HRRR 3km, Open-Meteo, Weather.com, AccuWeather)
+- 3-day solar forecast (HE09-HE16) with W/m² irradiance
+- Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak
 
 ### Documentation:
 - **README.md:** Project overview
@@ -384,6 +390,6 @@ You didn't just build a script. You built a **utility** that grid operators woul
 
 ---
 
-*Status Report Generated: December 12, 2025 @ 5:40 PM PST*  
-*Total Implementation Time: ~40 minutes*  
-*Files Modified: 2 | Files Created: 3 | Lines Added: 800+*
+*Status Report Updated: December 14, 2025*
+*Version: Uncanny Edition v1.1*
+*Latest Enhancement: PDF report with solar irradiance legend and precip source attribution*

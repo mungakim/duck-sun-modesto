@@ -1,17 +1,15 @@
 """
 Weather.com Provider for Duck Sun Modesto
 
+STATUS: Manual Ground Truth Updated Dec 14, 2025.
+
 NOTE: Weather.com is JavaScript-rendered and cannot be scraped without
-browser automation (Playwright/Selenium). The previous wttr.in proxy
-approach was found to provide INACCURATE data.
+browser automation (Playwright/Selenium). True organic automation requires
+a headless browser/Playwright, which is outside this script's scope.
 
-Current approach: Manual data entry until Playwright can be configured.
-The user provides Weather.com 10-day forecast data which is cached.
-
-TODO: Implement Playwright scraping when system dependencies are available.
+Current approach: Manual data entry with extended TTL (24h).
 """
 
-import httpx
 import json
 import logging
 from datetime import datetime, timedelta
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Cache configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
-CACHE_TTL_HOURS = 6  # Longer TTL since manual updates
+CACHE_TTL_HOURS = 24  # Extended TTL for manual ground truth
 
 
 class WeatherComDay(TypedDict):
@@ -108,33 +106,33 @@ class WeatherComProvider:
 
         This data was manually extracted from:
         https://weather.com/weather/tenday/l/USCA0714
-        As of: December 13, 2025 5:51 PM PST
-
-        TODO: Replace with Playwright scraping when available.
+        As of: December 14, 2025 (User-Provided Ground Truth)
         """
         # Base date for calculating forecast dates
-        base_date = datetime(2025, 12, 13)
+        base_date = datetime(2025, 12, 14)
 
-        # Weather.com 10-day forecast (manually entered)
+        # EXACT DATA FROM USER PROMPT (Dec 14, 2025)
         forecast_data = [
-            # Tonight/Today (Dec 13) - Tonight shows --/38
-            {"day_offset": 0, "high_f": None, "low_f": 38, "condition": "Foggy", "precip": 17},
-            # Sun 14 - AM Fog/PM Sun
-            {"day_offset": 1, "high_f": 49, "low_f": 40, "condition": "AM Fog/PM Sun", "precip": 12},
+            # Tonight/Today (Dec 14) - Tonight shows --/39
+            {"day_offset": 0, "high_f": None, "low_f": 39, "condition": "Foggy", "precip": 15},
             # Mon 15 - AM Fog/PM Sun
-            {"day_offset": 2, "high_f": 53, "low_f": 44, "condition": "AM Fog/PM Sun", "precip": 8},
-            # Tue 16 - Partly Cloudy
-            {"day_offset": 3, "high_f": 55, "low_f": 50, "condition": "Partly Cloudy", "precip": 13},
-            # Wed 17 - AM Clouds/PM Sun
-            {"day_offset": 4, "high_f": 61, "low_f": 48, "condition": "AM Clouds/PM Sun", "precip": 13},
+            {"day_offset": 1, "high_f": 46, "low_f": 44, "condition": "AM Fog/PM Sun", "precip": 11},
+            # Tue 16 - AM Fog/PM Clouds
+            {"day_offset": 2, "high_f": 52, "low_f": 50, "condition": "AM Fog/PM Clouds", "precip": 9},
+            # Wed 17 - Mostly Sunny
+            {"day_offset": 3, "high_f": 60, "low_f": 49, "condition": "Mostly Sunny", "precip": 19},
             # Thu 18 - Partly Cloudy
-            {"day_offset": 5, "high_f": 58, "low_f": 48, "condition": "Partly Cloudy", "precip": 8},
-            # Fri 19 - Showers
-            {"day_offset": 6, "high_f": 56, "low_f": 51, "condition": "Showers", "precip": 44},
+            {"day_offset": 4, "high_f": 58, "low_f": 49, "condition": "Partly Cloudy", "precip": 8},
+            # Fri 19 - PM Showers
+            {"day_offset": 5, "high_f": 56, "low_f": 52, "condition": "PM Showers", "precip": 34},
             # Sat 20 - Showers
-            {"day_offset": 7, "high_f": 53, "low_f": 49, "condition": "Showers", "precip": 50},
+            {"day_offset": 6, "high_f": 54, "low_f": 53, "condition": "Showers", "precip": 38},
             # Sun 21 - Showers
-            {"day_offset": 8, "high_f": 54, "low_f": 50, "condition": "Showers", "precip": 50},
+            {"day_offset": 7, "high_f": 55, "low_f": 51, "condition": "Showers", "precip": 52},
+            # Mon 22 - Showers
+            {"day_offset": 8, "high_f": 54, "low_f": 50, "condition": "Showers", "precip": 40},
+            # Tue 23 - Showers
+            {"day_offset": 9, "high_f": 53, "low_f": 49, "condition": "Showers", "precip": 59},
         ]
 
         results: List[WeatherComDay] = []
@@ -235,8 +233,8 @@ class WeatherComProvider:
         cache = self._load_cache()
         return {
             "provider": "Weather.com",
-            "status": "manual_entry",
-            "note": "JS-rendered site - using manually entered data",
+            "status": "manual_ground_truth",
+            "note": "Ground truth updated Dec 14, 2025",
             "cache_valid": cache is not None,
             "url": self.WEATHER_COM_URL
         }
