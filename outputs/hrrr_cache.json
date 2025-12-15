@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-12-15T03:39:46.817346",
+  "timestamp": "2025-12-15T05:08:34.187808",
   "data": {
-    "generated_at": "2025-12-15T03:39:46.817292",
+    "generated_at": "2025-12-15T05:08:34.187750",
     "model": "HRRR",
     "location": "Modesto, CA",
     "hourly": [
@@ -197,17 +197,7 @@
       },
       {
         "time": "2025-12-14T19:00",
-        "temperature_c": 5.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2025-12-14T20:00",
-        "temperature_c": 5.9,
+        "temperature_c": 6.0,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
@@ -216,8 +206,18 @@
         "is_fog": true
       },
       {
+        "time": "2025-12-14T20:00",
+        "temperature_c": 5.7,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 100.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
         "time": "2025-12-14T21:00",
-        "temperature_c": 5.9,
+        "temperature_c": 5.7,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
@@ -227,7 +227,7 @@
       },
       {
         "time": "2025-12-14T22:00",
-        "temperature_c": 5.9,
+        "temperature_c": 5.8,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
@@ -247,7 +247,7 @@
       },
       {
         "time": "2025-12-15T00:00",
-        "temperature_c": 5.8,
+        "temperature_c": 5.9,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
@@ -257,46 +257,26 @@
       },
       {
         "time": "2025-12-15T01:00",
-        "temperature_c": 5.7,
+        "temperature_c": 5.5,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 100.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2025-12-15T02:00",
-        "temperature_c": 5.7,
+        "temperature_c": 5.2,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 100.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2025-12-15T03:00",
-        "temperature_c": 5.4,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 0.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2025-12-15T04:00",
-        "temperature_c": 5.3,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 0.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2025-12-15T05:00",
         "temperature_c": 5.0,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
@@ -306,8 +286,28 @@
         "is_fog": true
       },
       {
+        "time": "2025-12-15T04:00",
+        "temperature_c": 4.7,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 100.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2025-12-15T05:00",
+        "temperature_c": 4.6,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
         "time": "2025-12-15T06:00",
-        "temperature_c": 5.0,
+        "temperature_c": 4.4,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
@@ -317,7 +317,7 @@
       },
       {
         "time": "2025-12-15T07:00",
-        "temperature_c": 5.0,
+        "temperature_c": 4.2,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
@@ -327,62 +327,62 @@
       },
       {
         "time": "2025-12-15T08:00",
-        "temperature_c": 4.9,
-        "precipitation_prob": 1,
+        "temperature_c": 4.2,
+        "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
-        "shortwave_radiation": 6.8,
+        "visibility_m": 100.0,
+        "shortwave_radiation": 7.5,
         "is_fog": true
       },
       {
         "time": "2025-12-15T09:00",
-        "temperature_c": 4.9,
-        "precipitation_prob": 1,
+        "temperature_c": 4.3,
+        "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
         "visibility_m": 100.0,
-        "shortwave_radiation": 40.0,
+        "shortwave_radiation": 45.5,
         "is_fog": true
       },
       {
         "time": "2025-12-15T10:00",
-        "temperature_c": 4.9,
-        "precipitation_prob": 1,
+        "temperature_c": 4.6,
+        "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
         "visibility_m": 100.0,
-        "shortwave_radiation": 88.2,
+        "shortwave_radiation": 98.8,
         "is_fog": true
       },
       {
         "time": "2025-12-15T11:00",
-        "temperature_c": 5.1,
+        "temperature_c": 5.0,
         "precipitation_prob": 1,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
         "visibility_m": 100.0,
-        "shortwave_radiation": 119.1,
+        "shortwave_radiation": 153.7,
         "is_fog": true
       },
       {
         "time": "2025-12-15T12:00",
-        "temperature_c": 5.6,
+        "temperature_c": 5.8,
         "precipitation_prob": 1,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 100.0,
-        "shortwave_radiation": 165.9,
-        "is_fog": true
+        "visibility_m": 2200.0,
+        "shortwave_radiation": 187.5,
+        "is_fog": false
       },
       {
         "time": "2025-12-15T13:00",
-        "temperature_c": 6.9,
+        "temperature_c": 6.4,
         "precipitation_prob": 1,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
         "visibility_m": 12200.0,
-        "shortwave_radiation": 192.0,
+        "shortwave_radiation": 209.2,
         "is_fog": false
       },
       {
