@@ -1,35 +1,26 @@
 {
-  "timestamp": "2025-12-15T21:13:36.564068",
+  "timestamp": "2025-12-16T13:30:47.510088",
   "location_key": "327145",
-  "call_date": "2025-12-15",
-  "call_count": 8,
+  "call_date": "2025-12-16",
+  "call_count": 1,
   "daily_limit": 42,
   "data": [
     {
-      "date": "2025-12-15",
-      "high_c": 10.56,
-      "low_c": 4.44,
-      "high_f": 51.0,
-      "low_f": 40.0,
-      "precip_prob": 25,
-      "condition": "Fog"
-    },
-    {
       "date": "2025-12-16",
       "high_c": 10.56,
-      "low_c": 8.33,
+      "low_c": 7.78,
       "high_f": 51.0,
-      "low_f": 47.0,
-      "precip_prob": 4,
+      "low_f": 46.0,
+      "precip_prob": 2,
       "condition": "Dreary"
     },
     {
       "date": "2025-12-17",
-      "high_c": 12.22,
-      "low_c": 8.33,
-      "high_f": 54.0,
-      "low_f": 47.0,
-      "precip_prob": 55,
+      "high_c": 11.11,
+      "low_c": 8.89,
+      "high_f": 52.0,
+      "low_f": 48.0,
+      "precip_prob": 49,
       "condition": "Mostly cloudy"
     },
     {
@@ -38,17 +29,26 @@
       "low_c": 7.78,
       "high_f": 57.0,
       "low_f": 46.0,
-      "precip_prob": 5,
+      "precip_prob": 0,
       "condition": "Partly sunny"
     },
     {
       "date": "2025-12-19",
-      "high_c": 12.78,
+      "high_c": 14.44,
       "low_c": 10.0,
-      "high_f": 55.0,
+      "high_f": 58.0,
       "low_f": 50.0,
       "precip_prob": 25,
       "condition": "Dreary"
+    },
+    {
+      "date": "2025-12-20",
+      "high_c": 15.56,
+      "low_c": 10.0,
+      "high_f": 60.0,
+      "low_f": 50.0,
+      "precip_prob": 25,
+      "condition": "Mostly cloudy"
     }
   ]
 }
