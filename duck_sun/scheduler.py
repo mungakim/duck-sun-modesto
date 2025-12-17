@@ -368,7 +368,8 @@ async def main():
             mid_data=mid_data,
             hrrr_data=hrrr_data,
             degraded_sources=degraded if degraded else None,
-            nws_daily_periods=nws_daily_periods if nws_daily_periods else None
+            nws_daily_periods=nws_daily_periods if nws_daily_periods else None,
+            report_timestamp=start_time
         )
 
         duration = (datetime.now(pacific) - start_time).total_seconds()

@@ -1,6 +1,6 @@
 """
 PDF Report Generator for Duck Sun Modesto
-Weights: NWS(5x), Accu(3x), Weather.com(2x), OM(1x)
+Weights: Accu(10x), NWS(3x), Weather.com(2x), OM(1x)
 
 WEIGHTED ENSEMBLE ARCHITECTURE - Reliability is King
 """
@@ -155,7 +155,8 @@ def generate_pdf_report(
     hrrr_data: Optional[Dict] = None,
     precip_data: Optional[Dict] = None,
     degraded_sources: Optional[List[str]] = None,
-    nws_daily_periods: Optional[Dict] = None
+    nws_daily_periods: Optional[Dict] = None,
+    report_timestamp: Optional[datetime] = None
 ) -> Optional[Path]:
     """
     Generate PDF report with 4-source temperature grid and weighted consensus.
@@ -174,6 +175,7 @@ def generate_pdf_report(
         precip_data: Aggregated precipitation probabilities by date
         degraded_sources: List of providers using cached/stale data
         nws_daily_periods: PRIORITY - NWS Period-based daily stats (matches website)
+        report_timestamp: Optional timestamp to use (ensures filename and content match)
     """
 
     if not HAS_FPDF:
@@ -243,8 +245,11 @@ def generate_pdf_report(
     margin = 8
     usable_width = 279 - (2 * margin)
 
-    # Capture exact timestamp for report
-    report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
+    # Use passed-in timestamp to ensure filename and content match
+    if report_timestamp:
+        report_time = report_timestamp
+    else:
+        report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
     timestamp_str = report_time.strftime("%A, %B %d, %Y %H:%M:%S")
 
     # ===================
@@ -424,9 +429,18 @@ def generate_pdf_report(
     # TEMPERATURE GRID (4 Sources + Weighted Consensus)
     # Color-coded day columns for easy reading
     # ===================
+    weight_col = 6  # Weight score column (blank header)
     source_col = 22
-    day_col = (usable_width - source_col) / 8
+    day_col = (usable_width - weight_col - source_col) / 8
     half_col, row_h = day_col / 2, 6
+
+    # Source weights for display (calibrated Dec 2025)
+    SOURCE_WEIGHT_DISPLAY = {
+        'OPEN-METEO': '1.0',
+        'NWS (GOV)': '3.0',
+        'WEATHER.COM': '2.0',
+        'ACCU (COM)': '10.0',
+    }
 
     # Define alternating day column colors (pastels for readability)
     DAY_COLORS = [
@@ -446,6 +460,7 @@ def generate_pdf_report(
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Helvetica', 'B', 7)
     pdf.set_fill_color(0, 60, 120)
+    pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight header
     pdf.cell(source_col, row_h, 'SOURCE', 1, 0, 'C', 1)
 
     for i, day in enumerate(om_daily):
@@ -461,6 +476,7 @@ def generate_pdf_report(
     pdf.set_font('Helvetica', '', 6)
     pdf.set_fill_color(70, 110, 160)
     pdf.set_text_color(255, 255, 255)
+    pdf.cell(weight_col, row_h-1, '', 1, 0, 'C', 1)  # Blank weight cell
     pdf.cell(source_col, row_h-1, 'DATE', 1, 0, 'C', 1)
     for i, day in enumerate(om_daily):
         date_str = day.get('date', '')[5:]  # MM-DD
@@ -471,8 +487,14 @@ def generate_pdf_report(
     pdf.ln()
 
     def draw_row_colored(label: str, getter):
-        """Draw a single row with source name + color-coded Hi/Lo cells."""
+        """Draw a single row with weight + source name + color-coded Hi/Lo cells."""
         pdf.set_text_color(0, 0, 0)
+
+        # Weight column (light gray)
+        pdf.set_fill_color(230, 230, 230)
+        pdf.set_font('Helvetica', '', 6)
+        weight_val = SOURCE_WEIGHT_DISPLAY.get(label, '')
+        pdf.cell(weight_col, row_h, weight_val, 1, 0, 'C', 1)
 
         # Source label (neutral gray)
         pdf.set_fill_color(245, 245, 245)
@@ -504,16 +526,17 @@ def generate_pdf_report(
 
     # ===================
     # WEIGHTED AVERAGES ROW
-    # Weights: OM(1), NWS(5), Weather.com(2), Accu(3)
+    # Weights: OM(1), NWS(3), Weather.com(2), Accu(5) - Calibrated Dec 2025
     # ===================
     logger.info("[generate_pdf_report] Calculating weighted averages...")
 
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(255, 220, 100)
+    pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight cell for averages row
     pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
 
-    weights = [1.0, 5.0, 2.0, 3.0]  # Weights: OM, NWS, Weather.com, Accu
+    weights = [1.0, 3.0, 2.0, 10.0]  # Weights: OM, NWS, Weather.com, Accu (calibrated Dec 2025)
 
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
@@ -551,6 +574,7 @@ def generate_pdf_report(
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(180, 210, 255)  # Light blue for precip
+    pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight cell for precip row
     pdf.cell(source_col, row_h, 'PRECIP %', 1, 0, 'C', 1)
 
     for i, day in enumerate(om_daily):

@@ -10,13 +10,13 @@ Key Features:
 3. Variance classification (LOW/MODERATE/CRITICAL)
 4. Confidence scoring based on source agreement
 
-WEIGHTS (User-specified hierarchy):
-- NWS: 5.0 (Official government, highest trust)
-- AccuWeather: 3.0 (Commercial, good accuracy)
+WEIGHTS (Calibrated via Dec 2025 verification):
+- AccuWeather: 10.0 (Best 2-day accuracy, correctly predicted cold hold)
+- NWS: 3.0 (Government source, but overshot Dec 16 by +7°F)
 - Met.no: 3.0 (ECMWF model, European quality)
 - Weather.com: 2.0 (User baseline reference via wttr.in)
 - MID.org: 2.0 (Local microclimate - when available)
-- Open-Meteo: 1.0 (Fallback only)
+- Open-Meteo: 1.0 (Fallback only - missed Dec 16 by +9°F)
 
 VARIANCE THRESHOLDS (in Fahrenheit):
 - LOW: spread < 5°F (normal operation)
@@ -49,20 +49,20 @@ class WeightedEnsembleEngine:
     Weighted ensemble engine for temperature consensus.
 
     Uses weighted median to compute consensus while respecting
-    source hierarchy (NWS > AccuWeather > Met.no > Open-Meteo).
+    source hierarchy (AccuWeather > NWS > Met.no > Open-Meteo).
 
     Outliers are flagged but NOT excluded from consensus - this
     is a "warn only" system that never blocks operations.
     """
 
-    # Source weights (user-specified hierarchy)
+    # Source weights (calibrated via Dec 2025 verification)
     SOURCE_WEIGHTS = {
-        "NWS": 5.0,
-        "AccuWeather": 3.0,
+        "AccuWeather": 10.0,  # Best 2-day accuracy (doubled)
+        "NWS": 3.0,           # Overshot Dec 16 by +7°F
         "Met.no": 3.0,
         "Weather.com": 2.0,
         "MID.org": 2.0,
-        "Open-Meteo": 1.0,
+        "Open-Meteo": 1.0,    # Missed Dec 16 by +9°F
     }
 
     # Variance thresholds (Fahrenheit)
