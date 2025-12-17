@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-12-17T02:42:00.975795",
+  "timestamp": "2025-12-16T20:42:40.901476",
   "location_key": "327145",
-  "call_date": "2025-12-17",
-  "call_count": 2,
+  "call_date": "2025-12-16",
+  "call_count": 3,
   "daily_limit": 42,
   "data": [
     {
@@ -11,7 +11,7 @@
       "low_c": 7.22,
       "high_f": 48.0,
       "low_f": 45.0,
-      "precip_prob": 25,
+      "precip_prob": 70,
       "condition": "Dreary"
     },
     {
@@ -29,7 +29,7 @@
       "low_c": 7.78,
       "high_f": 57.0,
       "low_f": 46.0,
-      "precip_prob": 0,
+      "precip_prob": 3,
       "condition": "Partly sunny"
     },
     {
@@ -47,7 +47,7 @@
       "low_c": 11.11,
       "high_f": 57.0,
       "low_f": 52.0,
-      "precip_prob": 25,
+      "precip_prob": 91,
       "condition": "Cloudy"
     }
   ]

@@ -304,7 +304,11 @@ class AccuWeatherProvider:
                     low_c = (low_f - 32) * 5/9 if low_f is not None else 0.0
                     
                     day_part = day.get("Day", {})
-                    precip = day_part.get("PrecipitationProbability", 0)
+                    night_part = day.get("Night", {})
+                    # Use max of day/night precip to match website display
+                    day_precip = day_part.get("PrecipitationProbability", 0)
+                    night_precip = night_part.get("PrecipitationProbability", 0)
+                    precip = max(day_precip, night_precip)
                     cond = day_part.get("IconPhrase", "Unknown")
 
                     logger.debug(f"[AccuWeatherProvider] {date_str}: Hi={high_f}F ({high_c:.1f}C), "
