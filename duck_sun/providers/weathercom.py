@@ -1,17 +1,22 @@
 """
 Weather.com Provider for Duck Sun Modesto
 
-STATUS: Manual Ground Truth Updated Dec 14, 2025.
+ARCHITECTURE: Cache-based with text parsing for easy updates.
 
-NOTE: Weather.com is JavaScript-rendered and cannot be scraped without
-browser automation (Playwright/Selenium). True organic automation requires
-a headless browser/Playwright, which is outside this script's scope.
+Weather.com is JavaScript-rendered and blocks automated scraping.
+This provider uses a TEXT PARSER approach:
+1. User pastes forecast text from weather.com
+2. Parser extracts dates, temps, conditions, precip
+3. Cache stores parsed data for 24 hours
 
-Current approach: Manual data entry with extended TTL (24h).
+To update: python -m duck_sun.providers.weathercom --update
+Then paste the 10-day forecast text from weather.com
 """
 
 import json
 import logging
+import re
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, TypedDict
@@ -35,20 +40,171 @@ class WeatherComDay(TypedDict):
     precip_prob: int
 
 
+# Day name to offset mapping (relative to today)
+DAY_NAMES = {
+    'sun': 0, 'sunday': 0,
+    'mon': 1, 'monday': 1,
+    'tue': 2, 'tuesday': 2,
+    'wed': 3, 'wednesday': 3,
+    'thu': 4, 'thursday': 4,
+    'fri': 5, 'friday': 5,
+    'sat': 6, 'saturday': 6,
+}
+
+
+def parse_weathercom_text(text: str) -> List[WeatherComDay]:
+    """
+    Parse Weather.com 10-day forecast text into structured data.
+
+    Expected format (copy-pasted from weather.com):
+    ```
+    Tonight
+    Cloudy
+    --
+    /44°
+    5%
+    Wed 17
+    AM Clouds/PM Sun
+    64°
+    /47°
+    22%
+    ...
+    ```
+
+    Returns:
+        List of WeatherComDay dicts
+    """
+    results: List[WeatherComDay] = []
+    lines = [line.strip() for line in text.strip().split('\n') if line.strip()]
+
+    today = datetime.now()
+    today_weekday = today.weekday()  # Monday = 0, Sunday = 6
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].lower()
+
+        # Check if this line is a day header (Tonight, Today, or Day Name + Date)
+        is_tonight = 'tonight' in line
+        is_today = line == 'today'
+        day_match = re.match(r'^(sun|mon|tue|wed|thu|fri|sat)\w*\s+(\d{1,2})$', line, re.IGNORECASE)
+
+        if is_tonight or is_today or day_match:
+            # Found a day header - extract forecast data
+            try:
+                if is_tonight or is_today:
+                    # Tonight/Today is current date
+                    forecast_date = today
+                    day_num = None
+                elif day_match:
+                    day_name = day_match.group(1).lower()
+                    day_num = int(day_match.group(2))
+
+                    # Calculate date from day name and day number
+                    # Find the next occurrence of this weekday
+                    target_weekday = DAY_NAMES.get(day_name[:3], 0)
+
+                    # Convert to Python weekday (Mon=0) from weather.com (Sun=0)
+                    python_weekday = (target_weekday + 6) % 7 if target_weekday == 0 else target_weekday - 1
+
+                    days_ahead = (python_weekday - today_weekday) % 7
+                    if days_ahead == 0 and day_num != today.day:
+                        days_ahead = 7  # Next week
+
+                    forecast_date = today + timedelta(days=days_ahead)
+
+                    # Adjust if the day number doesn't match (cross-month)
+                    if forecast_date.day != day_num:
+                        # Try to find correct date within next 10 days
+                        for offset in range(10):
+                            check_date = today + timedelta(days=offset)
+                            if check_date.day == day_num and check_date.strftime('%a').lower()[:3] == day_name[:3]:
+                                forecast_date = check_date
+                                break
+
+                # Next line should be condition
+                i += 1
+                if i >= len(lines):
+                    break
+                condition = lines[i]
+
+                # Next line should be high temp (or -- for tonight)
+                i += 1
+                if i >= len(lines):
+                    break
+                high_line = lines[i]
+                high_f = None
+                if high_line != '--':
+                    high_match = re.search(r'(\d+)', high_line)
+                    if high_match:
+                        high_f = int(high_match.group(1))
+
+                # Next line should be low temp (with / prefix)
+                i += 1
+                if i >= len(lines):
+                    break
+                low_line = lines[i]
+                low_match = re.search(r'(\d+)', low_line)
+                if not low_match:
+                    i += 1
+                    continue
+                low_f = int(low_match.group(1))
+
+                # Next line should be precip probability
+                i += 1
+                if i >= len(lines):
+                    break
+                precip_line = lines[i]
+                precip_match = re.search(r'(\d+)', precip_line)
+                precip_prob = int(precip_match.group(1)) if precip_match else 0
+
+                # Calculate Celsius
+                high_c = round((high_f - 32) * 5 / 9, 1) if high_f else None
+                low_c = round((low_f - 32) * 5 / 9, 1)
+
+                results.append({
+                    'date': forecast_date.strftime('%Y-%m-%d'),
+                    'high_f': high_f,
+                    'low_f': low_f,
+                    'high_c': high_c,
+                    'low_c': low_c,
+                    'condition': condition,
+                    'precip_prob': precip_prob
+                })
+
+            except (ValueError, IndexError) as e:
+                logger.warning(f"[parse_weathercom_text] Parse error at line {i}: {e}")
+
+        i += 1
+
+    # Remove duplicates (keep first occurrence of each date)
+    seen_dates = set()
+    unique_results = []
+    for day in results:
+        if day['date'] not in seen_dates:
+            seen_dates.add(day['date'])
+            unique_results.append(day)
+
+    # Sort by date
+    unique_results.sort(key=lambda x: x['date'])
+
+    return unique_results
+
+
 class WeatherComProvider:
     """
     Weather.com provider for Modesto, CA forecasts.
 
     Due to Weather.com being JavaScript-rendered, this provider:
-    1. Uses manually-entered data from the actual Weather.com website
-    2. Caches data for 6 hours
-    3. Falls back to cached data if available
+    1. Uses a TEXT PARSER to convert pasted forecast data
+    2. Caches parsed data for 24 hours
+    3. Provides CLI update tool: python -m duck_sun.providers.weathercom --update
 
     Weight in ensemble: 2.0 (user baseline reference)
     """
 
-    # Weather.com URL for reference (JS-rendered, not directly scrapable)
-    WEATHER_COM_URL = "https://weather.com/weather/tenday/l/USCA0714"
+    # Weather.com URL for reference
+    WEATHER_COM_URL = "https://weather.com/weather/tenday/l/37.6391,-120.9969"
 
     def __init__(self):
         logger.info("[WeatherComProvider] Initializing provider...")
@@ -57,6 +213,7 @@ class WeatherComProvider:
     def _load_cache(self) -> Optional[dict]:
         """Load cached data if within TTL."""
         if not CACHE_FILE.exists():
+            logger.warning("[WeatherComProvider] No cache file found")
             return None
 
         try:
@@ -73,8 +230,9 @@ class WeatherComProvider:
                 logger.info(f"[WeatherComProvider] Cache VALID (TTL: {CACHE_TTL_HOURS}h)")
                 return cache
             else:
-                logger.info("[WeatherComProvider] Cache EXPIRED")
-                return None
+                logger.warning(f"[WeatherComProvider] Cache EXPIRED (age: {age_minutes/60:.1f}h > {CACHE_TTL_HOURS}h)")
+                # Still return expired cache - better than nothing
+                return cache
 
         except Exception as e:
             logger.warning(f"[WeatherComProvider] Cache load error: {e}")
@@ -85,7 +243,7 @@ class WeatherComProvider:
         try:
             cache = {
                 'timestamp': datetime.now().isoformat(),
-                'source': 'weather.com (manual entry)',
+                'source': 'weather.com (text parser)',
                 'ttl_hours': CACHE_TTL_HOURS,
                 'data': data
             }
@@ -100,128 +258,42 @@ class WeatherComProvider:
             logger.error(f"[WeatherComProvider] Cache save failed: {e}")
             return False
 
-    def _get_current_forecast(self) -> List[WeatherComDay]:
-        """
-        Return current Weather.com forecast data.
-
-        This data was manually extracted from:
-        https://weather.com/weather/tenday/l/USCA0714
-        As of: December 14, 2025 (User-Provided Ground Truth)
-        """
-        # Base date for calculating forecast dates
-        base_date = datetime(2025, 12, 14)
-
-        # EXACT DATA FROM USER PROMPT (Dec 14, 2025)
-        forecast_data = [
-            # Tonight/Today (Dec 14) - Tonight shows --/39
-            {"day_offset": 0, "high_f": None, "low_f": 39, "condition": "Foggy", "precip": 15},
-            # Mon 15 - AM Fog/PM Sun
-            {"day_offset": 1, "high_f": 46, "low_f": 44, "condition": "AM Fog/PM Sun", "precip": 11},
-            # Tue 16 - AM Fog/PM Clouds
-            {"day_offset": 2, "high_f": 52, "low_f": 50, "condition": "AM Fog/PM Clouds", "precip": 9},
-            # Wed 17 - Mostly Sunny
-            {"day_offset": 3, "high_f": 60, "low_f": 49, "condition": "Mostly Sunny", "precip": 19},
-            # Thu 18 - Partly Cloudy
-            {"day_offset": 4, "high_f": 58, "low_f": 49, "condition": "Partly Cloudy", "precip": 8},
-            # Fri 19 - PM Showers
-            {"day_offset": 5, "high_f": 56, "low_f": 52, "condition": "PM Showers", "precip": 34},
-            # Sat 20 - Showers
-            {"day_offset": 6, "high_f": 54, "low_f": 53, "condition": "Showers", "precip": 38},
-            # Sun 21 - Showers
-            {"day_offset": 7, "high_f": 55, "low_f": 51, "condition": "Showers", "precip": 52},
-            # Mon 22 - Showers
-            {"day_offset": 8, "high_f": 54, "low_f": 50, "condition": "Showers", "precip": 40},
-            # Tue 23 - Showers
-            {"day_offset": 9, "high_f": 53, "low_f": 49, "condition": "Showers", "precip": 59},
-        ]
-
-        results: List[WeatherComDay] = []
-
-        for entry in forecast_data:
-            forecast_date = base_date + timedelta(days=entry["day_offset"])
-            date_str = forecast_date.strftime("%Y-%m-%d")
-
-            # Convert F to C
-            high_f = entry["high_f"]
-            low_f = entry["low_f"]
-            high_c = round((high_f - 32) * 5 / 9, 1) if high_f else None
-            low_c = round((low_f - 32) * 5 / 9, 1)
-
-            results.append({
-                "date": date_str,
-                "high_f": high_f,
-                "low_f": low_f,
-                "high_c": high_c,
-                "low_c": low_c,
-                "condition": entry["condition"],
-                "precip_prob": entry["precip"]
-            })
-
-        return results
-
     async def fetch_forecast(self, force_refresh: bool = False) -> Optional[List[WeatherComDay]]:
         """
-        Fetch Weather.com forecast data.
-
-        Currently returns manually-entered data from the actual Weather.com site.
+        Fetch Weather.com forecast data from cache.
 
         Args:
-            force_refresh: If True, regenerate from manual data
+            force_refresh: Ignored (cache-only provider)
 
         Returns:
-            List of WeatherComDay dicts, or None on failure
+            List of WeatherComDay dicts, or None if no cache
         """
-        # Check cache first
-        if not force_refresh:
-            cache = self._load_cache()
-            if cache and cache.get('data'):
-                logger.info("[WeatherComProvider] CACHE HIT - Returning cached data")
-                return cache['data']
+        cache = self._load_cache()
+        if cache and cache.get('data'):
+            logger.info("[WeatherComProvider] CACHE HIT - Returning cached data")
+            return cache['data']
 
-        logger.info("[WeatherComProvider] Generating Weather.com forecast data...")
-
-        # Get current forecast data (manually entered)
-        results = self._get_current_forecast()
-
-        if results:
-            logger.info(f"[WeatherComProvider] Retrieved {len(results)} days from Weather.com data")
-            self._save_cache(results)
-            return results
-
+        logger.warning("[WeatherComProvider] NO CACHE - Run: python -m duck_sun.providers.weathercom --update")
         return None
 
-    def update_forecast(self, forecast_data: List[dict]) -> bool:
+    def update_from_text(self, text: str) -> bool:
         """
-        Update the cached forecast with new manual data.
+        Update cache from pasted Weather.com forecast text.
 
         Args:
-            forecast_data: List of dicts with keys:
-                - date: YYYY-MM-DD
-                - high_f: High temp in F (or None)
-                - low_f: Low temp in F
-                - condition: Weather description
-                - precip_prob: Precipitation probability %
+            text: Raw text copied from weather.com 10-day page
 
         Returns:
             True if update successful
         """
         try:
-            results: List[WeatherComDay] = []
+            results = parse_weathercom_text(text)
 
-            for entry in forecast_data:
-                high_f = entry.get("high_f")
-                low_f = entry["low_f"]
+            if not results:
+                logger.error("[WeatherComProvider] No forecast data parsed from text")
+                return False
 
-                results.append({
-                    "date": entry["date"],
-                    "high_f": high_f,
-                    "low_f": low_f,
-                    "high_c": round((high_f - 32) * 5 / 9, 1) if high_f else None,
-                    "low_c": round((low_f - 32) * 5 / 9, 1),
-                    "condition": entry.get("condition", "Unknown"),
-                    "precip_prob": entry.get("precip_prob", 0)
-                })
-
+            logger.info(f"[WeatherComProvider] Parsed {len(results)} days from text")
             return self._save_cache(results)
 
         except Exception as e:
@@ -231,45 +303,137 @@ class WeatherComProvider:
     def get_status(self) -> dict:
         """Get provider status information."""
         cache = self._load_cache()
+        cache_age = None
+        if cache:
+            try:
+                cached_time = datetime.fromisoformat(cache.get('timestamp', ''))
+                cache_age = (datetime.now() - cached_time).total_seconds() / 3600
+            except:
+                pass
+
         return {
             "provider": "Weather.com",
-            "status": "manual_ground_truth",
-            "note": "Ground truth updated Dec 14, 2025",
+            "status": "cache_based",
             "cache_valid": cache is not None,
+            "cache_age_hours": round(cache_age, 1) if cache_age else None,
+            "days_cached": len(cache.get('data', [])) if cache else 0,
             "url": self.WEATHER_COM_URL
         }
+
+
+def interactive_update():
+    """Interactive CLI for updating Weather.com cache."""
+    print("=" * 60)
+    print("  WEATHER.COM CACHE UPDATER")
+    print("=" * 60)
+    print()
+    print("Instructions:")
+    print("1. Go to: https://weather.com/weather/tenday/l/37.6391,-120.9969")
+    print("2. Select and copy the 10-day forecast text")
+    print("3. Paste below (press Enter twice when done):")
+    print()
+    print("-" * 60)
+
+    lines = []
+    empty_count = 0
+
+    try:
+        while empty_count < 2:
+            line = input()
+            if line.strip() == '':
+                empty_count += 1
+            else:
+                empty_count = 0
+                lines.append(line)
+    except EOFError:
+        pass
+
+    if not lines:
+        print("\nNo input received. Aborting.")
+        return False
+
+    text = '\n'.join(lines)
+    print("-" * 60)
+    print()
+
+    # Parse and save
+    provider = WeatherComProvider()
+
+    print("Parsing forecast data...")
+    results = parse_weathercom_text(text)
+
+    if not results:
+        print("ERROR: Could not parse any forecast data from input.")
+        return False
+
+    print(f"\nParsed {len(results)} days:")
+    print("-" * 50)
+    for day in results:
+        hi = day['high_f'] if day['high_f'] else "--"
+        print(f"  {day['date']}: Hi={hi}F, Lo={day['low_f']}F, "
+              f"Precip={day['precip_prob']}%, {day['condition']}")
+
+    print()
+    confirm = input("Save to cache? [Y/n]: ").strip().lower()
+
+    if confirm in ('', 'y', 'yes'):
+        if provider._save_cache(results):
+            print("\n✓ Cache updated successfully!")
+            return True
+        else:
+            print("\n✗ Failed to save cache.")
+            return False
+    else:
+        print("\nCancelled.")
+        return False
 
 
 if __name__ == "__main__":
     import asyncio
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
-    async def test():
-        print("=" * 60)
-        print("  WEATHER.COM PROVIDER TEST")
-        print("=" * 60)
+    if '--update' in sys.argv:
+        # Interactive update mode
+        success = interactive_update()
+        sys.exit(0 if success else 1)
 
-        provider = WeatherComProvider()
+    elif '--parse' in sys.argv:
+        # Parse from stdin
+        print("Paste Weather.com forecast text (Ctrl+D when done):")
+        text = sys.stdin.read()
+        results = parse_weathercom_text(text)
+        print(json.dumps(results, indent=2))
 
-        print("\n[PROVIDER STATUS]")
-        status = provider.get_status()
-        for key, value in status.items():
-            print(f"  {key}: {value}")
+    else:
+        # Status/test mode
+        async def test():
+            print("=" * 60)
+            print("  WEATHER.COM PROVIDER STATUS")
+            print("=" * 60)
 
-        print("\n[FETCHING FORECAST]")
-        data = await provider.fetch_forecast(force_refresh=True)
+            provider = WeatherComProvider()
 
-        if data:
-            print(f"\n[RESULTS] Weather.com Forecast ({len(data)} days):")
-            print("-" * 50)
-            for day in data:
-                hi = day['high_f'] if day['high_f'] else "--"
-                print(f"  {day['date']}: Hi={hi}F, Lo={day['low_f']}F, "
-                      f"Precip={day['precip_prob']}%, {day['condition']}")
-        else:
-            print("[FAILED] Could not fetch Weather.com data")
+            print("\n[STATUS]")
+            status = provider.get_status()
+            for key, value in status.items():
+                print(f"  {key}: {value}")
 
-        print("\n" + "=" * 60)
+            print("\n[CACHE DATA]")
+            data = await provider.fetch_forecast()
 
-    asyncio.run(test())
+            if data:
+                print(f"  Found {len(data)} days in cache:")
+                print("-" * 50)
+                for day in data:
+                    hi = day['high_f'] if day['high_f'] else "--"
+                    print(f"  {day['date']}: Hi={hi}F, Lo={day['low_f']}F, "
+                          f"Precip={day['precip_prob']}%, {day['condition']}")
+            else:
+                print("  No cache data available.")
+                print("\n  To update, run:")
+                print("    python -m duck_sun.providers.weathercom --update")
+
+            print("\n" + "=" * 60)
+
+        asyncio.run(test())

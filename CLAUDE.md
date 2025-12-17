@@ -27,7 +27,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 |----------|-------------|------------------|
 | **NWS** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website |
 | **AccuWeather** | Official 5-day API | accuweather.com |
-| **Weather.com** | Manual ground truth (JS-rendered) | weather.com 10-day |
+| **Weather.com** | Text parser with cache (JS-rendered) | weather.com 10-day |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) |
 
 **NWS Organic Sourcing:** The NWS provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official NWS website exactly.
@@ -41,8 +41,11 @@ pip install -r requirements.txt
 # Run the full daily workflow (fetch data + generate briefing)
 python -m duck_sun.scheduler
 
-# Test the agent directly (generates briefing only)
-python -m duck_sun.agent
+# Update Weather.com cache (paste forecast text from website)
+python -m duck_sun.providers.weathercom --update
+
+# Check Weather.com cache status
+python -m duck_sun.providers.weathercom
 
 # Test the Open-Meteo provider directly
 python -m duck_sun.providers.open_meteo
@@ -79,8 +82,14 @@ The PDF report includes:
 **Source Replication Complete:**
 - **NWS:** Organic alignment via `/forecast` Period API (matches weather.gov)
 - **AccuWeather:** Direct API sourcing (matches accuweather.com)
-- **Weather.com:** Manual ground truth cache (JS-rendered site)
+- **Weather.com:** Text parser with 24h cache (JS blocks automation, paste to update)
 - **Open-Meteo:** Independent physics model (provides "second opinion")
+
+**Weather.com Update:** Since weather.com blocks automated scraping (JavaScript-rendered), use the text parser:
+```bash
+python -m duck_sun.providers.weathercom --update
+# Then paste the 10-day forecast text from the website
+```
 
 **Verification Results (Dec 16 Test Case):**
 - Actual: High 51°F, Low 41°F
