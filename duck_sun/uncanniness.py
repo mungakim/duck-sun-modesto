@@ -448,11 +448,10 @@ class UncannyEngine:
 if __name__ == "__main__":
     import asyncio
     from duck_sun.providers.open_meteo import fetch_open_meteo
-    from duck_sun.providers.nws import NWSProvider
+    from duck_sun.providers.noaa import NOAAProvider
     from duck_sun.providers.met_no import MetNoProvider
     from duck_sun.providers.smoke import SmokeProvider
     from duck_sun.providers.accuweather import AccuWeatherProvider
-    from duck_sun.providers.weathercom import WeatherComProvider
     from duck_sun.providers.mid_org import MIDOrgProvider
 
     logging.basicConfig(level=logging.INFO)
@@ -463,10 +462,10 @@ if __name__ == "__main__":
         print("Fetching Open-Meteo...")
         om_data = await fetch_open_meteo(days=3)
 
-        print("Fetching NWS...")
-        nws = NWSProvider()
-        nws_data = await nws.fetch_async()
-        nws_text = await nws.fetch_text_forecast()
+        print("Fetching NOAA...")
+        noaa = NOAAProvider()
+        noaa_data = await noaa.fetch_async()
+        noaa_text = await noaa.fetch_text_forecast()
 
         print("Fetching Met.no...")
         met = MetNoProvider()
@@ -475,10 +474,6 @@ if __name__ == "__main__":
         print("Fetching AccuWeather...")
         accu = AccuWeatherProvider()
         accu_data = await accu.fetch_forecast()
-
-        print("Fetching Weather.com (baseline)...")
-        weathercom = WeatherComProvider()
-        weathercom_data = await weathercom.fetch_forecast()
 
         print("Fetching MID.org (local)...")
         mid = MIDOrgProvider()
@@ -492,9 +487,8 @@ if __name__ == "__main__":
 
         print("\nBuilding WEIGHTED ENSEMBLE consensus model...")
         df = engine.normalize_temps(
-            om_data, nws_data, met_data,
+            om_data, noaa_data, met_data,
             accu_data=accu_data,
-            weathercom_data=weathercom_data,
             mid_data=mid_data,
             smoke_data=smoke_data
         )
@@ -508,7 +502,7 @@ if __name__ == "__main__":
             print(f"  WARNING: Critical variance detected!")
 
         print("\nRunning Fog Guard + Smoke Guard with Narrative Override...")
-        df_analyzed = engine.analyze_duck_curve(df, nws_text_data=nws_text)
+        df_analyzed = engine.analyze_duck_curve(df, nws_text_data=noaa_text)
 
         print("\n=== Daily Summary ===")
         for day in engine.get_daily_summary(df_analyzed, days=3):
