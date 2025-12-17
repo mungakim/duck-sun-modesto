@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 9 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
+Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 8 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
 
-**Current Status:** Production Ready - Calibrated for 7-Day Verification Test (Dec 14, 2025)
+**Current Status:** Production Ready - Calibrated for 7-Day Verification Test (Dec 16, 2025)
 
 ## Architecture
 
@@ -19,18 +19,18 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 1. **Source Replication:** Each provider fetches from the exact same API endpoint that powers the official website, ensuring organic alignment without hardcoding.
 2. **Deterministic Solar Math:** Solar factor calculation is done in Python for 100% accuracy.
-3. **Weighted Ensemble:** AccuWeather(10x) > NWS(3x) > Met.no(3x) > Weather.com(2x) > Open-Meteo(1x)
+3. **Weighted Ensemble:** AccuWeather(10x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
 
 ### Data Sourcing Strategy
 
 | Provider | API Endpoint | Alignment Target |
 |----------|-------------|------------------|
-| **NWS** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website |
+| **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website |
 | **AccuWeather** | Official 5-day API | accuweather.com |
-| **Weather.com** | Text parser with cache (JS-rendered) | weather.com 10-day |
+| **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) |
 
-**NWS Organic Sourcing:** The NWS provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official NWS website exactly.
+**NOAA Organic Sourcing:** The NOAA provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official weather.gov website exactly.
 
 ## Commands
 
@@ -41,11 +41,8 @@ pip install -r requirements.txt
 # Run the full daily workflow (fetch data + generate briefing)
 python -m duck_sun.scheduler
 
-# Update Weather.com cache (paste forecast text from website)
-python -m duck_sun.providers.weathercom --update
-
-# Check Weather.com cache status
-python -m duck_sun.providers.weathercom
+# Test the NOAA provider directly
+python -m duck_sun.providers.noaa
 
 # Test the Open-Meteo provider directly
 python -m duck_sun.providers.open_meteo
@@ -54,7 +51,7 @@ python -m duck_sun.providers.open_meteo
 ## Environment Variables
 
 Required in `.env`:
-- `ANTHROPIC_API_KEY` - Claude API key for briefing generation
+- `ACCUWEATHER_API_KEY` - AccuWeather API key for forecast data
 - `LOG_LEVEL` (optional) - Defaults to INFO
 
 ## Key Concepts
@@ -73,29 +70,23 @@ Required in `.env`:
 The PDF report includes:
 - 8-day temperature grid from 4 sources with weighted consensus
 - MID Weather 48-hour summary with historical records
-- Precipitation % from ensemble (NOAA HRRR, Open-Meteo, Weather.com, AccuWeather)
+- Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather)
 - 3-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
 ## Calibration Status (Dec 16, 2025)
 
 **Source Replication Complete:**
-- **NWS:** Organic alignment via `/forecast` Period API (matches weather.gov)
+- **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov)
 - **AccuWeather:** Direct API sourcing (matches accuweather.com)
-- **Weather.com:** Text parser with 24h cache (JS blocks automation, paste to update)
+- **Met.no:** ECMWF European model via Locationforecast 2.0 API
 - **Open-Meteo:** Independent physics model (provides "second opinion")
-
-**Weather.com Update:** Since weather.com blocks automated scraping (JavaScript-rendered), use the text parser:
-```bash
-python -m duck_sun.providers.weathercom --update
-# Then paste the 10-day forecast text from the website
-```
 
 **Verification Results (Dec 16 Test Case):**
 - Actual: High 51°F, Low 41°F
 - **AccuWeather:** Predicted 48-51°F → **Winner** (0-3°F error)
-- **NWS:** Predicted 58°F → Miss (+7°F)
-- **Weather.com:** Predicted 60°F → Major miss (+9°F)
+- **NOAA:** Predicted 58°F → Miss (+7°F)
+- **Met.no:** ECMWF European model (new addition)
 - **Open-Meteo:** Predicted 60°F → Major miss (+9°F)
 
-**Weight Adjustment:** AccuWeather promoted to 5x (was 3x), NWS demoted to 3x (was 5x) based on superior 2-day forecast accuracy.
+**Weight Adjustment:** AccuWeather promoted to 10x (highest), NOAA and Met.no at 3x, Open-Meteo at 1x based on 2-day forecast accuracy.

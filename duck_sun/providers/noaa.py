@@ -1,9 +1,9 @@
 """
-National Weather Service (NWS) Provider for Duck Sun Modesto
+NOAA (National Oceanic and Atmospheric Administration) Provider for Duck Sun Modesto
 
 Fetches official US government temperature forecasts from api.weather.gov.
 UPGRADE: Uses the 'forecast' endpoint (Periods) for daily High/Low
-to match the NWS website's human-curated numbers.
+to match the NOAA weather.gov website's human-curated numbers.
 """
 
 import httpx
@@ -14,17 +14,17 @@ from typing import List, Optional, TypedDict, Dict, Any
 logger = logging.getLogger(__name__)
 
 
-class NWSTemperature(TypedDict):
+class NOAATemperature(TypedDict):
     time: str
     temp_c: float
 
 
-class NWSTextForecast(TypedDict):
+class NOAATextForecast(TypedDict):
     name: str
     detailedForecast: str
 
 
-class NWSPeriod(TypedDict):
+class NOAAPeriod(TypedDict):
     name: str
     startTime: str
     isDaytime: bool
@@ -33,13 +33,13 @@ class NWSPeriod(TypedDict):
     detailedForecast: str
 
 
-class NWSProvider:
+class NOAAProvider:
     """
-    Provider for National Weather Service temperature data.
+    Provider for NOAA/NWS temperature data.
 
     Uses the api.weather.gov gridpoint endpoint for Modesto, CA.
     UPGRADE: Also fetches 'forecast' endpoint (Periods) for organic
-    alignment with NWS website numbers.
+    alignment with NOAA weather.gov website numbers.
     """
 
     # Modesto Gridpoint (Sacramento Weather Forecast Office)
@@ -54,12 +54,12 @@ class NWSProvider:
     }
 
     def __init__(self):
-        logger.info("[NWSProvider] Initializing provider...")
+        logger.info("[NOAAProvider] Initializing provider...")
         self.last_fetch: Optional[datetime] = None
-        self.cached_data: Optional[List[NWSTemperature]] = None
-        self.cached_periods: Optional[List[NWSPeriod]] = None
+        self.cached_data: Optional[List[NOAATemperature]] = None
+        self.cached_periods: Optional[List[NOAAPeriod]] = None
 
-    def fetch(self) -> Optional[List[NWSTemperature]]:
+    def fetch(self) -> Optional[List[NOAATemperature]]:
         """
         Fetch temperature forecast from NWS.
 
@@ -67,24 +67,24 @@ class NWSProvider:
             List of temperature records with time and temp_c,
             or None if the fetch fails.
         """
-        logger.info("[NWSProvider] Fetching data from api.weather.gov...")
+        logger.info("[NOAAProvider] Fetching data from api.weather.gov...")
 
         try:
             with httpx.Client(timeout=15.0) as client:
                 resp = client.get(self.GRIDPOINT_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
-                    logger.warning(f"[NWSProvider] HTTP {resp.status_code}: {resp.text[:200]}")
+                    logger.warning(f"[NOAAProvider] HTTP {resp.status_code}: {resp.text[:200]}")
                     return None
 
                 data = resp.json()
 
             # Extract temperature values from the gridpoint data
-            temps: List[NWSTemperature] = []
+            temps: List[NOAATemperature] = []
             temp_data = data.get('properties', {}).get('temperature', {}).get('values', [])
 
             if not temp_data:
-                logger.warning("[NWSProvider] No temperature data in response")
+                logger.warning("[NOAAProvider] No temperature data in response")
                 return None
 
             for point in temp_data:
@@ -101,7 +101,7 @@ class NWSProvider:
                     "temp_c": float(temp_c)
                 })
 
-            logger.info(f"[NWSProvider] Retrieved {len(temps)} temperature records")
+            logger.info(f"[NOAAProvider] Retrieved {len(temps)} temperature records")
 
             self.last_fetch = datetime.now()
             self.cached_data = temps
@@ -109,34 +109,34 @@ class NWSProvider:
             return temps
 
         except httpx.TimeoutException:
-            logger.warning("[NWSProvider] Request timed out")
+            logger.warning("[NOAAProvider] Request timed out")
             return None
         except httpx.RequestError as e:
-            logger.warning(f"[NWSProvider] Request error: {e}")
+            logger.warning(f"[NOAAProvider] Request error: {e}")
             return None
         except Exception as e:
-            logger.error(f"[NWSProvider] Unexpected error: {e}", exc_info=True)
+            logger.error(f"[NOAAProvider] Unexpected error: {e}", exc_info=True)
             return None
 
-    async def fetch_async(self) -> Optional[List[NWSTemperature]]:
+    async def fetch_async(self) -> Optional[List[NOAATemperature]]:
         """Fetch hourly temperature forecast (Numerical Grid)."""
-        logger.info("[NWSProvider] Async fetch from api.weather.gov (Gridpoints)...")
+        logger.info("[NOAAProvider] Async fetch from api.weather.gov (Gridpoints)...")
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(self.GRIDPOINT_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
-                    logger.warning(f"[NWSProvider] HTTP {resp.status_code}")
+                    logger.warning(f"[NOAAProvider] HTTP {resp.status_code}")
                     return None
 
                 data = resp.json()
 
-            temps: List[NWSTemperature] = []
+            temps: List[NOAATemperature] = []
             temp_data = data.get('properties', {}).get('temperature', {}).get('values', [])
 
             if not temp_data:
-                logger.warning("[NWSProvider] No temperature data in response")
+                logger.warning("[NOAAProvider] No temperature data in response")
                 return None
 
             for point in temp_data:
@@ -153,7 +153,7 @@ class NWSProvider:
                     "temp_c": float(temp_c)
                 })
 
-            logger.info(f"[NWSProvider] Retrieved {len(temps)} hourly records")
+            logger.info(f"[NOAAProvider] Retrieved {len(temps)} hourly records")
 
             self.last_fetch = datetime.now()
             self.cached_data = temps
@@ -161,12 +161,12 @@ class NWSProvider:
             return temps
 
         except Exception as e:
-            logger.warning(f"[NWSProvider] Async fetch failed: {e}")
+            logger.warning(f"[NOAAProvider] Async fetch failed: {e}")
             return None
 
-    async def fetch_text_forecast(self) -> Optional[List[NWSTextForecast]]:
+    async def fetch_text_forecast(self) -> Optional[List[NOAATextForecast]]:
         """Fetch human-written text forecast for Narrative Override."""
-        logger.info("[NWSProvider] Fetching text forecast (Narrative)...")
+        logger.info("[NOAAProvider] Fetching text forecast (Narrative)...")
 
         # Use cached periods if available
         if self.cached_periods:
@@ -180,27 +180,27 @@ class NWSProvider:
                     for p in periods]
         return None
 
-    async def fetch_forecast_periods(self) -> Optional[List[NWSPeriod]]:
+    async def fetch_forecast_periods(self) -> Optional[List[NOAAPeriod]]:
         """
         Fetch the 'Period' forecast (Monday, Monday Night, etc.).
         This is the ORGANIC SOURCE OF TRUTH for the NWS website numbers.
         """
-        logger.info("[NWSProvider] Fetching text forecast periods (Website Match)...")
+        logger.info("[NOAAProvider] Fetching text forecast periods (Website Match)...")
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(self.FORECAST_URL, headers=self.HEADERS)
                 if resp.status_code != 200:
-                    logger.warning(f"[NWSProvider] Forecast API {resp.status_code}")
+                    logger.warning(f"[NOAAProvider] Forecast API {resp.status_code}")
                     return None
 
                 data = resp.json()
                 periods = data.get('properties', {}).get('periods', [])
 
                 self.cached_periods = periods
-                logger.info(f"[NWSProvider] Retrieved {len(periods)} forecast periods")
+                logger.info(f"[NOAAProvider] Retrieved {len(periods)} forecast periods")
                 return periods
         except Exception as e:
-            logger.error(f"[NWSProvider] Period fetch failed: {e}", exc_info=True)
+            logger.error(f"[NOAAProvider] Period fetch failed: {e}", exc_info=True)
             return None
 
     def get_daily_high_low(self) -> Dict[str, Dict[str, Any]]:
@@ -238,10 +238,10 @@ class NWSProvider:
             else:
                 daily_map[date_str]['low_f'] = temp
 
-        logger.info(f"[NWSProvider] Processed {len(daily_map)} days from forecast periods")
+        logger.info(f"[NOAAProvider] Processed {len(daily_map)} days from forecast periods")
         return daily_map
 
-    def process_daily_high_low(self, hourly_data: Optional[List[NWSTemperature]]) -> dict:
+    def process_daily_high_low(self, hourly_data: Optional[List[NOAATemperature]]) -> dict:
         """
         Aggregate hourly NWS data into Daily High/Low for verification.
         
@@ -253,7 +253,7 @@ class NWSProvider:
             { '2025-12-12': {'high': 15.0, 'low': 5.2} }
         """
         if not hourly_data:
-            logger.debug("[NWSProvider] No hourly data to aggregate")
+            logger.debug("[NOAAProvider] No hourly data to aggregate")
             return {}
 
         daily_map = {}
@@ -270,7 +270,7 @@ class NWSProvider:
                 daily_map[dt_str]['temps'].append(temp)
                 
             except Exception as e:
-                logger.debug(f"[NWSProvider] Failed to parse record: {e}")
+                logger.debug(f"[NOAAProvider] Failed to parse record: {e}")
                 continue
 
         # Calculate Min/Max for each day
@@ -282,11 +282,11 @@ class NWSProvider:
                     'high': max(temps),
                     'low': min(temps)
                 }
-                logger.debug(f"[NWSProvider] Daily {date_key}: "
+                logger.debug(f"[NOAAProvider] Daily {date_key}: "
                            f"High={results[date_key]['high']:.1f}°C, "
                            f"Low={results[date_key]['low']:.1f}°C")
         
-        logger.info(f"[NWSProvider] Aggregated {len(results)} days from hourly data")
+        logger.info(f"[NOAAProvider] Aggregated {len(results)} days from hourly data")
         return results
 
 
@@ -297,9 +297,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     async def test():
-        provider = NWSProvider()
-        
-        print("=== Testing NWS Provider ===\n")
+        provider = NOAAProvider()
+
+        print("=== Testing NOAA Provider ===\n")
         
         # Test hourly data
         data = await provider.fetch_async()

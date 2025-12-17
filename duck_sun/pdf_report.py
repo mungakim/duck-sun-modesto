@@ -1,6 +1,6 @@
 """
 PDF Report Generator for Duck Sun Modesto
-Weights: Accu(10x), NWS(3x), Weather.com(2x), OM(1x)
+Weights: Accu(10x), NOAA(3x), Met.no(3x), OM(1x)
 
 WEIGHTED ENSEMBLE ARCHITECTURE - Reliability is King
 """
@@ -39,33 +39,46 @@ class DuckSunPDF(FPDF):
 
 
 def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
-    """Calculate daily high/low from hourly data."""
-    logger.debug(f"[calculate_daily_stats] Processing {len(hourly_data) if hourly_data else 0} hourly records")
-    
+    """
+    Calculate daily high/low from hourly data using meteorological day (6am-6am).
+
+    Meteorological day boundaries align with how weather services (yr.no, etc.)
+    report daily highs/lows - the "high" for Tuesday is the max temp from
+    Tuesday 6am to Wednesday 5:59am local time.
+    """
+    logger.debug(f"[calculate_daily_stats] Processing {len(hourly_data) if hourly_data else 0} hourly records (6am-6am windows)")
+
     daily_stats = {}
     tz = ZoneInfo(timezone)
-    
+
     for record in hourly_data:
         try:
             t = record.get('time', '')
             val = record.get('temp_c', record.get('temperature_c'))
             if val is None:
                 continue
-            
+
             if '+' in t or 'Z' in t:
                 dt = datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(tz)
             else:
                 dt = datetime.fromisoformat(t)
-            
-            k = dt.strftime('%Y-%m-%d')
+
+            # Meteorological day: 6am-6am window
+            # Hours before 6am belong to the previous day's high/low
+            if dt.hour < 6:
+                met_day = dt - timedelta(days=1)
+            else:
+                met_day = dt
+
+            k = met_day.strftime('%Y-%m-%d')
             if k not in daily_stats:
-                daily_stats[k] = {'temps': [], 'day_name': dt.strftime('%a')}
+                daily_stats[k] = {'temps': [], 'day_name': met_day.strftime('%a')}
             daily_stats[k]['temps'].append(float(val))
-            
+
         except Exception as e:
             logger.debug(f"[calculate_daily_stats] Failed to parse record: {e}")
             continue
-    
+
     result = {}
     for k, d in daily_stats.items():
         if d['temps']:
@@ -75,8 +88,8 @@ def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "
                 'high_f': round(max(d['temps']) * 1.8 + 32),
                 'low_f': round(min(d['temps']) * 1.8 + 32)
             }
-    
-    logger.debug(f"[calculate_daily_stats] Calculated stats for {len(result)} days")
+
+    logger.debug(f"[calculate_daily_stats] Calculated stats for {len(result)} days (6am-6am)")
     return result
 
 
@@ -144,18 +157,17 @@ def get_descriptive_risk(risk_level: str) -> str:
 
 def generate_pdf_report(
     om_data: Dict,
-    nws_data: Optional[List],
+    noaa_data: Optional[List],
     met_data: Optional[List],
     accu_data: Optional[List],
     df_analyzed: pd.DataFrame,
     fog_critical_hours: int = 0,
     output_path: Optional[Path] = None,
-    weathercom_data: Optional[List] = None,
     mid_data: Optional[Dict] = None,
     hrrr_data: Optional[Dict] = None,
     precip_data: Optional[Dict] = None,
     degraded_sources: Optional[List[str]] = None,
-    nws_daily_periods: Optional[Dict] = None,
+    noaa_daily_periods: Optional[Dict] = None,
     report_timestamp: Optional[datetime] = None
 ) -> Optional[Path]:
     """
@@ -163,18 +175,17 @@ def generate_pdf_report(
 
     Args:
         om_data: Open-Meteo forecast data
-        nws_data: NWS hourly data (fallback if period data unavailable)
-        met_data: Met.no hourly data (kept for backward compat, not displayed)
+        noaa_data: NOAA hourly data (fallback if period data unavailable)
+        met_data: Met.no hourly data (ECMWF European model)
         accu_data: AccuWeather daily data (5-day forecast)
         df_analyzed: Analyzed dataframe with solar/fog data
         fog_critical_hours: Number of critical fog hours
         output_path: Output path for PDF
-        weathercom_data: Weather.com daily data (replaces Met.no in display)
         mid_data: MID.org 48-hour summary data
         hrrr_data: HRRR model data (48-hour, 3km resolution)
         precip_data: Aggregated precipitation probabilities by date
         degraded_sources: List of providers using cached/stale data
-        nws_daily_periods: PRIORITY - NWS Period-based daily stats (matches website)
+        noaa_daily_periods: PRIORITY - NOAA Period-based daily stats (matches website)
         report_timestamp: Optional timestamp to use (ensures filename and content match)
     """
 
@@ -189,37 +200,16 @@ def generate_pdf_report(
     om_daily = om_data.get('daily_forecast', [])[:8]
     met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
 
-    # PRIORITY: Use NWS Period Data if available (matches website)
-    if nws_daily_periods:
-        logger.info("[generate_pdf_report] Using NWS Period Data (Website Match)")
-        nws_daily = nws_daily_periods
+    # PRIORITY: Use NOAA Period Data if available (matches website)
+    if noaa_daily_periods:
+        logger.info("[generate_pdf_report] Using NOAA Period Data (Website Match)")
+        noaa_daily = noaa_daily_periods
     else:
         # Fallback to calculating from hourly grid (Legacy/Risk of mismatch)
-        logger.info("[generate_pdf_report] Falling back to NWS hourly aggregation")
-        nws_daily = calculate_daily_stats_from_hourly(nws_data) if nws_data else {}
+        logger.info("[generate_pdf_report] Falling back to NOAA hourly aggregation")
+        noaa_daily = calculate_daily_stats_from_hourly(noaa_data) if noaa_data else {}
 
-    # Process Weather.com data (replaces Met.no in display)
-    weathercom_daily = {}
-    if weathercom_data:
-        for d in weathercom_data:
-            high_f = d.get('high_f')
-            low_f = d.get('low_f')
-            high_c = d.get('high_c')
-            low_c = d.get('low_c')
-            # Skip entries without valid high temp (e.g., "Tonight" forecast)
-            if high_f is None and high_c is None:
-                continue
-            if high_f is not None and low_f is not None:
-                weathercom_daily[d['date']] = {
-                    'high_f': int(high_f),
-                    'low_f': int(low_f)
-                }
-            elif high_c is not None and low_c is not None:
-                weathercom_daily[d['date']] = {
-                    'high_f': round(high_c * 1.8 + 32),
-                    'low_f': round(low_c * 1.8 + 32)
-                }
-        logger.info(f"[generate_pdf_report] Weather.com processed: {len(weathercom_daily)} days")
+    logger.info(f"[generate_pdf_report] Met.no processed: {len(met_daily)} days")
 
     # Process AccuWeather data
     # Now uses native Fahrenheit values (no conversion rounding)
@@ -437,8 +427,8 @@ def generate_pdf_report(
     # Source weights for display (calibrated Dec 2025)
     SOURCE_WEIGHT_DISPLAY = {
         'OPEN-METEO': '1.0',
-        'NWS (GOV)': '3.0',
-        'WEATHER.COM': '2.0',
+        'NOAA (GOV)': '3.0',
+        'MET.NO (EU)': '3.0',
         'ACCU (COM)': '10.0',
     }
 
@@ -515,18 +505,18 @@ def generate_pdf_report(
     draw_row_colored('OPEN-METEO',
              lambda d, k: (d.get('high_f'), d.get('low_f')))
 
-    draw_row_colored('NWS (GOV)',
-             lambda d, k: (nws_daily.get(k, {}).get('high_f'), nws_daily.get(k, {}).get('low_f')))
+    draw_row_colored('NOAA (GOV)',
+             lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')))
 
-    draw_row_colored('WEATHER.COM',
-             lambda d, k: (weathercom_daily.get(k, {}).get('high_f'), weathercom_daily.get(k, {}).get('low_f')))
+    draw_row_colored('MET.NO (EU)',
+             lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')))
 
     draw_row_colored('ACCU (COM)',
              lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')))
 
     # ===================
     # WEIGHTED AVERAGES ROW
-    # Weights: OM(1), NWS(3), Weather.com(2), Accu(5) - Calibrated Dec 2025
+    # Weights: OM(1), NOAA(3), Met.no(3), Accu(10) - Calibrated Dec 2025
     # ===================
     logger.info("[generate_pdf_report] Calculating weighted averages...")
 
@@ -536,7 +526,7 @@ def generate_pdf_report(
     pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight cell for averages row
     pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
 
-    weights = [1.0, 3.0, 2.0, 10.0]  # Weights: OM, NWS, Weather.com, Accu (calibrated Dec 2025)
+    weights = [1.0, 3.0, 3.0, 10.0]  # Weights: OM, NOAA, Met.no, Accu (calibrated Dec 2025)
 
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
@@ -547,14 +537,14 @@ def generate_pdf_report(
 
         hi_vals = [
             day.get('high_f'),
-            nws_daily.get(k, {}).get('high_f'),
-            weathercom_daily.get(k, {}).get('high_f'),
+            noaa_daily.get(k, {}).get('high_f'),
+            met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f')
         ]
         lo_vals = [
             day.get('low_f'),
-            nws_daily.get(k, {}).get('low_f'),
-            weathercom_daily.get(k, {}).get('low_f'),
+            noaa_daily.get(k, {}).get('low_f'),
+            met_daily.get(k, {}).get('low_f'),
             accu_daily.get(k, {}).get('low_f')
         ]
 
@@ -569,7 +559,7 @@ def generate_pdf_report(
 
     # ===================
     # PRECIPITATION ROW (below Wtd. Averages)
-    # Uses HRRR + Weather.com + Accu consensus
+    # Uses HRRR + Open-Meteo + Accu consensus
     # ===================
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
@@ -602,7 +592,7 @@ def generate_pdf_report(
     # Precip sources note - right-aligned below temperature matrix
     pdf.set_font('Helvetica', 'I', 5)
     pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 3, 'PRECIP = Avg of NOAA HRRR (3km), Open-Meteo, Weather.com, AccuWeather  ', 0, 1, 'R')
+    pdf.cell(0, 3, 'PRECIP = Avg of NOAA HRRR (3km), Open-Meteo, AccuWeather  ', 0, 1, 'R')
 
     # ===================
     # SOLAR FORECAST GRID (3-Day)
@@ -763,45 +753,45 @@ def generate_pdf_report(
 if __name__ == "__main__":
     import asyncio
     from duck_sun.providers.open_meteo import fetch_open_meteo
-    from duck_sun.providers.nws import NWSProvider
+    from duck_sun.providers.noaa import NOAAProvider
     from duck_sun.providers.met_no import MetNoProvider
     from duck_sun.providers.accuweather import AccuWeatherProvider
     from duck_sun.uncanniness import UncannyEngine
     from dotenv import load_dotenv
-    
+
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
-    
+
     async def test():
         print("=== Testing PDF Report Generator (Hybrid Architecture) ===\n")
-        
+
         om_data = await fetch_open_meteo(days=8)
-        
-        nws = NWSProvider()
-        nws_data = await nws.fetch_async()
-        
+
+        noaa = NOAAProvider()
+        noaa_data = await noaa.fetch_async()
+
         met = MetNoProvider()
         met_data = await met.fetch_async()
-        
+
         accu = AccuWeatherProvider()
         accu_data = await accu.fetch_forecast()
-        
+
         engine = UncannyEngine()
-        df = engine.normalize_temps(om_data, nws_data, met_data)
+        df = engine.normalize_temps(om_data, noaa_data, met_data)
         df_analyzed = engine.analyze_duck_curve(df)
-        
+
         critical = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
-        
+
         pdf_path = generate_pdf_report(
             om_data=om_data,
-            nws_data=nws_data,
+            noaa_data=noaa_data,
             met_data=met_data,
             accu_data=accu_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical
         )
-        
+
         if pdf_path:
             print(f"\n✅ PDF generated: {pdf_path}")
-    
+
     asyncio.run(test())

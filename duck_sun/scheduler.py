@@ -27,10 +27,9 @@ from dotenv import load_dotenv
 
 # Core providers
 from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
-from duck_sun.providers.nws import NWSProvider
+from duck_sun.providers.noaa import NOAAProvider
 from duck_sun.providers.met_no import MetNoProvider
 from duck_sun.providers.accuweather import AccuWeatherProvider
-from duck_sun.providers.weathercom import WeatherComProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.smoke import SmokeProvider
@@ -132,7 +131,7 @@ async def fetch_with_retry(
 
 async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]:
     """
-    Fetch data from ALL 9 providers with retry + fallback.
+    Fetch data from ALL 8 providers with retry + fallback.
 
     Returns:
         Dict mapping provider name to FetchResult
@@ -140,7 +139,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     """
     results: Dict[str, FetchResult] = {}
 
-    logger.info("[fetch_all_providers] Starting fetch from 9 providers...")
+    logger.info("[fetch_all_providers] Starting fetch from 8 providers...")
 
     # 1. Open-Meteo (primary source - required)
     logger.info("[fetch_all_providers] Fetching Open-Meteo...")
@@ -159,16 +158,16 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
         cache_mgr
     )
 
-    # 3. NWS (highest weight - 5x)
-    logger.info("[fetch_all_providers] Fetching NWS...")
+    # 3. NOAA (US government - weight 3x)
+    logger.info("[fetch_all_providers] Fetching NOAA...")
 
-    async def _fetch_nws():
-        nws = NWSProvider()
-        return await nws.fetch_async()
+    async def _fetch_noaa():
+        noaa = NOAAProvider()
+        return await noaa.fetch_async()
 
-    results["nws"] = await fetch_with_retry("nws", _fetch_nws, cache_mgr)
+    results["noaa"] = await fetch_with_retry("noaa", _fetch_noaa, cache_mgr)
 
-    # 4. Met.no (ECMWF model)
+    # 4. Met.no (ECMWF model - weight 3x)
     logger.info("[fetch_all_providers] Fetching Met.no...")
 
     async def _fetch_met():
@@ -177,7 +176,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["met_no"] = await fetch_with_retry("met_no", _fetch_met, cache_mgr)
 
-    # 5. AccuWeather (commercial - weight 3x)
+    # 5. AccuWeather (commercial - weight 10x HIGHEST)
     logger.info("[fetch_all_providers] Fetching AccuWeather...")
 
     async def _fetch_accu():
@@ -186,16 +185,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["accuweather"] = await fetch_with_retry("accuweather", _fetch_accu, cache_mgr)
 
-    # 6. Weather.com (manual cache mode)
-    logger.info("[fetch_all_providers] Fetching Weather.com...")
-
-    async def _fetch_weathercom():
-        wc = WeatherComProvider()
-        return await wc.fetch_forecast()
-
-    results["weathercom"] = await fetch_with_retry("weathercom", _fetch_weathercom, cache_mgr)
-
-    # 7. MID.org (local ground truth)
+    # 6. MID.org (local ground truth)
     logger.info("[fetch_all_providers] Fetching MID.org...")
 
     async def _fetch_mid():
@@ -204,7 +194,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["mid_org"] = await fetch_with_retry("mid_org", _fetch_mid, cache_mgr)
 
-    # 8. METAR (airport observations)
+    # 7. METAR (airport observations)
     logger.info("[fetch_all_providers] Fetching METAR...")
 
     async def _fetch_metar():
@@ -214,7 +204,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["metar"] = await fetch_with_retry("metar", _fetch_metar, cache_mgr)
 
-    # 9. Smoke (air quality)
+    # 8. Smoke (air quality)
     logger.info("[fetch_all_providers] Fetching Smoke/AQI...")
 
     async def _fetch_smoke():
@@ -255,7 +245,7 @@ async def main():
 
         # --- STEP 1: Fetch ALL Data Sources ---
         logger.info("")
-        logger.info("STEP 1: Fetching weather data from ALL 9 providers...")
+        logger.info("STEP 1: Fetching weather data from ALL 8 providers...")
         logger.info("-" * 40)
 
         results = await fetch_all_providers(cache_mgr)
@@ -263,10 +253,9 @@ async def main():
         # Extract data from results
         om_data = results["open_meteo"].data
         hrrr_data = results["hrrr"].data
-        nws_data = results["nws"].data
+        noaa_data = results["noaa"].data
         met_data = results["met_no"].data
         accu_data = results["accuweather"].data
-        weathercom_data = results["weathercom"].data
         mid_data = results["mid_org"].data
         metar_data = results["metar"].data
         smoke_data = results["smoke"].data
@@ -276,18 +265,18 @@ async def main():
             logger.error("CRITICAL: Open-Meteo data unavailable - cannot continue")
             return 1
 
-        # --- SPECIAL HANDLING FOR NWS PERIOD DATA ---
+        # --- SPECIAL HANDLING FOR NOAA PERIOD DATA ---
         # Fetch the Period-based forecast for website alignment
-        nws_daily_periods = {}
+        noaa_daily_periods = {}
         try:
-            nws_periods_provider = NWSProvider()
-            await nws_periods_provider.fetch_forecast_periods()
-            nws_daily_periods = nws_periods_provider.get_daily_high_low()
-            logger.info(f"[main] NWS Period Daily Stats: {len(nws_daily_periods)} days")
-            for date_key, stats in list(nws_daily_periods.items())[:3]:
+            noaa_periods_provider = NOAAProvider()
+            await noaa_periods_provider.fetch_forecast_periods()
+            noaa_daily_periods = noaa_periods_provider.get_daily_high_low()
+            logger.info(f"[main] NOAA Period Daily Stats: {len(noaa_daily_periods)} days")
+            for date_key, stats in list(noaa_daily_periods.items())[:3]:
                 logger.info(f"[main]   {date_key}: Hi={stats.get('high_f')}F, Lo={stats.get('low_f')}F")
         except Exception as e:
-            logger.warning(f"[main] NWS period fetch failed: {e}")
+            logger.warning(f"[main] NOAA period fetch failed: {e}")
 
         # --- STEP 2: Run Physics Engine ---
         logger.info("")
@@ -300,10 +289,9 @@ async def main():
         # Pass additional sources to normalize_temps if available
         df = engine.normalize_temps(
             om_data,
-            nws_data if nws_data else None,
+            noaa_data if noaa_data else None,
             met_data if met_data else None,
             accu_data=accu_data if accu_data else None,
-            weathercom_data=weathercom_data if weathercom_data else None,
             mid_data=mid_data if mid_data else None
         )
 
@@ -358,17 +346,16 @@ async def main():
 
         pdf_path = generate_pdf_report(
             om_data=om_data,
-            nws_data=nws_data,
+            noaa_data=noaa_data,
             met_data=met_data,
             accu_data=accu_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
             output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.pdf",
-            weathercom_data=weathercom_data,
             mid_data=mid_data,
             hrrr_data=hrrr_data,
             degraded_sources=degraded if degraded else None,
-            nws_daily_periods=nws_daily_periods if nws_daily_periods else None,
+            noaa_daily_periods=noaa_daily_periods if noaa_daily_periods else None,
             report_timestamp=start_time
         )
 
@@ -393,7 +380,7 @@ async def main():
             logger.info(f"  PDF:  {pdf_path}")
         else:
             logger.warning("  PDF:  Generation skipped (fpdf2 not installed)")
-        logger.info(f"  Providers: {len(active_sources)}/9 active")
+        logger.info(f"  Providers: {len(active_sources)}/8 active")
         if degraded:
             logger.warning(f"  Degraded: {', '.join(degraded)}")
         logger.info(f"  Duration: {duration:.2f} seconds")

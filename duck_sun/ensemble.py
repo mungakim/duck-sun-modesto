@@ -5,16 +5,15 @@ Computes robust temperature consensus using weighted statistics
 and detects high-variance conditions between weather sources.
 
 Key Features:
-1. Weighted median calculation (NWS weighted highest)
+1. Weighted median calculation (AccuWeather weighted highest)
 2. Outlier detection (flags sources > 2 stdev from median)
 3. Variance classification (LOW/MODERATE/CRITICAL)
 4. Confidence scoring based on source agreement
 
 WEIGHTS (Calibrated via Dec 2025 verification):
 - AccuWeather: 10.0 (Best 2-day accuracy, correctly predicted cold hold)
-- NWS: 3.0 (Government source, but overshot Dec 16 by +7°F)
+- NOAA: 3.0 (Government source, but overshot Dec 16 by +7°F)
 - Met.no: 3.0 (ECMWF model, European quality)
-- Weather.com: 2.0 (User baseline reference via wttr.in)
 - MID.org: 2.0 (Local microclimate - when available)
 - Open-Meteo: 1.0 (Fallback only - missed Dec 16 by +9°F)
 
@@ -58,9 +57,8 @@ class WeightedEnsembleEngine:
     # Source weights (calibrated via Dec 2025 verification)
     SOURCE_WEIGHTS = {
         "AccuWeather": 10.0,  # Best 2-day accuracy (doubled)
-        "NWS": 3.0,           # Overshot Dec 16 by +7°F
+        "NOAA": 3.0,          # Overshot Dec 16 by +7°F
         "Met.no": 3.0,
-        "Weather.com": 2.0,
         "MID.org": 2.0,
         "Open-Meteo": 1.0,    # Missed Dec 16 by +9°F
     }
@@ -311,10 +309,9 @@ class WeightedEnsembleEngine:
 
 # Convenience function for simple consensus
 def quick_consensus(
-    nws: Optional[float] = None,
+    noaa: Optional[float] = None,
     accuweather: Optional[float] = None,
     met_no: Optional[float] = None,
-    weathercom: Optional[float] = None,
     mid_org: Optional[float] = None,
     open_meteo: Optional[float] = None,
     unit: str = "C"
@@ -323,15 +320,14 @@ def quick_consensus(
     Quick consensus calculation with named parameters.
 
     Example:
-        result = quick_consensus(nws=7.2, met_no=8.0, open_meteo=6.5)
+        result = quick_consensus(noaa=7.2, met_no=8.0, open_meteo=6.5)
         print(f"Consensus: {result.consensus_value}°C")
     """
     engine = WeightedEnsembleEngine()
     sources = {
-        "NWS": nws,
+        "NOAA": noaa,
         "AccuWeather": accuweather,
         "Met.no": met_no,
-        "Weather.com": weathercom,
         "MID.org": mid_org,
         "Open-Meteo": open_meteo
     }
@@ -350,10 +346,9 @@ if __name__ == "__main__":
     # Test 1: Normal agreement (LOW variance)
     print("\n[TEST 1] Normal agreement (all sources close)")
     sources_1 = {
-        "NWS": 7.2,
+        "NOAA": 7.2,
         "AccuWeather": 7.5,
         "Met.no": 7.0,
-        "Weather.com": 7.3,
         "Open-Meteo": 7.1
     }
     result_1 = engine.compute_consensus(sources_1)
@@ -364,10 +359,9 @@ if __name__ == "__main__":
     # Test 2: Moderate disagreement
     print("\n[TEST 2] Moderate disagreement")
     sources_2 = {
-        "NWS": 7.0,
+        "NOAA": 7.0,
         "AccuWeather": 8.5,
         "Met.no": 7.2,
-        "Weather.com": 9.0,
         "Open-Meteo": 7.5
     }
     result_2 = engine.compute_consensus(sources_2)
@@ -376,12 +370,11 @@ if __name__ == "__main__":
     print(f"  Outliers: {result_2.outliers}")
 
     # Test 3: Critical variance (one source way off)
-    print("\n[TEST 3] Critical variance (NWS cold bias example)")
+    print("\n[TEST 3] Critical variance (NOAA cold bias example)")
     sources_3 = {
-        "NWS": 2.0,      # Cold bias: -7°F
+        "NOAA": 2.0,      # Cold bias: -7°F
         "AccuWeather": 7.0,
         "Met.no": 7.2,
-        "Weather.com": 10.5,  # Warm: +6°F
         "Open-Meteo": 7.5
     }
     result_3 = engine.compute_consensus(sources_3)
@@ -393,7 +386,7 @@ if __name__ == "__main__":
     # Test 4: Few sources (graceful degradation)
     print("\n[TEST 4] Few sources available")
     sources_4 = {
-        "NWS": 7.0,
+        "NOAA": 7.0,
         "Open-Meteo": 7.5
     }
     result_4 = engine.compute_consensus(sources_4)
