@@ -1,25 +1,16 @@
 {
-  "timestamp": "2025-12-17T05:40:34.723274",
+  "timestamp": "2025-12-17T13:26:16.629677",
   "location_key": "327145",
   "call_date": "2025-12-17",
-  "call_count": 1,
+  "call_count": 2,
   "daily_limit": 42,
   "data": [
     {
-      "date": "2025-12-16",
-      "high_c": 8.89,
-      "low_c": 6.67,
-      "high_f": 48.0,
-      "low_f": 44.0,
-      "precip_prob": 70,
-      "condition": "Dreary"
-    },
-    {
       "date": "2025-12-17",
       "high_c": 11.11,
-      "low_c": 8.89,
+      "low_c": 9.44,
       "high_f": 52.0,
-      "low_f": 48.0,
+      "low_f": 49.0,
       "precip_prob": 49,
       "condition": "Mostly cloudy"
     },
@@ -29,26 +20,35 @@
       "low_c": 7.78,
       "high_f": 57.0,
       "low_f": 46.0,
-      "precip_prob": 3,
+      "precip_prob": 2,
       "condition": "Partly sunny"
     },
     {
       "date": "2025-12-19",
-      "high_c": 12.78,
+      "high_c": 13.89,
       "low_c": 10.0,
-      "high_f": 55.0,
+      "high_f": 57.0,
       "low_f": 50.0,
       "precip_prob": 25,
       "condition": "Dreary"
     },
     {
       "date": "2025-12-20",
-      "high_c": 13.89,
+      "high_c": 15.0,
       "low_c": 11.11,
-      "high_f": 57.0,
+      "high_f": 59.0,
       "low_f": 52.0,
       "precip_prob": 91,
       "condition": "Cloudy"
+    },
+    {
+      "date": "2025-12-21",
+      "high_c": 14.44,
+      "low_c": 11.67,
+      "high_f": 58.0,
+      "low_f": 53.0,
+      "precip_prob": 94,
+      "condition": "Showers"
     }
   ]
 }
