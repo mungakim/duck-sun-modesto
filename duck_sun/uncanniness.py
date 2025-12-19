@@ -2,9 +2,9 @@
 Uncanny Engine for Duck Sun Modesto
 
 Architecture:
-1. Thermodynamics: WEIGHTED ENSEMBLE (NWS 5x > AccuWeather 3x > Met.no 3x > Weather.com 2x > Open-Meteo 1x)
+1. Thermodynamics: WEIGHTED ENSEMBLE (NOAA 5x > AccuWeather 3x > Met.no 3x > Weather.com 2x > Open-Meteo 1x)
 2. Energy: Open-Meteo (Physics)
-3. Logic Override: NWS Text Narratives ("Dense Fog") force the model's hand.
+3. Logic Override: NOAA Text Narratives ("Dense Fog") force the model's hand.
 4. Variance Detection: Flags high spread (>10°F) with WARN-ONLY alerts (never blocks)
 
 RELIABILITY IS KING - Consistent, accurate values every time.
@@ -18,6 +18,11 @@ from typing import Dict, List, Optional, Any
 from zoneinfo import ZoneInfo
 
 from duck_sun.ensemble import WeightedEnsembleEngine, ConsensusResult
+from duck_sun.solar_physics import (
+    calculate_hybrid_solar,
+    calculate_tule_fog_penalty,
+    get_irradiance_category
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +31,9 @@ class UncannyEngine:
     """
     The Hybrid Architecture Engine with WEIGHTED ENSEMBLE Consensus.
 
-    Temperature consensus: Weighted Ensemble (NWS 5x > AccuWeather 3x > Met.no 3x > Weather.com 2x > Open-Meteo 1x)
+    Temperature consensus: Weighted Ensemble (NOAA 5x > AccuWeather 3x > Met.no 3x > Weather.com 2x > Open-Meteo 1x)
     Solar physics: Always Open-Meteo radiation data
-    Logic override: NWS text narratives trigger fog probability boosts
+    Logic override: NOAA text narratives trigger fog probability boosts
     Variance detection: Flags high spread (>10°F) with WARN-ONLY alerts
 
     RELIABILITY IS KING - This engine prioritizes consistent, accurate values.
@@ -51,7 +56,7 @@ class UncannyEngine:
     def normalize_temps(
         self,
         om_data: Dict[str, Any],
-        nws_data: Optional[List[Dict]],
+        noaa_data: Optional[List[Dict]],
         met_no_data: Optional[List[Dict]],
         accu_data: Optional[List[Dict]] = None,
         weathercom_data: Optional[List[Dict]] = None,
@@ -62,7 +67,7 @@ class UncannyEngine:
         Merge temps using WEIGHTED ENSEMBLE strategy.
 
         Sources (weighted):
-        - NWS: 5.0 (highest trust)
+        - NOAA: 5.0 (highest trust)
         - AccuWeather: 3.0
         - Met.no: 3.0
         - Weather.com: 2.0 (baseline reference)
@@ -92,23 +97,23 @@ class UncannyEngine:
 
         # === MERGE ALL SOURCE TEMPERATURES ===
 
-        # NWS temperatures
-        df['temp_nws'] = np.nan
-        if nws_data:
-            nws_df = pd.DataFrame(nws_data)
-            nws_df['time'] = pd.to_datetime(nws_df['time'], utc=True).dt.tz_convert(self.timezone).dt.tz_localize(None)
+        # NOAA temperatures
+        df['temp_noaa'] = np.nan
+        if noaa_data:
+            noaa_df = pd.DataFrame(noaa_data)
+            noaa_df['time'] = pd.to_datetime(noaa_df['time'], utc=True).dt.tz_convert(self.timezone).dt.tz_localize(None)
 
-            nws_merged = 0
+            noaa_merged = 0
             for idx, row in df.iterrows():
-                matches = nws_df[(nws_df['time'] >= row['time'] - timedelta(minutes=30)) &
-                                 (nws_df['time'] <= row['time'] + timedelta(minutes=30))]
+                matches = noaa_df[(noaa_df['time'] >= row['time'] - timedelta(minutes=30)) &
+                                 (noaa_df['time'] <= row['time'] + timedelta(minutes=30))]
                 if not matches.empty:
-                    df.at[idx, 'temp_nws'] = matches.iloc[0]['temp_c']
-                    nws_merged += 1
+                    df.at[idx, 'temp_noaa'] = matches.iloc[0]['temp_c']
+                    noaa_merged += 1
 
-            logger.info(f"[UncannyEngine] Merged {nws_merged} NWS temperature records")
+            logger.info(f"[UncannyEngine] Merged {noaa_merged} NOAA temperature records")
         else:
-            logger.warning("[UncannyEngine] No NWS data available")
+            logger.warning("[UncannyEngine] No NOAA data available")
 
         # Met.no temperatures
         df['temp_met'] = np.nan
@@ -219,7 +224,7 @@ class UncannyEngine:
         for idx, row in df.iterrows():
             # Build source dict for this hour
             sources = {
-                "NWS": row['temp_nws'] if pd.notna(row['temp_nws']) else None,
+                "NOAA": row['temp_noaa'] if pd.notna(row['temp_noaa']) else None,
                 "AccuWeather": row['temp_accu'] if pd.notna(row.get('temp_accu')) else None,
                 "Met.no": row['temp_met'] if pd.notna(row['temp_met']) else None,
                 "Weather.com": row['temp_weathercom'] if pd.notna(row.get('temp_weathercom')) else None,
@@ -283,42 +288,103 @@ class UncannyEngine:
         return self.ensemble_engine.get_variance_report(self.variance_results)
 
     def analyze_duck_curve(
-        self, 
-        df: pd.DataFrame, 
-        nws_text_data: Optional[List[Dict]] = None
+        self,
+        df: pd.DataFrame,
+        google_hourly: Optional[List[Dict]] = None,
+        noaa_text_data: Optional[List[Dict]] = None
     ) -> pd.DataFrame:
-        """Apply Physics + Narrative Override for fog/smoke detection."""
-        logger.info("[UncannyEngine] Running Fog Guard + Smoke Guard analysis...")
-        
+        """
+        Apply Hybrid Solar Physics + Fog/Smoke Detection.
+
+        The new architecture:
+        1. Uses calculate_hybrid_solar() which fuses Open-Meteo physics with Google cloud timing
+        2. Applies Tule Fog specific penalties for Central Valley radiation fog
+        3. Applies smoke/AQI penalties
+        4. Uses NOAA narrative override for fog warnings
+        """
+        logger.info("[UncannyEngine] Running Hybrid Solar Physics + Fog Guard + Smoke Guard...")
+
         df['solar_adjusted'] = df['radiation'].copy()
         df['risk_level'] = "LOW"
         df['fog_probability'] = 0.0
         df['smoke_penalty'] = 1.0
-        
+        df['hybrid_source'] = "Open-Meteo"  # Track which source is used
+
+        # Build Google Cloud Cover map from hourly data
+        google_cloud_map = {}
+        if google_hourly:
+            logger.info(f"[UncannyEngine] Processing {len(google_hourly)} Google hourly records for cloud timing...")
+            for h in google_hourly:
+                try:
+                    time_str = h.get('time', '')
+                    if not time_str:
+                        continue
+                    # Parse time and convert to local
+                    if 'Z' in time_str:
+                        dt = datetime.fromisoformat(time_str.replace('Z', '+00:00')).astimezone(self.timezone)
+                    else:
+                        dt = datetime.fromisoformat(time_str).astimezone(self.timezone)
+                    # Remove timezone for matching with df
+                    dt_naive = dt.replace(tzinfo=None)
+                    google_cloud_map[dt_naive] = h.get('cloud_cover', 50)
+                except Exception as e:
+                    logger.debug(f"[UncannyEngine] Error parsing Google time: {e}")
+                    continue
+            logger.info(f"[UncannyEngine] Mapped {len(google_cloud_map)} Google cloud observations")
+
         # Check text forecast for fog keywords (Narrative Override)
         text_mentions_fog = False
-        if nws_text_data:
-            logger.info("[UncannyEngine] Scanning NWS text forecast for fog keywords...")
-            for p in nws_text_data[:4]:  # Check next ~48 hours
+        if noaa_text_data:
+            logger.info("[UncannyEngine] Scanning NOAA text forecast for fog keywords...")
+            for p in noaa_text_data[:4]:  # Check next ~48 hours
                 text = p.get('detailedForecast', '').lower()
                 if 'dense fog' in text or 'patchy fog' in text or 'areas of fog' in text:
                     text_mentions_fog = True
                     logger.warning(f"[UncannyEngine] NARRATIVE OVERRIDE: '{p['name']}' mentions fog!")
                     break
-        
+
         is_fog_locked_in = False
         fog_hours_detected = 0
+        tule_fog_hours = 0
         lock_in_hours = 0
         smoke_hours_detected = 0
-        
+        hybrid_solar_used = 0
+
         for idx, row in df.iterrows():
             hour = row['time'].hour
-            
+            day_of_year = row['time'].timetuple().tm_yday
+
             # Reset lock at midnight (new day logic)
             if hour == 0:
                 is_fog_locked_in = False
 
-            # === 1. SMOKE GUARD (Applies 24/7) ===
+            # === 1. HYBRID SOLAR CALCULATION ===
+            # Get Google cloud cover for this hour (default to 50% if not available)
+            row_time = row['time']
+            if hasattr(row_time, 'to_pydatetime'):
+                row_time = row_time.to_pydatetime()
+            if row_time.tzinfo is not None:
+                row_time = row_time.replace(tzinfo=None)
+
+            google_cloud = google_cloud_map.get(row_time, 50)
+            om_radiation = row.get('radiation', 0)
+
+            # Calculate hybrid solar using the new physics module
+            if om_radiation > 0 or google_cloud < 100:
+                hybrid_watts = calculate_hybrid_solar(
+                    om_radiation=om_radiation,
+                    google_cloud=google_cloud,
+                    hour=hour,
+                    day_of_year=day_of_year
+                )
+                df.at[idx, 'solar_adjusted'] = hybrid_watts
+                df.at[idx, 'hybrid_source'] = "Hybrid (OM+Google)"
+                hybrid_solar_used += 1
+            else:
+                # No data available - use radiation as-is
+                df.at[idx, 'solar_adjusted'] = om_radiation
+
+            # === 2. SMOKE GUARD (Applies 24/7) ===
             pm = row.get('pm2_5', 0)
             smoke_factor = 1.0
             for limit, factor in self.SMOKE_TIERS:
@@ -326,29 +392,47 @@ class UncannyEngine:
                     smoke_factor = factor
                     break
             df.at[idx, 'smoke_penalty'] = smoke_factor
-            
+
             if smoke_factor < 1.0:
-                df.at[idx, 'solar_adjusted'] = row['radiation'] * smoke_factor
+                df.at[idx, 'solar_adjusted'] = df.at[idx, 'solar_adjusted'] * smoke_factor
                 if pm > 100:
                     smoke_hours_detected += 1
                     df.at[idx, 'risk_level'] = f"SMOKE ({int(pm)} ug/m3)"
 
-            # === 2. FOG GUARD ===
+            # === 3. TULE FOG SPECIFIC CHECK (Physics + Conditions) ===
+            temp = row['temp_consensus']
             dewpoint = row.get('dewpoint_c', row.get('dewpoint', 0))
             wind = row.get('wind_speed_kmh', row.get('wind', 0))
-            
-            dp_depression = row['temp_consensus'] - dewpoint
-            
+
+            # Use new Tule Fog penalty calculation
+            tule_penalty = calculate_tule_fog_penalty(temp, dewpoint, wind, hour)
+
+            if tule_penalty < 0.2:
+                # Severe Tule Fog - apply massive penalty
+                current_solar = df.at[idx, 'solar_adjusted']
+                df.at[idx, 'solar_adjusted'] = current_solar * tule_penalty
+                df.at[idx, 'risk_level'] = "CRITICAL (TULE FOG)"
+                tule_fog_hours += 1
+                logger.warning(f"[UncannyEngine] TULE FOG at {row['time']}: penalty={tule_penalty:.2f}")
+            elif tule_penalty < 0.5:
+                # Moderate Tule Fog risk
+                current_solar = df.at[idx, 'solar_adjusted']
+                df.at[idx, 'solar_adjusted'] = current_solar * tule_penalty
+                df.at[idx, 'risk_level'] = "HIGH (TULE FOG RISK)"
+
+            # === 4. STANDARD FOG GUARD (Fallback) ===
+            dp_depression = temp - dewpoint
+
             # Calculate fog probability
             depression_factor = max(0, 1 - (dp_depression / self.DEW_POINT_DEPRESSION_THRESHOLD))
             stagnation_factor = max(0, 1 - (wind / self.WIND_STAGNATION_THRESHOLD))
             fog_prob = round(depression_factor * stagnation_factor, 2)
-            
-            # NARRATIVE OVERRIDE: If NWS text mentions fog, boost probability
+
+            # NARRATIVE OVERRIDE: If NOAA text mentions fog, boost probability
             if text_mentions_fog and fog_prob > 0.3:
                 fog_prob = min(0.99, fog_prob + 0.3)
                 logger.debug(f"[UncannyEngine] Fog prob boosted by narrative: {fog_prob:.2f}")
-            
+
             df.at[idx, 'fog_probability'] = fog_prob
 
             # Pre-Dawn Lock-In Check
@@ -357,23 +441,23 @@ class UncannyEngine:
                 lock_in_hours += 1
                 logger.warning(f"[UncannyEngine] PRE-DAWN LOCK at {row['time']}: fog_prob={fog_prob:.2f}")
 
-            # Apply Fog Penalties during sun hours
-            if self.FOG_HOURS_START <= hour <= self.FOG_HOURS_END:
+            # Apply Standard Fog Penalties during sun hours (if not already penalized by Tule Fog)
+            if self.FOG_HOURS_START <= hour <= self.FOG_HOURS_END and "TULE FOG" not in df.at[idx, 'risk_level']:
                 current_adj = df.at[idx, 'solar_adjusted']
-                
+
                 if fog_prob > 0.85:
                     fog_solar = row['radiation'] * self.FOG_SOLAR_PENALTY
                     if fog_solar < current_adj:
                         df.at[idx, 'solar_adjusted'] = fog_solar
                         df.at[idx, 'risk_level'] = "CRITICAL (ACTIVE FOG)"
                         fog_hours_detected += 1
-                        
+
                 elif is_fog_locked_in:
                     fog_solar = row['radiation'] * 0.40
                     if fog_solar < current_adj:
                         df.at[idx, 'solar_adjusted'] = fog_solar
                         df.at[idx, 'risk_level'] = "HIGH (PERSISTENT STRATUS)"
-                        
+
                 elif fog_prob > 0.5:
                     fog_solar = row['radiation'] * 0.7
                     if fog_solar < current_adj:
@@ -381,14 +465,17 @@ class UncannyEngine:
                         df.at[idx, 'risk_level'] = "MODERATE (RISK)"
 
         # Final summary logging
+        logger.info(f"[UncannyEngine] Hybrid solar calculations: {hybrid_solar_used} hours processed")
+        if tule_fog_hours > 0:
+            logger.warning(f"[UncannyEngine] TULE FOG ALERT: {tule_fog_hours} hours with Central Valley radiation fog")
         if lock_in_hours > 0:
             logger.warning(f"[UncannyEngine] FOG LOCK-IN: {lock_in_hours} pre-dawn hours triggered inversion")
         if fog_hours_detected > 0:
             logger.warning(f"[UncannyEngine] ACTIVE FOG: {fog_hours_detected} daytime hours CRITICAL")
         if smoke_hours_detected > 0:
             logger.warning(f"[UncannyEngine] SMOKE IMPACT: {smoke_hours_detected} hours with PM2.5 > 100")
-        
-        if not is_fog_locked_in and fog_hours_detected == 0 and smoke_hours_detected == 0:
+
+        if not is_fog_locked_in and fog_hours_detected == 0 and smoke_hours_detected == 0 and tule_fog_hours == 0:
             logger.info("[UncannyEngine] No Tule Fog or significant smoke detected - Clear forecast")
 
         return df
@@ -502,7 +589,7 @@ if __name__ == "__main__":
             print(f"  WARNING: Critical variance detected!")
 
         print("\nRunning Fog Guard + Smoke Guard with Narrative Override...")
-        df_analyzed = engine.analyze_duck_curve(df, nws_text_data=noaa_text)
+        df_analyzed = engine.analyze_duck_curve(df, noaa_text_data=noaa_text)
 
         print("\n=== Daily Summary ===")
         for day in engine.get_daily_summary(df_analyzed, days=3):

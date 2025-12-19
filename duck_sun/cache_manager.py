@@ -125,7 +125,7 @@ class CacheManager:
             "daily_precip_prob": {},
             "status": "DEFAULT"
         },
-        "nws": [],  # Empty list, handled gracefully by PDF
+        "noaa": [],  # Empty list, handled gracefully by PDF
         "met_no": [],  # Empty list, handled gracefully by PDF
         "accuweather": [
             {"date": datetime.now().strftime("%Y-%m-%d"), "high_f": 55, "low_f": 40, "condition": "Default"},

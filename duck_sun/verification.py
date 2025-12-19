@@ -129,7 +129,7 @@ class TruthTracker:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS forecasts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source TEXT NOT NULL,              -- 'Open-Meteo', 'NWS', 'Met.no'
+                source TEXT NOT NULL,              -- 'Open-Meteo', 'NOAA', 'Met.no'
                 run_timestamp TEXT NOT NULL,       -- When the script ran (YYYY-MM-DD_HH)
                 target_date TEXT NOT NULL,         -- The date being forecast (YYYY-MM-DD)
                 days_out INTEGER NOT NULL,         -- 0 = Today, 1 = Tomorrow, etc.
@@ -175,7 +175,7 @@ class TruthTracker:
         Save a single forecast entry to the database.
         
         Args:
-            source: Provider name ('Open-Meteo', 'NWS', 'Met.no')
+            source: Provider name ('Open-Meteo', 'NOAA', 'Met.no')
             target_date: Date being forecast (YYYY-MM-DD)
             high: Predicted high temperature (Celsius)
             low: Predicted low temperature (Celsius)
@@ -420,7 +420,7 @@ def extract_daily_high_low_from_hourly(
     """
     Convert hourly temperature data to daily high/low summaries.
     
-    This is needed because NWS and Met.no return hourly temps, but we need
+    This is needed because NOAA and Met.no return hourly temps, but we need
     daily high/low for the verification system.
     
     Args:
@@ -654,7 +654,7 @@ if __name__ == "__main__":
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         
         tracker.log_forecast("Open-Meteo", tomorrow, high=15.5, low=5.2, precip=10)
-        tracker.log_forecast("NWS", tomorrow, high=14.8, low=6.0, precip=15)
+        tracker.log_forecast("NOAA", tomorrow, high=14.8, low=6.0, precip=15)
         tracker.log_forecast("Met.no", tomorrow, high=16.0, low=4.5, precip=5)
         
         # Test fetching actuals

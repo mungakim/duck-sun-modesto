@@ -164,7 +164,7 @@ def with_retry(
     Works with async functions only (all providers use async).
 
     Usage:
-        @with_retry(provider_name="NWS")
+        @with_retry(provider_name="NOAA")
         async def fetch_async(self) -> Optional[List[dict]]:
             ...
 

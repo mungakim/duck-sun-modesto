@@ -5,13 +5,14 @@ Computes robust temperature consensus using weighted statistics
 and detects high-variance conditions between weather sources.
 
 Key Features:
-1. Weighted median calculation (AccuWeather weighted highest)
+1. Weighted median calculation (Google Weather weighted highest)
 2. Outlier detection (flags sources > 2 stdev from median)
 3. Variance classification (LOW/MODERATE/CRITICAL)
 4. Confidence scoring based on source agreement
 
-WEIGHTS (Calibrated via Dec 2025 verification):
-- AccuWeather: 10.0 (Best 2-day accuracy, correctly predicted cold hold)
+WEIGHTS (Calibrated Dec 2025 + Google MetNet-3 Integration):
+- Google: 10.0 (MetNet-3 neural model - satellite/radar fusion, best 0-4 day accuracy)
+- AccuWeather: 4.0 (Commercial provider, demoted from 10 - still high quality)
 - NOAA: 3.0 (Government source, but overshot Dec 16 by +7°F)
 - Met.no: 3.0 (ECMWF model, European quality)
 - MID.org: 2.0 (Local microclimate - when available)
@@ -48,15 +49,16 @@ class WeightedEnsembleEngine:
     Weighted ensemble engine for temperature consensus.
 
     Uses weighted median to compute consensus while respecting
-    source hierarchy (AccuWeather > NWS > Met.no > Open-Meteo).
+    source hierarchy (AccuWeather > NOAA > Met.no > Open-Meteo).
 
     Outliers are flagged but NOT excluded from consensus - this
     is a "warn only" system that never blocks operations.
     """
 
-    # Source weights (calibrated via Dec 2025 verification)
+    # Source weights (calibrated Dec 2025 + Google MetNet-3 integration)
     SOURCE_WEIGHTS = {
-        "AccuWeather": 10.0,  # Best 2-day accuracy (doubled)
+        "Google": 10.0,       # MetNet-3 neural model - satellite/radar fusion (HIGHEST)
+        "AccuWeather": 4.0,   # Commercial provider - demoted from 10
         "NOAA": 3.0,          # Overshot Dec 16 by +7°F
         "Met.no": 3.0,
         "MID.org": 2.0,
@@ -81,7 +83,12 @@ class WeightedEnsembleEngine:
         unit: str = "C"
     ) -> ConsensusResult:
         """
-        Compute weighted median consensus with outlier detection.
+        Compute weighted median consensus with outlier detection and Google Veto.
+
+        The Google Veto Guardrail:
+        - If Google deviates >10°F from the peer median, demote weight 10.0 -> 3.0
+        - If Google deviates >6°F from the peer median, demote weight 10.0 -> 5.0
+        - This prevents Google "hallucinations" from crashing the forecast
 
         Args:
             sources: Dict mapping source name to temperature value (or None)
@@ -105,10 +112,40 @@ class WeightedEnsembleEngine:
                 diagnostics={"error": "No valid sources"}
             )
 
+        # === GOOGLE VETO GUARDRAIL ===
+        # Calculate "Peer Median" (everyone EXCEPT Google)
+        peers = [v for k, v in valid_sources.items() if k != "Google" and v is not None]
+        peer_median = np.median(peers) if peers else None
+
+        # Working copy of weights (may be modified by veto)
+        current_weights = self.SOURCE_WEIGHTS.copy()
+        google_veto_triggered = False
+        google_veto_severity = None
+
+        google_val = valid_sources.get("Google")
+        if google_val is not None and peer_median is not None and len(peers) >= 2:
+            # Check deviation (convert to F for intuitive threshold)
+            delta_c = abs(google_val - peer_median)
+            delta_f = delta_c * 1.8  # Convert C to F
+
+            if delta_f > 10.0:
+                logger.warning(f"[WeightedEnsembleEngine] GOOGLE VETO TRIGGERED! "
+                             f"Deviation {delta_f:.1f}F from peer median. "
+                             f"Demoting weight 10.0 -> 3.0")
+                current_weights["Google"] = 3.0
+                google_veto_triggered = True
+                google_veto_severity = "CRITICAL"
+            elif delta_f > 6.0:
+                logger.warning(f"[WeightedEnsembleEngine] Google deviating {delta_f:.1f}F "
+                             f"from peer median. Demoting weight 10.0 -> 5.0")
+                current_weights["Google"] = 5.0
+                google_veto_triggered = True
+                google_veto_severity = "MODERATE"
+
         # Convert to arrays for calculation
         source_names = list(valid_sources.keys())
         values = np.array([valid_sources[s] for s in source_names])
-        weights = np.array([self.SOURCE_WEIGHTS.get(s, 1.0) for s in source_names])
+        weights = np.array([current_weights.get(s, 1.0) for s in source_names])
 
         # Calculate unweighted median for outlier detection
         unweighted_median = np.median(values)
@@ -146,10 +183,10 @@ class WeightedEnsembleEngine:
         # Calculate confidence (higher agreement = higher confidence)
         confidence = self._calculate_confidence(values, weights, consensus_value)
 
-        # Build source contributions (normalized weights)
+        # Build source contributions (normalized weights - use current_weights which may be modified)
         total_weight = sum(weights)
         source_contributions = {
-            name: self.SOURCE_WEIGHTS.get(name, 1.0) / total_weight
+            name: current_weights.get(name, 1.0) / total_weight
             for name in source_names
         }
 
@@ -164,7 +201,11 @@ class WeightedEnsembleEngine:
             "spread_f": spread_f,
             "unit": unit,
             "outlier_count": len(outliers),
-            "raw_values": dict(valid_sources)
+            "raw_values": dict(valid_sources),
+            "google_veto_triggered": google_veto_triggered,
+            "google_veto_severity": google_veto_severity,
+            "peer_median": peer_median,
+            "effective_weights": {name: current_weights.get(name, 1.0) for name in source_names}
         }
 
         # Log summary
@@ -309,6 +350,7 @@ class WeightedEnsembleEngine:
 
 # Convenience function for simple consensus
 def quick_consensus(
+    google: Optional[float] = None,
     noaa: Optional[float] = None,
     accuweather: Optional[float] = None,
     met_no: Optional[float] = None,
@@ -320,11 +362,12 @@ def quick_consensus(
     Quick consensus calculation with named parameters.
 
     Example:
-        result = quick_consensus(noaa=7.2, met_no=8.0, open_meteo=6.5)
+        result = quick_consensus(google=7.0, noaa=7.2, met_no=8.0)
         print(f"Consensus: {result.consensus_value}°C")
     """
     engine = WeightedEnsembleEngine()
     sources = {
+        "Google": google,
         "NOAA": noaa,
         "AccuWeather": accuweather,
         "Met.no": met_no,
