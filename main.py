@@ -1,12 +1,12 @@
 """
 Duck Sun Modesto: WEIGHTED ENSEMBLE Architecture
 
-Triangulates weather data from 8 sources using weighted ensemble consensus,
+Triangulates weather data from 9 sources using weighted ensemble consensus,
 runs physics model with narrative override, logs verification stats,
 and outputs the PDF report with variance alerts.
 
-Sources: Open-Meteo + NOAA + Met.no + AccuWeather + MID.org + METAR + Smoke + HRRR
-Weights: AccuWeather(10x) > NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
+Sources: Open-Meteo + NOAA + Met.no + AccuWeather + Google + MID.org + METAR + Smoke + HRRR
+Weights: Google(10x) > AccuWeather(4x) > NOAA(3x) = Met.no(3x) > Open-Meteo(1x)
 Physics: Fog Guard + Smoke Guard + NOAA Narrative Override
 Variance: Warn-only alerts for >10°F spread (never blocks)
 
@@ -53,6 +53,7 @@ from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.smoke import SmokeProvider
 from duck_sun.providers.accuweather import AccuWeatherProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
+from duck_sun.providers.google_weather import GoogleWeatherProvider
 from duck_sun.uncanniness import UncannyEngine
 from duck_sun.pdf_report import generate_pdf_report
 from duck_sun.verification import TruthTracker, fetch_yesterday_actuals
@@ -86,8 +87,8 @@ def print_banner():
     print(f"{Fore.CYAN}   Reliability-First Temperature Consensus System{Style.RESET_ALL}")
     print(f"{Fore.CYAN}   + Fog Guard + Smoke Guard + Narrative Override{Style.RESET_ALL}")
     print(f"{Fore.CYAN}{'=' * 60}{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}   [SOURCES] Open-Meteo + HRRR + NOAA + Met.no + AccuWeather + MID.org{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}   [WEIGHTS] Accu(10x) > NOAA(3x) = Met(3x) > MID(2x) > OM(1x){Style.RESET_ALL}")
+    print(f"{Fore.WHITE}   [SOURCES] Open-Meteo + HRRR + NOAA + Met.no + AccuWeather + Google + MID.org{Style.RESET_ALL}")
+    print(f"{Fore.WHITE}   [WEIGHTS] Google(10x) > Accu(4x) > NOAA(3x) = Met(3x) > OM(1x){Style.RESET_ALL}")
     print(f"{Fore.WHITE}   [VARIANCE] Warn-only alerts for >10°F spread (never blocks){Style.RESET_ALL}")
     print()
 
@@ -103,18 +104,18 @@ def ensure_directories():
 
 async def fetch_all_sources():
     """
-    Fetch data from all weather sources (8 total).
+    Fetch data from all weather sources (9 total).
 
     Returns:
-        Tuple of (om_data, noaa_data, noaa_text, met_data, metar_raw, accu_data, smoke_data, mid_data, hrrr_data)
+        Tuple of (om_data, noaa_data, noaa_text, met_data, metar_raw, accu_data, smoke_data, mid_data, hrrr_data, noaa_daily_periods, google_data)
     """
-    print(f"{Fore.YELLOW}[1/8]{Style.RESET_ALL} Polling Open-Meteo (GFS/ICON/GEM)...")
+    print(f"{Fore.YELLOW}[1/9]{Style.RESET_ALL} Polling Open-Meteo (GFS/ICON/GEM)...")
     logger.info("[fetch_all_sources] Fetching Open-Meteo data...")
     om_data = await fetch_open_meteo(days=8)
     print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {len(om_data['daily_summary'])} hourly records")
     logger.info(f"[fetch_all_sources] Open-Meteo returned {len(om_data['daily_summary'])} records")
 
-    print(f"{Fore.YELLOW}[2/8]{Style.RESET_ALL} Polling HRRR Model (3km, 15-min updates)...")
+    print(f"{Fore.YELLOW}[2/9]{Style.RESET_ALL} Polling HRRR Model (3km, 15-min updates)...")
     logger.info("[fetch_all_sources] Fetching HRRR data...")
     hrrr_data = await fetch_hrrr_forecast()
     if hrrr_data:
@@ -125,7 +126,7 @@ async def fetch_all_sources():
         print(f"      {Fore.YELLOW}UNAVAILABLE{Style.RESET_ALL} - Using other models")
         logger.warning("[fetch_all_sources] HRRR data unavailable")
 
-    print(f"{Fore.YELLOW}[3/8]{Style.RESET_ALL} Polling NOAA (weather.gov)...")
+    print(f"{Fore.YELLOW}[3/9]{Style.RESET_ALL} Polling NOAA (weather.gov)...")
     logger.info("[fetch_all_sources] Fetching NOAA data...")
     noaa_provider = NOAAProvider()
     noaa_data = await noaa_provider.fetch_async()
@@ -154,7 +155,7 @@ async def fetch_all_sources():
     else:
         logger.warning("[fetch_all_sources] NOAA text forecast unavailable")
 
-    print(f"{Fore.YELLOW}[4/8]{Style.RESET_ALL} Polling Met.no (European ECMWF)...")
+    print(f"{Fore.YELLOW}[4/9]{Style.RESET_ALL} Polling Met.no (European ECMWF)...")
     logger.info("[fetch_all_sources] Fetching Met.no data...")
     met_provider = MetNoProvider()
     met_data = await met_provider.fetch_async()
@@ -165,7 +166,7 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL} - Using fallback")
         logger.warning("[fetch_all_sources] Met.no data unavailable")
 
-    print(f"{Fore.YELLOW}[5/8]{Style.RESET_ALL} Polling AccuWeather (Commercial)...")
+    print(f"{Fore.YELLOW}[5/9]{Style.RESET_ALL} Polling AccuWeather (Commercial)...")
     logger.info("[fetch_all_sources] Fetching AccuWeather data...")
     accu_provider = AccuWeatherProvider()
     accu_data = await accu_provider.fetch_forecast()
@@ -176,7 +177,20 @@ async def fetch_all_sources():
         print(f"      {Fore.YELLOW}UNAVAILABLE{Style.RESET_ALL} - Quota exceeded or no API key")
         logger.warning("[fetch_all_sources] AccuWeather data unavailable")
 
-    print(f"{Fore.YELLOW}[6/8]{Style.RESET_ALL} Polling MID.org (Local Modesto)...")
+    print(f"{Fore.YELLOW}[6/9]{Style.RESET_ALL} Polling Google Weather (MetNet-3 Neural Model)...")
+    logger.info("[fetch_all_sources] Fetching Google Weather data...")
+    google_provider = GoogleWeatherProvider()
+    google_data = await google_provider.fetch_forecast(hours=96)
+    if google_data:
+        hourly_count = len(google_data.get('hourly', []))
+        daily_count = len(google_data.get('daily', []))
+        print(f"      {Fore.GREEN}OK{Style.RESET_ALL} - {hourly_count} hourly, {daily_count} daily records")
+        logger.info(f"[fetch_all_sources] Google Weather returned {hourly_count} hourly, {daily_count} daily records")
+    else:
+        print(f"      {Fore.YELLOW}UNAVAILABLE{Style.RESET_ALL} - No API key or quota exceeded")
+        logger.warning("[fetch_all_sources] Google Weather data unavailable")
+
+    print(f"{Fore.YELLOW}[7/9]{Style.RESET_ALL} Polling MID.org (Local Modesto)...")
     logger.info("[fetch_all_sources] Fetching MID.org local data...")
     mid_provider = MIDOrgProvider()
     mid_data = await mid_provider.fetch_48hr_summary()
@@ -187,7 +201,7 @@ async def fetch_all_sources():
         print(f"      {Fore.YELLOW}UNAVAILABLE{Style.RESET_ALL} - JS-rendered (pending enhancement)")
         logger.info("[fetch_all_sources] MID.org data unavailable (expected - JS-rendered)")
 
-    print(f"{Fore.YELLOW}[7/8]{Style.RESET_ALL} Fetching KMOD Ground Truth (METAR)...")
+    print(f"{Fore.YELLOW}[8/9]{Style.RESET_ALL} Fetching KMOD Ground Truth (METAR)...")
     logger.info("[fetch_all_sources] Fetching METAR data...")
     metar_provider = MetarProvider()
     metar_raw = await metar_provider.fetch_async()
@@ -199,7 +213,7 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL}")
         logger.warning("[fetch_all_sources] METAR data unavailable")
 
-    print(f"{Fore.YELLOW}[8/8]{Style.RESET_ALL} Polling Air Quality (Smoke/PM2.5)...")
+    print(f"{Fore.YELLOW}[9/9]{Style.RESET_ALL} Polling Air Quality (Smoke/PM2.5)...")
     logger.info("[fetch_all_sources] Fetching smoke/AQI data...")
     smoke_provider = SmokeProvider()
     smoke_data = await smoke_provider.fetch_async(days=5)
@@ -219,7 +233,7 @@ async def fetch_all_sources():
         print(f"      {Fore.RED}UNAVAILABLE{Style.RESET_ALL}")
         logger.warning("[fetch_all_sources] Smoke data unavailable")
 
-    return om_data, noaa_data, noaa_text, met_data, metar_raw, accu_data, smoke_data, mid_data, hrrr_data, noaa_daily_periods
+    return om_data, noaa_data, noaa_text, met_data, metar_raw, accu_data, smoke_data, mid_data, hrrr_data, noaa_daily_periods, google_data
 
 
 def run_consensus_model(om_data, noaa_data, met_data, accu_data, mid_data, smoke_data, noaa_text):
@@ -441,11 +455,11 @@ async def main(args=None):
 
     try:
         # Step 1: Fetch from all sources
-        print(f"{Fore.WHITE}STEP 1: Fetching Weather Data (8 Sources){Style.RESET_ALL}")
+        print(f"{Fore.WHITE}STEP 1: Fetching Weather Data (9 Sources){Style.RESET_ALL}")
         print("-" * 40)
         logger.info("[main] STEP 1: Fetching weather data from all sources...")
         (om_data, noaa_data, noaa_text, met_data, metar_raw,
-         accu_data, smoke_data, mid_data, hrrr_data, noaa_daily_periods) = await fetch_all_sources()
+         accu_data, smoke_data, mid_data, hrrr_data, noaa_daily_periods, google_data) = await fetch_all_sources()
 
         if not om_data:
             print(f"{Fore.RED}CRITICAL ERROR: Primary data source failed.{Style.RESET_ALL}")
@@ -586,7 +600,8 @@ async def main(args=None):
             mid_data=mid_data,
             hrrr_data=hrrr_data,
             precip_data=precip_data,
-            noaa_daily_periods=noaa_daily_periods
+            noaa_daily_periods=noaa_daily_periods,
+            google_data=google_data
         )
         
         if pdf_path:
