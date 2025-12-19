@@ -366,10 +366,19 @@ class GoogleWeatherProvider:
 
         This matches how other providers (NOAA, Met.no) report daily stats.
         """
-        tz = ZoneInfo(self.TIMEZONE)
+        logger.info(f"[GoogleWeatherProvider] _aggregate_to_daily called with {len(hourly_data)} hourly records")
+
+        try:
+            tz = ZoneInfo(self.TIMEZONE)
+        except Exception as e:
+            logger.error(f"[GoogleWeatherProvider] Failed to create timezone: {e}")
+            return []
+
         daily_temps: Dict[str, List[float]] = {}
         daily_precip: Dict[str, List[int]] = {}
         daily_conditions: Dict[str, List[str]] = {}
+        processed_count = 0
+        error_count = 0
 
         for hour in hourly_data:
             try:
@@ -398,10 +407,14 @@ class GoogleWeatherProvider:
                 daily_precip[date_key].append(hour['precip_prob'])
                 if hour.get('is_daytime', True):
                     daily_conditions[date_key].append(hour['condition'])
+                processed_count += 1
 
             except Exception as e:
-                logger.debug(f"[GoogleWeatherProvider] Error aggregating hour: {e}")
+                error_count += 1
+                logger.warning(f"[GoogleWeatherProvider] Error aggregating hour: {e}")
                 continue
+
+        logger.info(f"[GoogleWeatherProvider] Aggregation loop: {processed_count} processed, {error_count} errors, {len(daily_temps)} unique days")
 
         # Build daily results
         results: List[GoogleDailyData] = []
