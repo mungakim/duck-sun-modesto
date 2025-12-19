@@ -287,7 +287,7 @@ def run_consensus_model(om_data, noaa_data, met_data, accu_data, mid_data, smoke
     # Apply Fog Guard + Smoke Guard + Narrative Override
     print(f"{Fore.CYAN}Applying Fog Guard + Smoke Guard + Narrative Override...{Style.RESET_ALL}")
     logger.info("[run_consensus_model] Running physics engine with narrative override...")
-    df_analyzed = engine.analyze_duck_curve(df, nws_text_data=noaa_text)
+    df_analyzed = engine.analyze_duck_curve(df, noaa_text_data=noaa_text)
 
     # Count risk levels
     critical_fog = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
