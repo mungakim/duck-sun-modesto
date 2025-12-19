@@ -54,6 +54,7 @@ jobs:
       env:
         LOG_LEVEL: INFO
         ACCUWEATHER_API_KEY: ${{ secrets.ACCUWEATHER_API_KEY }}
+        GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       run: |
         python main.py
 
