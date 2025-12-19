@@ -143,6 +143,12 @@ class CacheManager:
             "today": {"high": "55", "low": "40", "condition": "Default"},
             "yesterday": {"high": "54", "low": "39", "condition": "Default"}
         },
+        "google_weather": {
+            "hourly": [],
+            "daily": [],
+            "source": "DEFAULT",
+            "fetched_at": "DEFAULT"
+        },
         "metar": None,  # Ground truth - None is acceptable
         "smoke": None,  # Optional - None is acceptable
     }

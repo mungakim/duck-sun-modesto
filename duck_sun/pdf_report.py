@@ -476,7 +476,11 @@ def generate_pdf_report(
     # Process Google Weather data (MetNet-3 neural model - HIGHEST WEIGHT)
     google_daily = {}
     if google_data:
+        logger.info(f"[generate_pdf_report] Google data keys: {list(google_data.keys()) if isinstance(google_data, dict) else 'NOT A DICT'}")
         daily_list = google_data.get('daily', [])
+        logger.info(f"[generate_pdf_report] Google daily_list length: {len(daily_list)}")
+        if daily_list:
+            logger.info(f"[generate_pdf_report] Google first daily entry: {daily_list[0]}")
         for d in daily_list:
             if 'high_f' in d and 'low_f' in d:
                 google_daily[d['date']] = {
@@ -489,6 +493,8 @@ def generate_pdf_report(
                     'low_f': round(d['low_c'] * 1.8 + 32)
                 }
         logger.info(f"[generate_pdf_report] Google Weather processed: {len(google_daily)} days (MetNet-3)")
+    else:
+        logger.warning(f"[generate_pdf_report] google_data is None or empty!")
 
     pdf = DuckSunPDF()
     pdf.add_page()

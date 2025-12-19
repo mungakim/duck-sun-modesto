@@ -347,7 +347,13 @@ async def main():
         google_hourly = None
         if google_data and isinstance(google_data, dict):
             google_hourly = google_data.get('hourly', [])
+            google_daily_list = google_data.get('daily', [])
             logger.info(f"[main] Extracted {len(google_hourly) if google_hourly else 0} Google hourly records")
+            logger.info(f"[main] Extracted {len(google_daily_list)} Google daily records")
+            if google_daily_list:
+                logger.info(f"[main] Google daily sample: {google_daily_list[0]}")
+        else:
+            logger.warning(f"[main] google_data is None or not a dict: {type(google_data)}")
 
         logger.info("[main] Analyzing duck curve and fog risk (Hybrid Solar Physics)...")
         df_analyzed = engine.analyze_duck_curve(df, google_hourly=google_hourly)
