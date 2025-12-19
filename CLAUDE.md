@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 8 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
+Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 9 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
 
-**Current Status:** Production Ready - Calibrated for 7-Day Verification Test (Dec 16, 2025)
+**Current Status:** Production Ready - Google MetNet-3 Neural Model Integration (Dec 18, 2025)
 
 ## Architecture
 
@@ -19,16 +19,19 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 1. **Source Replication:** Each provider fetches from the exact same API endpoint that powers the official website, ensuring organic alignment without hardcoding.
 2. **Deterministic Solar Math:** Solar factor calculation is done in Python for 100% accuracy.
-3. **Weighted Ensemble:** AccuWeather(10x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
+3. **Weighted Ensemble:** Google(10x) > AccuWeather(4x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
 
 ### Data Sourcing Strategy
 
-| Provider | API Endpoint | Alignment Target |
-|----------|-------------|------------------|
-| **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website |
-| **AccuWeather** | Official 5-day API | accuweather.com |
-| **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute |
-| **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) |
+| Provider | API Endpoint | Alignment Target | Weight |
+|----------|-------------|------------------|--------|
+| **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **10x** |
+| **AccuWeather** | Official 5-day API | accuweather.com | 4x |
+| **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website | 3x |
+| **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute | 3x |
+| **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) | 1x |
+
+**Google Weather (MetNet-3):** The primary source uses Google's neural weather model which fuses satellite imagery and radar data for hyperlocal 0-96 hour predictions. Superior short-term accuracy compared to pure physics models.
 
 **NOAA Organic Sourcing:** The NOAA provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official weather.gov website exactly.
 
@@ -51,6 +54,7 @@ python -m duck_sun.providers.open_meteo
 ## Environment Variables
 
 Required in `.env`:
+- `GOOGLE_MAPS_API_KEY` - Google Maps Platform Weather API key (MetNet-3 neural model)
 - `ACCUWEATHER_API_KEY` - AccuWeather API key for forecast data
 - `LOG_LEVEL` (optional) - Defaults to INFO
 
@@ -68,25 +72,28 @@ Required in `.env`:
 ## PDF Report Structure
 
 The PDF report includes:
-- 8-day temperature grid from 4 sources with weighted consensus
+- 8-day temperature grid from 5 sources with weighted consensus
 - MID Weather 48-hour summary with historical records
-- Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather)
+- Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
 - 3-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
-## Calibration Status (Dec 16, 2025)
+## Calibration Status (Dec 18, 2025)
 
-**Source Replication Complete:**
-- **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov)
-- **AccuWeather:** Direct API sourcing (matches accuweather.com)
-- **Met.no:** ECMWF European model via Locationforecast 2.0 API
-- **Open-Meteo:** Independent physics model (provides "second opinion")
+**Google MetNet-3 Integration Complete:**
+- **Google Weather:** MetNet-3 neural model via Maps Platform Weather API (HIGHEST weight - 10x)
+- **AccuWeather:** Direct API sourcing (matches accuweather.com) - Weight: 4x
+- **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov) - Weight: 3x
+- **Met.no:** ECMWF European model via Locationforecast 2.0 API - Weight: 3x
+- **Open-Meteo:** Independent physics model (provides "second opinion") - Weight: 1x
 
-**Verification Results (Dec 16 Test Case):**
+**Weight Rationale:**
+- Google MetNet-3 uses real-time radar/satellite fusion for superior 0-96 hour accuracy
+- Neural model "nowcasts" rather than just physics simulations
+- Best for hyperlocal, short-term predictions (ideal for duck curve forecasting)
+
+**Previous Verification Results (Dec 16 Test Case):**
 - Actual: High 51°F, Low 41°F
-- **AccuWeather:** Predicted 48-51°F → **Winner** (0-3°F error)
+- **AccuWeather:** Predicted 48-51°F → Winner (0-3°F error)
 - **NOAA:** Predicted 58°F → Miss (+7°F)
-- **Met.no:** ECMWF European model (new addition)
 - **Open-Meteo:** Predicted 60°F → Major miss (+9°F)
-
-**Weight Adjustment:** AccuWeather promoted to 10x (highest), NOAA and Met.no at 3x, Open-Meteo at 1x based on 2-day forecast accuracy.

@@ -1,8 +1,8 @@
 """
 PDF Report Generator for Duck Sun Modesto
-Weights: Accu(10x), NOAA(3x), Met.no(3x), OM(1x)
+Weights: Google(10x), Accu(4x), NOAA(3x), Met.no(3x), OM(1x)
 
-WEIGHTED ENSEMBLE ARCHITECTURE - Reliability is King
+WEIGHTED ENSEMBLE ARCHITECTURE - Google MetNet-3 Neural Model is Primary
 """
 
 import logging
@@ -96,12 +96,12 @@ def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "
 def calculate_weighted_average(values: List[Optional[float]], weights: List[float]) -> Optional[int]:
     """Calculate weighted average from values with weights."""
     total_val, total_weight = 0.0, 0.0
-    
+
     for val, weight in zip(values, weights):
         if val is not None:
             total_val += val * weight
             total_weight += weight
-    
+
     if total_weight > 0:
         result = round(total_val / total_weight)
         logger.debug(f"[weighted_average] values={values}, weights={weights}, result={result}")
@@ -109,50 +109,291 @@ def calculate_weighted_average(values: List[Optional[float]], weights: List[floa
     return None
 
 
+def calculate_weighted_average_excluding_max(
+    values: List[Optional[float]],
+    weights: List[float]
+) -> tuple[Optional[int], set[int]]:
+    """
+    Calculate weighted average excluding ONE highest value.
+
+    If multiple sources have the same max, only exclude the first one found.
+
+    Returns:
+        tuple: (weighted_average, set of indices that were excluded - always 0 or 1 element)
+    """
+    # Find valid values with their indices
+    valid_pairs = [(i, v) for i, v in enumerate(values) if v is not None]
+
+    if not valid_pairs:
+        return None, set()
+
+    # Find the maximum value and the FIRST index that has it
+    max_val = max(v for _, v in valid_pairs)
+    excluded_idx = None
+    for i, v in valid_pairs:
+        if v == max_val:
+            excluded_idx = i
+            break  # Only exclude the first one
+
+    excluded_indices = {excluded_idx} if excluded_idx is not None else set()
+
+    # Calculate weighted average excluding ONE max value
+    total_val, total_weight = 0.0, 0.0
+    for i, v in valid_pairs:
+        if i not in excluded_indices:
+            total_val += v * weights[i]
+            total_weight += weights[i]
+
+    if total_weight > 0:
+        result = round(total_val / total_weight)
+        logger.debug(f"[weighted_average_excl_max] values={values}, excluded={excluded_indices}, result={result}")
+        return result, excluded_indices
+
+    # Only one value existed - return it
+    return round(max_val), excluded_indices
 
 
+def calculate_clear_sky_ghi(hour: int, day_of_year: int, lat: float = 37.6391) -> float:
+    """
+    Calculate theoretical clear-sky Global Horizontal Irradiance (GHI).
+
+    Uses a simplified solar position model for Modesto, CA.
+
+    Args:
+        hour: Local hour (0-23)
+        day_of_year: Day of year (1-366)
+        lat: Latitude in degrees
+
+    Returns:
+        Clear-sky GHI in W/m² (0 if sun is below horizon)
+    """
+    import math
+
+    # Solar declination angle
+    declination = 23.45 * math.sin(math.radians(360 * (284 + day_of_year) / 365))
+
+    # Hour angle (solar noon = 0)
+    # Assume solar noon at 12:30 PST for Modesto
+    hour_angle = 15 * (hour - 12.5)
+
+    # Solar elevation angle
+    lat_rad = math.radians(lat)
+    decl_rad = math.radians(declination)
+    hour_rad = math.radians(hour_angle)
+
+    sin_elevation = (math.sin(lat_rad) * math.sin(decl_rad) +
+                     math.cos(lat_rad) * math.cos(decl_rad) * math.cos(hour_rad))
+
+    if sin_elevation <= 0:
+        return 0.0  # Sun below horizon
+
+    elevation = math.degrees(math.asin(sin_elevation))
+
+    # Clear-sky GHI model (simplified)
+    # Max GHI at solar noon in winter ~600 W/m², summer ~1000 W/m²
+    # Seasonal factor based on day of year
+    seasonal_factor = 0.7 + 0.3 * math.cos(math.radians((day_of_year - 172) * 360 / 365))
+    max_ghi = 900 * seasonal_factor
+
+    # GHI based on elevation angle
+    ghi = max_ghi * sin_elevation
+
+    return min(ghi, 900)  # Cap at MAX_GHI
+
+
+def estimate_irradiance_from_cloud_cover(cloud_cover: int, hour: int, day_of_year: int) -> float:
+    """
+    Estimate solar irradiance from cloud cover percentage.
+
+    Args:
+        cloud_cover: Cloud cover percentage (0-100)
+        hour: Local hour (0-23)
+        day_of_year: Day of year (1-366)
+
+    Returns:
+        Estimated GHI in W/m²
+    """
+    # Get clear-sky GHI
+    clear_sky_ghi = calculate_clear_sky_ghi(hour, day_of_year)
+
+    if clear_sky_ghi <= 0:
+        return 0.0
+
+    # Cloud cover attenuation (70% reduction at 100% cloud cover)
+    cloud_fraction = cloud_cover / 100.0
+    attenuation = 1.0 - (0.7 * cloud_fraction)
+
+    return round(clear_sky_ghi * attenuation, 1)
+
+
+
+
+def get_solar_color_and_desc(risk_level: str, solar_value: float, condition: str = None) -> tuple:
+    """
+    Get cell color AND description based on solar conditions.
+
+    Returns (r, g, b), description - ensures color and text are always consistent.
+
+    Legend mapping:
+    - Gray (220,220,220) = "Cloudy" (solar < 50)
+    - Blue (200,230,255) = "Some Sun" (solar 50-150)
+    - Light Green (200,255,200) = "Good Sun" (solar 150-400)
+    - Bright Green (144,238,144) = "Full Sun" (solar > 400)
+    - Yellow (255,255,180) = "Fog Possible" (MODERATE risk)
+    - Orange (255,210,160) = "Heavy Clouds" (HIGH/STRATUS risk)
+    - Pink (255,180,180) = "Dense Fog" (CRITICAL/FOG risk)
+    - Purple/Grey (180,160,200) = "TULE FOG" (Central Valley radiation fog - DISTINCT)
+    """
+    risk_upper = risk_level.upper()
+
+    # TULE FOG - Distinct purple/grey color (Central Valley specific)
+    # This takes highest priority as it's a distinct weather phenomenon
+    if 'TULE FOG' in risk_upper:
+        return (180, 160, 200), "TULE FOG"
+
+    # Risk-based colors take priority (weather impacts)
+    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
+        return (255, 180, 180), "Dense Fog"
+    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
+        return (255, 210, 160), "Heavy Clouds"
+    elif 'MODERATE' in risk_upper:
+        return (255, 255, 180), "Fog Possible"
+
+    # For LOW risk, check if we have a valid weather condition from API
+    # (not "Unknown", not "Open-Meteo" - those are fallback markers)
+    if condition and condition not in ('Unknown', 'Open-Meteo'):
+        cond_lower = condition.lower()
+        # Map weather conditions to appropriate colors based on solar impact
+        if 'rain' in cond_lower or 'storm' in cond_lower or 'shower' in cond_lower:
+            # Rain/storms = Heavy Clouds (orange)
+            desc = "Light rain" if 'light' in cond_lower else "Rain" if 'rain' in cond_lower else "Storms"
+            return (255, 210, 160), desc
+        elif 'fog' in cond_lower or 'mist' in cond_lower:
+            return (255, 255, 180), "Fog Possible"
+        elif 'cloudy' in cond_lower:
+            if 'partly' in cond_lower:
+                # Partly cloudy = Some Sun (blue)
+                return (200, 230, 255), "Partly cloudy"
+            elif 'mostly' in cond_lower:
+                # Mostly cloudy = less sun, use solar value
+                if solar_value < 50:
+                    return (220, 220, 220), "Mostly cloudy"
+                else:
+                    return (200, 230, 255), "Mostly cloudy"
+            else:
+                # Full cloudy
+                return (220, 220, 220), "Cloudy"
+        elif 'clear' in cond_lower or 'sunny' in cond_lower:
+            if solar_value >= 400:
+                return (144, 238, 144), "Clear, sunny"
+            elif solar_value >= 150:
+                return (200, 255, 200), "Clear, sunny"
+            else:
+                return (200, 230, 255), "Clear, sunny"
+
+    # Fall back to solar-value based color and description (legend-consistent)
+    if solar_value < 50:
+        return (220, 220, 220), "Cloudy"
+    elif solar_value < 150:
+        return (200, 230, 255), "Some Sun"
+    elif solar_value < 400:
+        return (200, 255, 200), "Good Sun"
+    else:
+        return (144, 238, 144), "Full Sun"
+
+
+# Keep old functions for backward compatibility but have them use the new one
 def get_solar_color(risk_level: str, solar_value: float) -> tuple:
     """Get cell color based on solar conditions."""
-    risk_upper = risk_level.upper()
-    
-    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
-        return (255, 180, 180)
-    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
-        return (255, 210, 160)
-    elif 'MODERATE' in risk_upper:
-        return (255, 255, 180)
-    elif solar_value < 50:
-        return (220, 220, 220)
-    elif solar_value < 150:
-        return (200, 230, 255)
-    else:
-        return (200, 255, 200)
+    color, _ = get_solar_color_and_desc(risk_level, solar_value)
+    return color
 
 
-def get_descriptive_risk(risk_level: str) -> str:
-    """Convert risk codes to human-readable 3-7 word descriptions."""
-    risk_upper = risk_level.upper()
-    
-    if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
-        return "Dense fog, minimal solar"
-    elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
-        return "Stratus layer blocking"
-    elif 'MODERATE' in risk_upper:
-        return "Fog risk, reduced solar"
-    elif 'SMOKE' in risk_upper:
-        # Extract PM2.5 value if present
-        import re
-        match = re.search(r'(\d+)', risk_level)
-        if match:
-            pm_val = int(match.group(1))
-            if pm_val > 100:
-                return "Heavy smoke, poor air"
-            else:
-                return "Light smoke haze"
-        return "Smoke affecting solar"
-    else:
-        # LOW risk
-        return "Clear, good conditions"
+def get_descriptive_risk(risk_level: str, condition: str = None, solar_value: float = 0) -> str:
+    """Get description consistent with color."""
+    _, desc = get_solar_color_and_desc(risk_level, solar_value, condition)
+    return desc
+
+
+def get_daily_condition_display(condition: str, dewpoint_c: float = None, temp_c: float = None,
+                                 visibility_low: bool = False) -> tuple:
+    """
+    Map Google Weather API condition to display text and color for daily descriptor.
+
+    Detects rare Tule Fog conditions for Central Valley:
+    - Temperature near or below dewpoint (high humidity)
+    - Low visibility
+    - Cool, calm conditions typical of radiation fog
+
+    Returns: (display_text, background_color_rgb, text_color_rgb, is_special)
+    """
+    if not condition or condition == "Unknown":
+        return ("--", (240, 240, 240), (100, 100, 100), False)
+
+    cond_lower = condition.lower()
+
+    # SPECIAL RARE CONDITIONS - Tule Fog detection for Central Valley
+    # Tule fog occurs when: cold nights, high humidity (temp near dewpoint), calm winds
+    is_potential_fog = False
+    if dewpoint_c is not None and temp_c is not None:
+        temp_dewpoint_spread = temp_c - dewpoint_c
+        # If spread is < 2°C and conditions are foggy/misty, it's likely Tule fog
+        if temp_dewpoint_spread < 2.0 and ('fog' in cond_lower or 'mist' in cond_lower):
+            is_potential_fog = True
+
+    if 'fog' in cond_lower or 'mist' in cond_lower:
+        if is_potential_fog or visibility_low:
+            # RARE TULE FOG - special formatting (red background, white text, bold)
+            return ("TULE FOG", (180, 0, 0), (255, 255, 255), True)
+        else:
+            return ("Fog", (255, 230, 180), (80, 60, 0), False)
+
+    # Rain conditions
+    if 'thunderstorm' in cond_lower or 'storm' in cond_lower:
+        return ("Storms", (100, 100, 180), (255, 255, 255), True)  # Special - rare
+    elif 'heavy rain' in cond_lower:
+        return ("Heavy Rain", (100, 140, 200), (255, 255, 255), False)
+    elif 'rain shower' in cond_lower or 'showers' in cond_lower:
+        return ("Showers", (140, 170, 220), (0, 0, 80), False)
+    elif 'light rain' in cond_lower:
+        return ("Light Rain", (180, 200, 230), (0, 0, 80), False)
+    elif 'drizzle' in cond_lower:
+        return ("Drizzle", (180, 200, 230), (0, 0, 80), False)
+    elif 'rain' in cond_lower:
+        return ("Rain", (120, 160, 210), (255, 255, 255), False)
+
+    # Snow (rare for Central Valley - special)
+    if 'snow' in cond_lower or 'sleet' in cond_lower or 'ice' in cond_lower:
+        return ("SNOW", (200, 220, 255), (0, 0, 120), True)  # Special - rare
+
+    # Cloud conditions
+    if 'overcast' in cond_lower:
+        return ("Overcast", (200, 200, 200), (40, 40, 40), False)
+    elif 'cloudy' in cond_lower:
+        if 'partly' in cond_lower:
+            return ("Partly Cloudy", (230, 245, 255), (40, 60, 80), False)
+        elif 'mostly' in cond_lower:
+            return ("Mostly Cloudy", (210, 220, 230), (40, 50, 60), False)
+        else:
+            return ("Cloudy", (200, 210, 220), (40, 50, 60), False)
+
+    # Clear/Sunny conditions
+    if 'clear' in cond_lower or 'sunny' in cond_lower:
+        return ("Sunny", (255, 250, 200), (120, 100, 0), False)
+    elif 'fair' in cond_lower:
+        return ("Fair", (250, 250, 220), (100, 90, 0), False)
+
+    # Haze/Smoke (can be special during fire season)
+    if 'haze' in cond_lower or 'smoke' in cond_lower:
+        return ("SMOKE/HAZE", (255, 200, 150), (120, 60, 0), True)  # Special
+
+    # Wind
+    if 'wind' in cond_lower:
+        return ("Windy", (230, 240, 255), (60, 80, 120), False)
+
+    # Default - use the condition as-is, truncated
+    display = condition[:12] if len(condition) > 12 else condition
+    return (display, (245, 245, 245), (60, 60, 60), False)
 
 
 def generate_pdf_report(
@@ -160,7 +401,8 @@ def generate_pdf_report(
     noaa_data: Optional[List],
     met_data: Optional[List],
     accu_data: Optional[List],
-    df_analyzed: pd.DataFrame,
+    google_data: Optional[Dict] = None,
+    df_analyzed: pd.DataFrame = None,
     fog_critical_hours: int = 0,
     output_path: Optional[Path] = None,
     mid_data: Optional[Dict] = None,
@@ -171,13 +413,14 @@ def generate_pdf_report(
     report_timestamp: Optional[datetime] = None
 ) -> Optional[Path]:
     """
-    Generate PDF report with 4-source temperature grid and weighted consensus.
+    Generate PDF report with 5-source temperature grid and weighted consensus.
 
     Args:
         om_data: Open-Meteo forecast data
         noaa_data: NOAA hourly data (fallback if period data unavailable)
         met_data: Met.no hourly data (ECMWF European model)
         accu_data: AccuWeather daily data (5-day forecast)
+        google_data: Google Weather API data (MetNet-3 neural model) - HIGHEST WEIGHT
         df_analyzed: Analyzed dataframe with solar/fog data
         fog_critical_hours: Number of critical fog hours
         output_path: Output path for PDF
@@ -229,6 +472,23 @@ def generate_pdf_report(
                     'low_f': round(d['low_c'] * 1.8 + 32)
                 }
         logger.info(f"[generate_pdf_report] AccuWeather processed: {len(accu_daily)} days (native F)")
+
+    # Process Google Weather data (MetNet-3 neural model - HIGHEST WEIGHT)
+    google_daily = {}
+    if google_data:
+        daily_list = google_data.get('daily', [])
+        for d in daily_list:
+            if 'high_f' in d and 'low_f' in d:
+                google_daily[d['date']] = {
+                    'high_f': int(d['high_f']),
+                    'low_f': int(d['low_f'])
+                }
+            elif 'high_c' in d and 'low_c' in d:
+                google_daily[d['date']] = {
+                    'high_f': round(d['high_c'] * 1.8 + 32),
+                    'low_f': round(d['low_c'] * 1.8 + 32)
+                }
+        logger.info(f"[generate_pdf_report] Google Weather processed: {len(google_daily)} days (MetNet-3)")
 
     pdf = DuckSunPDF()
     pdf.add_page()
@@ -424,12 +684,13 @@ def generate_pdf_report(
     day_col = (usable_width - weight_col - source_col) / 8
     half_col, row_h = day_col / 2, 6
 
-    # Source weights for display (calibrated Dec 2025)
+    # Source weights for display (calibrated Dec 2025 + Google MetNet-3)
     SOURCE_WEIGHT_DISPLAY = {
         'OPEN-METEO': '1.0',
         'NOAA (GOV)': '3.0',
         'MET.NO (EU)': '3.0',
-        'ACCU (COM)': '10.0',
+        'ACCU (COM)': '4.0',
+        'GOOGLE (AI)': '10.0',  # MetNet-3 neural model - HIGHEST
     }
 
     # Define alternating day column colors (pastels for readability)
@@ -445,6 +706,71 @@ def generate_pdf_report(
     ]
 
     logger.info("[generate_pdf_report] Drawing temperature grid...")
+
+    # ===================
+    # BUILD MERGED CONDITIONS MAP
+    # Priority: Google (best) → AccuWeather → Open-Meteo (always 8 days)
+    # ===================
+    daily_conditions = {}
+
+    # Step 1: Open-Meteo as base (always has 8 days from WMO weather codes)
+    for day_record in om_daily:
+        date_key = day_record.get('date', '')
+        condition = day_record.get('condition', 'Unknown')
+        if condition and condition != 'Unknown':
+            daily_conditions[date_key] = {'condition': condition, 'source': 'Open-Meteo'}
+
+    # Step 2: AccuWeather overwrites (better quality, 5 days)
+    if accu_data:
+        for day_record in accu_data:
+            date_key = day_record.get('date', '')
+            condition = day_record.get('condition', '')
+            if condition and condition != 'Unknown':
+                daily_conditions[date_key] = {'condition': condition, 'source': 'AccuWeather'}
+
+    # Step 3: Google overwrites (best quality, 4-5 days)
+    if google_data:
+        for day_record in google_data.get('daily', []):
+            date_key = day_record.get('date', '')
+            condition = day_record.get('condition', '')
+            if condition and condition != 'Unknown':
+                daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
+
+    logger.info(f"[generate_pdf_report] Merged conditions: {len(daily_conditions)} days")
+    for date_key, info in list(daily_conditions.items())[:3]:
+        logger.debug(f"[generate_pdf_report]   {date_key}: {info['condition']} ({info['source']})")
+
+    # ===================
+    # CONDITION DESCRIPTORS ROW (Above Day Names)
+    # Shows overall daily weather condition for each day
+    # ===================
+    pdf.set_font('Helvetica', 'B', 6)
+    pdf.set_text_color(80, 80, 80)
+    pdf.set_fill_color(250, 250, 250)
+    pdf.cell(weight_col + source_col, row_h - 1, '', 1, 0, 'C', 1)  # Merged blank cell (no label)
+
+    for i, day in enumerate(om_daily):
+        date_key = day.get('date', '')
+        condition_info = daily_conditions.get(date_key, {'condition': 'Unknown', 'source': None})
+        condition = condition_info['condition']
+
+        # Get display text and colors
+        display_text, bg_color, text_color, is_special = get_daily_condition_display(condition)
+
+        # Set colors
+        pdf.set_fill_color(*bg_color)
+        pdf.set_text_color(*text_color)
+
+        # Bold for special conditions (rare weather)
+        if is_special:
+            pdf.set_font('Helvetica', 'B', 6)
+        else:
+            pdf.set_font('Helvetica', '', 6)
+
+        pdf.cell(day_col, row_h - 1, display_text, 1, 0, 'C', 1)
+
+    pdf.ln()
+    pdf.set_text_color(0, 0, 0)  # Reset text color
 
     # Header Row (Day Names) - Color coded by day
     pdf.set_text_color(255, 255, 255)
@@ -476,8 +802,32 @@ def generate_pdf_report(
         pdf.cell(day_col, row_h-1, date_str, 1, 0, 'C', 1)
     pdf.ln()
 
-    def draw_row_colored(label: str, getter):
-        """Draw a single row with weight + source name + color-coded Hi/Lo cells."""
+    # Pre-calculate which high value is excluded (highest) for each day
+    # excluded_highs[day_index] = set with ONE source index (0=OM, 1=NOAA, 2=Met.no, 3=Accu, 4=Google)
+    excluded_highs = {}
+    for i, day in enumerate(om_daily):
+        k = day.get('date', '')
+        hi_vals = [
+            day.get('high_f'),
+            noaa_daily.get(k, {}).get('high_f'),
+            met_daily.get(k, {}).get('high_f'),
+            accu_daily.get(k, {}).get('high_f'),
+            google_daily.get(k, {}).get('high_f')
+        ]
+        # Find max value and the FIRST index that has it (only exclude one)
+        valid_highs = [(idx, v) for idx, v in enumerate(hi_vals) if v is not None]
+        if valid_highs:
+            max_high = max(v for _, v in valid_highs)
+            for idx, v in valid_highs:
+                if v == max_high:
+                    excluded_highs[i] = {idx}  # Only exclude the first one
+                    break
+        else:
+            excluded_highs[i] = set()
+
+    def draw_row_colored(label: str, getter, source_idx: int):
+        """Draw a single row with weight + source name + color-coded Hi/Lo cells.
+        Highlights excluded (max) high values in red."""
         pdf.set_text_color(0, 0, 0)
 
         # Weight column (light gray)
@@ -492,33 +842,49 @@ def generate_pdf_report(
         pdf.cell(source_col, row_h, label, 1, 0, 'C', 1)
 
         # Temperature cells - COLOR CODED BY DAY
-        pdf.set_font('Helvetica', '', 7)
+        pdf.set_font('Helvetica', '', 8)  # 15% larger than original 7pt
         for i, d in enumerate(om_daily):
+            v1, v2 = getter(d, d.get('date', ''))
+
+            # Check if this high value is excluded (max)
+            is_excluded_high = source_idx in excluded_highs.get(i, set())
+
+            # High cell - red background if excluded, else day color
+            if is_excluded_high and v1 is not None:
+                pdf.set_fill_color(255, 180, 180)  # Light red for excluded
+            else:
+                day_color = DAY_COLORS[i % len(DAY_COLORS)]
+                pdf.set_fill_color(*day_color)
+            pdf.cell(half_col, row_h, str(v1) if v1 else "--", 1, 0, 'C', 1)
+
+            # Low cell - always day color
             day_color = DAY_COLORS[i % len(DAY_COLORS)]
             pdf.set_fill_color(*day_color)
-            v1, v2 = getter(d, d.get('date', ''))
-            pdf.cell(half_col, row_h, str(v1) if v1 else "--", 1, 0, 'C', 1)
             pdf.cell(half_col, row_h, str(v2) if v2 else "--", 1, 0, 'C', 1)
         pdf.ln()
 
-    # Draw source rows with day-colored columns
+    # Draw source rows with day-colored columns (pass source index for exclusion tracking)
     draw_row_colored('OPEN-METEO',
-             lambda d, k: (d.get('high_f'), d.get('low_f')))
+             lambda d, k: (d.get('high_f'), d.get('low_f')), 0)
 
     draw_row_colored('NOAA (GOV)',
-             lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')))
+             lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')), 1)
 
     draw_row_colored('MET.NO (EU)',
-             lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')))
+             lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2)
 
     draw_row_colored('ACCU (COM)',
-             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')))
+             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3)
+
+    draw_row_colored('GOOGLE (AI)',
+             lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 4)
 
     # ===================
     # WEIGHTED AVERAGES ROW
-    # Weights: OM(1), NOAA(3), Met.no(3), Accu(10) - Calibrated Dec 2025
+    # Weights: OM(1), NOAA(3), Met.no(3), Accu(4), Google(10) - Dec 2025 + MetNet-3
+    # EXCLUDES HIGHEST HIGH VALUE(S) FROM CALCULATION
     # ===================
-    logger.info("[generate_pdf_report] Calculating weighted averages...")
+    logger.info("[generate_pdf_report] Calculating weighted averages (excluding max highs)...")
 
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
@@ -526,8 +892,10 @@ def generate_pdf_report(
     pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight cell for averages row
     pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
 
-    weights = [1.0, 3.0, 3.0, 10.0]  # Weights: OM, NOAA, Met.no, Accu (calibrated Dec 2025)
+    # Weights: OM, NOAA, Met.no, Accu, Google (calibrated Dec 2025 + MetNet-3)
+    weights = [1.0, 3.0, 3.0, 4.0, 10.0]
 
+    pdf.set_font('Helvetica', 'B', 8)  # 15% larger for weighted average values
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
         # Slightly golden tint on day colors for averages row
@@ -539,19 +907,23 @@ def generate_pdf_report(
             day.get('high_f'),
             noaa_daily.get(k, {}).get('high_f'),
             met_daily.get(k, {}).get('high_f'),
-            accu_daily.get(k, {}).get('high_f')
+            accu_daily.get(k, {}).get('high_f'),
+            google_daily.get(k, {}).get('high_f')
         ]
         lo_vals = [
             day.get('low_f'),
             noaa_daily.get(k, {}).get('low_f'),
             met_daily.get(k, {}).get('low_f'),
-            accu_daily.get(k, {}).get('low_f')
+            accu_daily.get(k, {}).get('low_f'),
+            google_daily.get(k, {}).get('low_f')
         ]
 
-        avg_hi = calculate_weighted_average(hi_vals, weights)
+        # Calculate high average EXCLUDING the max value(s)
+        avg_hi, excluded = calculate_weighted_average_excluding_max(hi_vals, weights)
+        # Low average uses all values (no exclusion)
         avg_lo = calculate_weighted_average(lo_vals, weights)
 
-        logger.debug(f"[generate_pdf_report] {k}: hi_vals={hi_vals}, avg_hi={avg_hi}")
+        logger.debug(f"[generate_pdf_report] {k}: hi_vals={hi_vals}, excluded={excluded}, avg_hi={avg_hi}")
 
         pdf.cell(half_col, row_h, str(avg_hi) if avg_hi else "--", 1, 0, 'C', 1)
         pdf.cell(half_col, row_h, str(avg_lo) if avg_lo else "--", 1, 0, 'C', 1)
@@ -585,42 +957,130 @@ def generate_pdf_report(
             day_color = DAY_COLORS[i % len(DAY_COLORS)]
             pdf.set_fill_color(*day_color)
 
-        pdf.set_font('Helvetica', '', 7)
+        pdf.set_font('Helvetica', '', 8)  # 15% larger for consistency
         pdf.cell(day_col, row_h, f"{precip_pct}%", 1, 0, 'C', 1)
     pdf.ln()
 
     # Precip sources note - right-aligned below temperature matrix
     pdf.set_font('Helvetica', 'I', 5)
     pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 3, 'PRECIP = Avg of NOAA HRRR (3km), Open-Meteo, AccuWeather  ', 0, 1, 'R')
+    pdf.cell(0, 3, 'PRECIP = Google (0-72hr) > AccuWeather (72hr+) > Open-Meteo  ', 0, 1, 'R')
 
     # ===================
-    # SOLAR FORECAST GRID (3-Day)
+    # SOLAR FORECAST GRID (4-Day: Today + 3 Days)
+    # Uses Google Weather API cloud cover → estimated irradiance
     # ===================
     pdf.ln(1)
     pdf.set_font('Helvetica', 'B', 9)
     pdf.set_text_color(0, 60, 120)
-    pdf.cell(0, 5, 'SOLAR FORECAST (9AM-4PM) - W/m² Irradiance', 0, 1, 'L')
-    
-    logger.info("[generate_pdf_report] Drawing solar forecast grid...")
-    
+    pdf.cell(0, 5, 'SOLAR FORECAST (GOOGLE AI WEATHER API) - W/m² Irradiance', 0, 1, 'L')
+
+    logger.info("[generate_pdf_report] Drawing solar forecast grid (Google Weather)...")
+
     tz = ZoneInfo("America/Los_Angeles")
-    future_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(1, 4)]
-    
-    duck_data = {d: [] for d in future_dates}
-    for _, row in df_analyzed.iterrows():
+    # 4 days: today + next 3 days
+    forecast_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 4)]
+
+    # Build duck curve data from Google Weather hourly cloud cover
+    duck_data = {d: [] for d in forecast_dates}
+
+    # Get Google hourly data
+    google_hourly = google_data.get('hourly', []) if google_data else []
+
+    for hour_record in google_hourly:
         try:
-            row_date = row['time'].strftime('%Y-%m-%d')
-            row_hour = row['time'].hour
-            if row_date in future_dates and 9 <= row_hour <= 16:
+            time_str = hour_record.get('time', '')
+            if not time_str:
+                continue
+
+            # Parse UTC time and convert to local
+            if 'Z' in time_str:
+                dt = datetime.fromisoformat(time_str.replace('Z', '+00:00')).astimezone(tz)
+            else:
+                dt = datetime.fromisoformat(time_str).astimezone(tz)
+
+            row_date = dt.strftime('%Y-%m-%d')
+            row_hour = dt.hour
+
+            # Duck curve hours: 9 AM to 4 PM (HE09-HE16)
+            if row_date in forecast_dates and 9 <= row_hour <= 16:
+                cloud_cover = hour_record.get('cloud_cover', 50)
+                day_of_year = dt.timetuple().tm_yday
+                condition = hour_record.get('condition', 'Unknown')
+
+                # Estimate irradiance from cloud cover
+                irradiance = estimate_irradiance_from_cloud_cover(cloud_cover, row_hour, day_of_year)
+
+                # Determine risk level from condition
+                condition_lower = condition.lower()
+                if 'rain' in condition_lower or 'storm' in condition_lower:
+                    risk = 'HIGH'
+                elif cloud_cover >= 90:
+                    risk = 'MODERATE'
+                elif cloud_cover >= 70:
+                    risk = 'LOW-MOD'
+                else:
+                    risk = 'LOW'
+
                 duck_data[row_date].append({
                     'hour': row_hour,
-                    'solar': row.get('solar_adjusted', 0),
-                    'risk': row.get('risk_level', 'LOW')
+                    'solar': irradiance,
+                    'risk': risk,
+                    'condition': condition
                 })
         except Exception as e:
-            logger.debug(f"[generate_pdf_report] Error processing row: {e}")
+            logger.debug(f"[generate_pdf_report] Error processing Google hour: {e}")
             continue
+
+    # Fallback to df_analyzed if no Google data available
+    if not any(duck_data.values()) and df_analyzed is not None:
+        logger.info("[generate_pdf_report] Falling back to ensemble data for solar forecast")
+        for _, row in df_analyzed.iterrows():
+            try:
+                row_date = row['time'].strftime('%Y-%m-%d')
+                row_hour = row['time'].hour
+                if row_date in forecast_dates and 9 <= row_hour <= 16:
+                    duck_data[row_date].append({
+                        'hour': row_hour,
+                        'solar': row.get('solar_adjusted', 0),
+                        'risk': row.get('risk_level', 'LOW'),
+                        'condition': None  # Will use solar-based description
+                    })
+            except Exception as e:
+                logger.debug(f"[generate_pdf_report] Error processing row: {e}")
+                continue
+
+    # Fill gaps for TODAY using Open-Meteo if Google doesn't have past hours
+    # (Google API only returns data from "now" forward, so morning hours may be missing)
+    today = datetime.now(tz).strftime('%Y-%m-%d')
+    if today in forecast_dates and df_analyzed is not None:
+        existing_hours = {h['hour'] for h in duck_data.get(today, [])}
+        missing_duck_hours = [h for h in range(9, 17) if h not in existing_hours]
+
+        if missing_duck_hours:
+            logger.info(f"[generate_pdf_report] Filling {len(missing_duck_hours)} missing hours for today from Open-Meteo")
+            for _, row in df_analyzed.iterrows():
+                try:
+                    row_date = row['time'].strftime('%Y-%m-%d')
+                    row_hour = row['time'].hour
+                    if row_date == today and row_hour in missing_duck_hours:
+                        # Estimate cloud-adjusted irradiance from Open-Meteo solar data
+                        solar_val = row.get('solar_adjusted', 0)
+                        if solar_val == 0:
+                            solar_val = row.get('solar_raw', 0)
+
+                        duck_data[today].append({
+                            'hour': row_hour,
+                            'solar': solar_val,
+                            'risk': row.get('risk_level', 'LOW'),
+                            'condition': None  # Will use solar-based description
+                        })
+                except Exception as e:
+                    logger.debug(f"[generate_pdf_report] Error filling gap: {e}")
+                    continue
+
+            # Sort today's hours after adding
+            duck_data[today].sort(key=lambda x: x['hour'])
 
     date_label_col = 22
     hour_col = (usable_width - date_label_col) / 8
@@ -636,7 +1096,7 @@ def generate_pdf_report(
     pdf.ln()
 
     # Data rows
-    for d in future_dates:
+    for d in forecast_dates:
         # Save starting position for this row
         row_x_start = pdf.get_x()
         row_y_start = pdf.get_y()
@@ -672,18 +1132,24 @@ def generate_pdf_report(
         hours_dict = {h['hour']: h for h in duck_data.get(d, [])}
         
         for i in range(8):
-            h_data = hours_dict.get(9+i, {'solar': 0, 'risk': 'LOW'})
-            r, g, b = get_solar_color(h_data['risk'], h_data['solar'])
+            h_data = hours_dict.get(9+i, {'solar': 0, 'risk': 'LOW', 'condition': 'Unknown'})
+            # Boost solar value by 15% for display (calibration adjustment)
+            solar_display = h_data['solar'] * 1.15
+            condition = h_data.get('condition', 'Unknown')
+
+            # Get BOTH color and description from same function (ensures consistency)
+            (r, g, b), risk_desc = get_solar_color_and_desc(
+                h_data['risk'], solar_display, condition
+            )
             pdf.set_fill_color(r, g, b)
-            
-            # Solar value
+
+            # Solar value (boosted 15%)
             pdf.set_xy(x_start + i * hour_col, y_start)
-            pdf.cell(hour_col, solar_row_h, f"{h_data['solar']:.0f}", 1, 0, 'C', 1)
-            
-            # Risk label - use descriptive text instead of truncated codes
+            pdf.cell(hour_col, solar_row_h, f"{solar_display:.0f}", 1, 0, 'C', 1)
+
+            # Condition label - consistent with color
             pdf.set_xy(x_start + i * hour_col, y_start + solar_row_h)
-            pdf.set_font('Helvetica', 'I', 6)  # 6pt (2pts larger than original 4pt)
-            risk_desc = get_descriptive_risk(h_data['risk'])
+            pdf.set_font('Helvetica', 'I', 6)
             pdf.cell(hour_col, solar_row_h, risk_desc, 1, 0, 'C', 1)
             pdf.set_font('Helvetica', '', 6)
         
@@ -691,43 +1157,77 @@ def generate_pdf_report(
         pdf.set_xy(row_x_start, row_y_start + solar_row_h * 2)
 
     # ===================
-    # SOLAR IRRADIANCE LEGEND (directly below solar grid)
+    # SOLAR IRRADIANCE LEGEND (single line, compact)
     # ===================
     pdf.ln(1)
-    pdf.set_font('Helvetica', '', 6)
+    pdf.set_font('Helvetica', '', 5)
     pdf.set_text_color(80, 80, 80)
 
-    # Draw legend items inline, positioned below solar grid (shifted 1" / 25.4mm to the right)
+    # Draw all legend items on one line
     legend_y = pdf.get_y()
-    legend_x = margin + date_label_col + 25.4  # Start 1 inch to the right of hour columns
-    box_w, box_h = 4, 3
+    legend_x = margin + 2
+    box_w, box_h = 3, 2.5
 
-    # <50 W/m² - Minimal
+    # Cloudy/No Sun - Gray
     pdf.set_fill_color(220, 220, 220)
     pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
-    pdf.set_xy(legend_x + box_w + 1, legend_y)
-    pdf.cell(38, box_h, '<50 W/m² = Minimal', 0, 0, 'L')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(18, box_h, 'Cloudy', 0, 0, 'L')
 
-    # 50-150 W/m² - Low
-    legend_x += 44
+    # Some Sun - Blue
+    legend_x += 22
     pdf.set_fill_color(200, 230, 255)
     pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
-    pdf.set_xy(legend_x + box_w + 1, legend_y)
-    pdf.cell(42, box_h, '50-150 W/m² = Low-Moderate', 0, 0, 'L')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(18, box_h, 'Some Sun', 0, 0, 'L')
 
-    # 150-400 W/m² - Good
-    legend_x += 48
+    # Good Sun - Light Green
+    legend_x += 22
     pdf.set_fill_color(200, 255, 200)
     pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
-    pdf.set_xy(legend_x + box_w + 1, legend_y)
-    pdf.cell(48, box_h, '150-400 W/m² = Good Production', 0, 0, 'L')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(18, box_h, 'Good Sun', 0, 0, 'L')
 
-    # >400 W/m² - Peak
-    legend_x += 54
+    # Full Sun - Bright Green
+    legend_x += 22
     pdf.set_fill_color(144, 238, 144)
     pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
-    pdf.set_xy(legend_x + box_w + 1, legend_y)
-    pdf.cell(48, box_h, '>400 W/m² = Peak Production', 0, 0, 'L')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(18, box_h, 'Full Sun', 0, 0, 'L')
+
+    # Fog Possible - Yellow
+    legend_x += 24
+    pdf.set_fill_color(255, 255, 180)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(20, box_h, 'Fog Possible', 0, 0, 'L')
+
+    # Heavy Clouds - Orange
+    legend_x += 24
+    pdf.set_fill_color(255, 210, 160)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(22, box_h, 'Heavy Clouds', 0, 0, 'L')
+
+    # Dense Fog - Pink
+    legend_x += 26
+    pdf.set_fill_color(255, 180, 180)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(18, box_h, 'Dense Fog', 0, 0, 'L')
+
+    # Tule Fog - Purple/Grey (Central Valley specific)
+    legend_x += 22
+    pdf.set_fill_color(180, 160, 200)
+    pdf.rect(legend_x, legend_y, box_w, box_h, 'F')
+    pdf.set_xy(legend_x + box_w + 0.5, legend_y)
+    pdf.cell(16, box_h, 'Tule Fog', 0, 0, 'L')
+
+    # Units note
+    legend_x += 18
+    pdf.set_xy(legend_x, legend_y)
+    pdf.set_font('Helvetica', 'I', 4)
+    pdf.cell(30, box_h, '(values = W/m²)', 0, 0, 'L')
     
     
     # ===================

@@ -30,6 +30,7 @@ from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
 from duck_sun.providers.noaa import NOAAProvider
 from duck_sun.providers.met_no import MetNoProvider
 from duck_sun.providers.accuweather import AccuWeatherProvider
+from duck_sun.providers.google_weather import GoogleWeatherProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.smoke import SmokeProvider
@@ -41,6 +42,9 @@ from duck_sun.pdf_report import generate_pdf_report
 # Resilience infrastructure
 from duck_sun.resilience import with_retry, RetryConfig, categorize_error
 from duck_sun.cache_manager import CacheManager, FetchResult
+
+# Verification system (Truth Tracker)
+from duck_sun.verification import TruthTracker, run_daily_verification
 
 # Load environment variables
 load_dotenv()
@@ -131,7 +135,7 @@ async def fetch_with_retry(
 
 async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]:
     """
-    Fetch data from ALL 8 providers with retry + fallback.
+    Fetch data from ALL 9 providers with retry + fallback.
 
     Returns:
         Dict mapping provider name to FetchResult
@@ -139,7 +143,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     """
     results: Dict[str, FetchResult] = {}
 
-    logger.info("[fetch_all_providers] Starting fetch from 8 providers...")
+    logger.info("[fetch_all_providers] Starting fetch from 9 providers...")
 
     # 1. Open-Meteo (primary source - required)
     logger.info("[fetch_all_providers] Fetching Open-Meteo...")
@@ -176,7 +180,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["met_no"] = await fetch_with_retry("met_no", _fetch_met, cache_mgr)
 
-    # 5. AccuWeather (commercial - weight 10x HIGHEST)
+    # 5. AccuWeather (commercial - weight 4x)
     logger.info("[fetch_all_providers] Fetching AccuWeather...")
 
     async def _fetch_accu():
@@ -185,7 +189,16 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["accuweather"] = await fetch_with_retry("accuweather", _fetch_accu, cache_mgr)
 
-    # 6. MID.org (local ground truth)
+    # 6. Google Weather (MetNet-3 neural model - weight 10x HIGHEST)
+    logger.info("[fetch_all_providers] Fetching Google Weather (MetNet-3)...")
+
+    async def _fetch_google():
+        google = GoogleWeatherProvider()
+        return await google.fetch_forecast(hours=96)
+
+    results["google_weather"] = await fetch_with_retry("google_weather", _fetch_google, cache_mgr)
+
+    # 7. MID.org (local ground truth)
     logger.info("[fetch_all_providers] Fetching MID.org...")
 
     async def _fetch_mid():
@@ -194,7 +207,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["mid_org"] = await fetch_with_retry("mid_org", _fetch_mid, cache_mgr)
 
-    # 7. METAR (airport observations)
+    # 8. METAR (airport observations)
     logger.info("[fetch_all_providers] Fetching METAR...")
 
     async def _fetch_metar():
@@ -204,7 +217,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["metar"] = await fetch_with_retry("metar", _fetch_metar, cache_mgr)
 
-    # 8. Smoke (air quality)
+    # 9. Smoke (air quality)
     logger.info("[fetch_all_providers] Fetching Smoke/AQI...")
 
     async def _fetch_smoke():
@@ -243,9 +256,43 @@ async def main():
         cache_mgr = CacheManager()
         cache_mgr.increment_run_count()
 
+        # --- STEP 0: AUTOMATED VERIFICATION (Truth Tracker) ---
+        logger.info("")
+        logger.info("STEP 0: Running Truth Tracker (Yesterday's Verification)...")
+        logger.info("-" * 40)
+
+        tracker = TruthTracker()
+        try:
+            verify_result = await run_daily_verification(tracker)
+            if verify_result:
+                leaderboard = verify_result.get('leaderboard', [])
+                if leaderboard:
+                    top_dog = leaderboard[0]['source']
+                    top_mae = leaderboard[0]['combined_mae']
+                    logger.info(f"LEADERBOARD UPDATE: {top_dog} is currently #1 (MAE: {top_mae}C)")
+
+                    # Log top 3
+                    for entry in leaderboard[:3]:
+                        logger.info(f"  #{entry['rank']} {entry['source']}: "
+                                  f"High MAE={entry['high_error_mae']}C, "
+                                  f"Low MAE={entry['low_error_mae']}C")
+
+                    # ADVANCED: Dynamic Weight Alert (if Google falls out of Top 3)
+                    google_rank = next((x['rank'] for x in leaderboard if x['source'] == 'Google'), 99)
+                    if google_rank > 3:
+                        logger.error(f"GOOGLE WEATHER ACCURACY ALERT: Ranked #{google_rank}")
+                else:
+                    logger.info("No verification data yet (need 24+ hours of forecasts)")
+            else:
+                logger.info("Could not fetch yesterday's actuals - skipping verification")
+        except Exception as e:
+            logger.warning(f"Verification failed (non-critical): {e}")
+        finally:
+            tracker.close()
+
         # --- STEP 1: Fetch ALL Data Sources ---
         logger.info("")
-        logger.info("STEP 1: Fetching weather data from ALL 8 providers...")
+        logger.info("STEP 1: Fetching weather data from ALL 9 providers...")
         logger.info("-" * 40)
 
         results = await fetch_all_providers(cache_mgr)
@@ -256,6 +303,7 @@ async def main():
         noaa_data = results["noaa"].data
         met_data = results["met_no"].data
         accu_data = results["accuweather"].data
+        google_data = results["google_weather"].data
         mid_data = results["mid_org"].data
         metar_data = results["metar"].data
         smoke_data = results["smoke"].data
@@ -295,15 +343,24 @@ async def main():
             mid_data=mid_data if mid_data else None
         )
 
-        logger.info("[main] Analyzing duck curve and fog risk...")
-        df_analyzed = engine.analyze_duck_curve(df)
+        # Extract Google hourly data for hybrid solar calculations
+        google_hourly = None
+        if google_data and isinstance(google_data, dict):
+            google_hourly = google_data.get('hourly', [])
+            logger.info(f"[main] Extracted {len(google_hourly) if google_hourly else 0} Google hourly records")
 
-        # Count risk levels
+        logger.info("[main] Analyzing duck curve and fog risk (Hybrid Solar Physics)...")
+        df_analyzed = engine.analyze_duck_curve(df, google_hourly=google_hourly)
+
+        # Count risk levels (including Tule Fog specific detection)
         critical_hours = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
+        tule_fog_hours = len(df_analyzed[df_analyzed['risk_level'].str.contains('TULE FOG', na=False)])
         moderate_hours = len(df_analyzed[df_analyzed['risk_level'].str.contains('MODERATE', na=False)])
 
+        if tule_fog_hours > 0:
+            logger.warning(f"[main] TULE FOG ALERT: {tule_fog_hours} hours with Central Valley radiation fog")
         if critical_hours > 0:
-            logger.warning(f"[main] TULE FOG ALERT: {critical_hours} critical hours detected")
+            logger.warning(f"[main] CRITICAL FOG ALERT: {critical_hours} critical hours detected")
         elif moderate_hours > 0:
             logger.info(f"[main] FOG RISK: {moderate_hours} hours under monitoring")
         else:
@@ -344,16 +401,81 @@ async def main():
         if degraded:
             logger.warning(f"[main] Degraded providers: {', '.join(degraded)}")
 
+        # Build PRECIP consensus data with range-aware source selection
+        # Google MetNet-3 is best for 0-72 hours (days 0-2)
+        # AccuWeather is better for 72+ hours (days 3+) - physics models beat neural at longer ranges
+        precip_data = {}
+        today = start_time.strftime('%Y-%m-%d')
+
+        # Step 1: Open-Meteo as fallback base (always has 8 days)
+        if om_data and 'daily_forecast' in om_data:
+            for d in om_data['daily_forecast']:
+                date_key = d.get('date', '')
+                if date_key:
+                    precip_data[date_key] = {
+                        'consensus': d.get('precip_prob', 0),
+                        'source': 'Open-Meteo'
+                    }
+
+        # Step 2: AccuWeather overwrites Open-Meteo (better quality, 5 days)
+        if accu_data:
+            for d in accu_data:
+                date_key = d.get('date', '')
+                if date_key and d.get('precip_prob') is not None:
+                    precip_data[date_key] = {
+                        'consensus': d.get('precip_prob', 0),
+                        'source': 'AccuWeather'
+                    }
+
+        # Step 3: Google Weather overwrites BUT ONLY for days 0-2 (0-72 hours)
+        # MetNet-3 neural model is optimized for short-term "nowcasting"
+        # At 72+ hours, physics models (AccuWeather) are more reliable for precip
+        if google_data and 'daily' in google_data:
+            from datetime import datetime as dt_class
+            today_dt = dt_class.strptime(today, '%Y-%m-%d')
+
+            for d in google_data['daily']:
+                date_key = d.get('date', '')
+                if date_key and d.get('precip_prob') is not None:
+                    try:
+                        forecast_dt = dt_class.strptime(date_key, '%Y-%m-%d')
+                        days_ahead = (forecast_dt - today_dt).days
+
+                        # Only use Google for days 0-2 (0-72 hours)
+                        if days_ahead <= 2:
+                            precip_data[date_key] = {
+                                'consensus': d.get('precip_prob', 0),
+                                'source': 'Google'
+                            }
+                        else:
+                            # For days 3+, keep AccuWeather (already set in step 2)
+                            # Log when Google would disagree significantly
+                            accu_val = precip_data.get(date_key, {}).get('consensus', 0)
+                            google_val = d.get('precip_prob', 0)
+                            if abs(google_val - accu_val) > 30:
+                                logger.warning(f"[main] PRECIP RANGE CHECK: {date_key} (day {days_ahead}) - "
+                                             f"Google={google_val}% vs AccuWeather={accu_val}% - Using AccuWeather")
+                    except ValueError:
+                        pass
+
+        # Log precip source summary
+        google_days = sum(1 for v in precip_data.values() if v.get('source') == 'Google')
+        accu_days = sum(1 for v in precip_data.values() if v.get('source') == 'AccuWeather')
+        om_days = sum(1 for v in precip_data.values() if v.get('source') == 'Open-Meteo')
+        logger.info(f"[main] PRECIP sources: Google={google_days} (days 0-2), AccuWeather={accu_days} (days 3+), Open-Meteo={om_days}")
+
         pdf_path = generate_pdf_report(
             om_data=om_data,
             noaa_data=noaa_data,
             met_data=met_data,
             accu_data=accu_data,
+            google_data=google_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
             output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.pdf",
             mid_data=mid_data,
             hrrr_data=hrrr_data,
+            precip_data=precip_data,
             degraded_sources=degraded if degraded else None,
             noaa_daily_periods=noaa_daily_periods if noaa_daily_periods else None,
             report_timestamp=start_time
@@ -380,7 +502,7 @@ async def main():
             logger.info(f"  PDF:  {pdf_path}")
         else:
             logger.warning("  PDF:  Generation skipped (fpdf2 not installed)")
-        logger.info(f"  Providers: {len(active_sources)}/8 active")
+        logger.info(f"  Providers: {len(active_sources)}/9 active")
         if degraded:
             logger.warning(f"  Degraded: {', '.join(degraded)}")
         logger.info(f"  Duration: {duration:.2f} seconds")
