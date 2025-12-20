@@ -6,7 +6,7 @@ runs physics model with narrative override, logs verification stats,
 and outputs the PDF report with variance alerts.
 
 Sources: Open-Meteo + NOAA + Met.no + AccuWeather + Google + MID.org + METAR + Smoke + HRRR
-Weights: Google(10x) > AccuWeather(4x) > NOAA(3x) = Met.no(3x) > Open-Meteo(1x)
+Weights: Google(6x) > AccuWeather(4x) > NOAA(3x) = Met.no(3x) > Open-Meteo(1x)
 Physics: Fog Guard + Smoke Guard + NOAA Narrative Override
 Variance: Warn-only alerts for >10°F spread (never blocks)
 
@@ -88,7 +88,7 @@ def print_banner():
     print(f"{Fore.CYAN}   + Fog Guard + Smoke Guard + Narrative Override{Style.RESET_ALL}")
     print(f"{Fore.CYAN}{'=' * 60}{Style.RESET_ALL}")
     print(f"{Fore.WHITE}   [SOURCES] Open-Meteo + HRRR + NOAA + Met.no + AccuWeather + Google + MID.org{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}   [WEIGHTS] Google(10x) > Accu(4x) > NOAA(3x) = Met(3x) > OM(1x){Style.RESET_ALL}")
+    print(f"{Fore.WHITE}   [WEIGHTS] Google(6x) > Accu(4x) > NOAA(3x) = Met(3x) > OM(1x){Style.RESET_ALL}")
     print(f"{Fore.WHITE}   [VARIANCE] Warn-only alerts for >10°F spread (never blocks){Style.RESET_ALL}")
     print()
 
@@ -258,7 +258,7 @@ def run_consensus_model(om_data, noaa_data, met_data, accu_data, mid_data, smoke
     engine = UncannyEngine()
 
     # Normalize and merge temperatures from ALL sources
-    logger.info("[run_consensus_model] Building weighted ensemble (Accu 10x > NOAA 3x > Met 3x > MID 2x > OM 1x)...")
+    logger.info("[run_consensus_model] Building weighted ensemble (Google 6x > Accu 4x > NOAA 3x > Met 3x > MID 2x > OM 1x)...")
     df = engine.normalize_temps(
         om_data, noaa_data, met_data,
         accu_data=accu_data,
@@ -422,7 +422,7 @@ async def save_outputs(timestamp: str, om_data, df_analyzed, engine, metar_raw, 
         "location": "Modesto, CA",
         "architecture": "Weighted Ensemble (Reliability-First)",
         "sources": ["Open-Meteo", "NOAA", "Met.no", "AccuWeather", "MID.org", "AQI"],
-        "weights": {"AccuWeather": 10, "NOAA": 3, "Met.no": 3, "MID.org": 2, "Open-Meteo": 1},
+        "weights": {"Google": 6, "AccuWeather": 4, "NOAA": 3, "Met.no": 3, "MID.org": 2, "Open-Meteo": 1},
         "variance_report": engine.get_variance_report() if hasattr(engine, 'get_variance_report') else {},
         "8_day_outlook": engine.get_daily_summary(df_analyzed, days=8),
         "duck_curve_tomorrow": engine.get_duck_curve_hours(df_analyzed),

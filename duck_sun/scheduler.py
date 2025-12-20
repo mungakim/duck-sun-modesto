@@ -189,7 +189,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["accuweather"] = await fetch_with_retry("accuweather", _fetch_accu, cache_mgr)
 
-    # 6. Google Weather (MetNet-3 neural model - weight 10x HIGHEST)
+    # 6. Google Weather (MetNet-3 neural model - weight 6x)
     logger.info("[fetch_all_providers] Fetching Google Weather (MetNet-3)...")
 
     async def _fetch_google():

@@ -1,6 +1,6 @@
 """
 PDF Report Generator for Duck Sun Modesto
-Weights: Google(10x), Accu(4x), NOAA(3x), Met.no(3x), OM(1x)
+Weights: Google(6x), Accu(4x), NOAA(3x), Met.no(3x), OM(1x)
 
 WEIGHTED ENSEMBLE ARCHITECTURE - Google MetNet-3 Neural Model is Primary
 """
@@ -898,8 +898,8 @@ def generate_pdf_report(
     pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight cell for averages row
     pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
 
-    # Weights: OM, NOAA, Met.no, Accu, Google (calibrated Dec 2025 + MetNet-3)
-    weights = [1.0, 3.0, 3.0, 4.0, 10.0]
+    # Weights: OM, NOAA, Met.no, Accu, Google (calibrated Dec 2025)
+    weights = [1.0, 3.0, 3.0, 4.0, 6.0]
 
     pdf.set_font('Helvetica', 'B', 8)  # 15% larger for weighted average values
     for i, day in enumerate(om_daily):

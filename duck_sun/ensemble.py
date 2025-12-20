@@ -10,13 +10,13 @@ Key Features:
 3. Variance classification (LOW/MODERATE/CRITICAL)
 4. Confidence scoring based on source agreement
 
-WEIGHTS (Calibrated Dec 2025 + Google MetNet-3 Integration):
-- Google: 10.0 (MetNet-3 neural model - satellite/radar fusion, best 0-4 day accuracy)
-- AccuWeather: 4.0 (Commercial provider, demoted from 10 - still high quality)
-- NOAA: 3.0 (Government source, but overshot Dec 16 by +7°F)
-- Met.no: 3.0 (ECMWF model, European quality)
-- MID.org: 2.0 (Local microclimate - when available)
-- Open-Meteo: 1.0 (Fallback only - missed Dec 16 by +9°F)
+WEIGHTS (Calibrated Dec 2025):
+- Google: 6.0 (MetNet-3 neural model - satellite/radar fusion)
+- AccuWeather: 4.0 (Commercial provider)
+- NOAA: 3.0 (Government source)
+- Met.no: 3.0 (ECMWF model)
+- MID.org: 2.0 (Local microclimate)
+- Open-Meteo: 1.0 (Fallback)
 
 VARIANCE THRESHOLDS (in Fahrenheit):
 - LOW: spread < 5°F (normal operation)
@@ -55,14 +55,14 @@ class WeightedEnsembleEngine:
     is a "warn only" system that never blocks operations.
     """
 
-    # Source weights (calibrated Dec 2025 + Google MetNet-3 integration)
+    # Source weights (calibrated Dec 2025)
     SOURCE_WEIGHTS = {
-        "Google": 10.0,       # MetNet-3 neural model - satellite/radar fusion (HIGHEST)
-        "AccuWeather": 4.0,   # Commercial provider - demoted from 10
-        "NOAA": 3.0,          # Overshot Dec 16 by +7°F
-        "Met.no": 3.0,
-        "MID.org": 2.0,
-        "Open-Meteo": 1.0,    # Missed Dec 16 by +9°F
+        "Google": 6.0,        # MetNet-3 neural model - satellite/radar fusion
+        "AccuWeather": 4.0,   # Commercial provider
+        "NOAA": 3.0,          # Government source
+        "Met.no": 3.0,        # ECMWF model
+        "MID.org": 2.0,       # Local microclimate
+        "Open-Meteo": 1.0,    # Fallback
     }
 
     # Variance thresholds (Fahrenheit)
@@ -86,8 +86,8 @@ class WeightedEnsembleEngine:
         Compute weighted median consensus with outlier detection and Google Veto.
 
         The Google Veto Guardrail:
-        - If Google deviates >10°F from the peer median, demote weight 10.0 -> 3.0
-        - If Google deviates >6°F from the peer median, demote weight 10.0 -> 5.0
+        - If Google deviates >10°F from the peer median, demote weight 6.0 -> 2.0
+        - If Google deviates >6°F from the peer median, demote weight 6.0 -> 3.0
         - This prevents Google "hallucinations" from crashing the forecast
 
         Args:
@@ -131,14 +131,14 @@ class WeightedEnsembleEngine:
             if delta_f > 10.0:
                 logger.warning(f"[WeightedEnsembleEngine] GOOGLE VETO TRIGGERED! "
                              f"Deviation {delta_f:.1f}F from peer median. "
-                             f"Demoting weight 10.0 -> 3.0")
-                current_weights["Google"] = 3.0
+                             f"Demoting weight 6.0 -> 2.0")
+                current_weights["Google"] = 2.0
                 google_veto_triggered = True
                 google_veto_severity = "CRITICAL"
             elif delta_f > 6.0:
                 logger.warning(f"[WeightedEnsembleEngine] Google deviating {delta_f:.1f}F "
-                             f"from peer median. Demoting weight 10.0 -> 5.0")
-                current_weights["Google"] = 5.0
+                             f"from peer median. Demoting weight 6.0 -> 3.0")
+                current_weights["Google"] = 3.0
                 google_veto_triggered = True
                 google_veto_severity = "MODERATE"
 

@@ -19,13 +19,13 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 1. **Source Replication:** Each provider fetches from the exact same API endpoint that powers the official website, ensuring organic alignment without hardcoding.
 2. **Deterministic Solar Math:** Solar factor calculation is done in Python for 100% accuracy.
-3. **Weighted Ensemble:** Google(10x) > AccuWeather(4x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
+3. **Weighted Ensemble:** Google(6x) > AccuWeather(4x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
 
 ### Data Sourcing Strategy
 
 | Provider | API Endpoint | Alignment Target | Weight |
 |----------|-------------|------------------|--------|
-| **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **10x** |
+| **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **6x** |
 | **AccuWeather** | Official 5-day API | accuweather.com | 4x |
 | **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website | 3x |
 | **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute | 3x |
@@ -37,18 +37,35 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 ## Commands
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+**CRITICAL: WSL/Windows Python Environment**
 
-# Run the full daily workflow (fetch data + generate briefing)
-python -m duck_sun.scheduler
+This project runs on Windows filesystem (`/mnt/c/...`) accessed via WSL. The virtual environment was created with Windows Python, so you MUST use the Windows Python executable directly. **Do NOT try to `source activate`** - it won't work.
+
+```bash
+# CORRECT - Use Windows Python executable directly
+./venv/Scripts/python.exe -m duck_sun.scheduler
+
+# WRONG - These will all fail in WSL:
+# python -m duck_sun.scheduler          # "command not found"
+# python3 -m duck_sun.scheduler         # uses system Python, missing deps
+# source venv/bin/activate              # path doesn't exist (Windows venv)
+# source venv/Scripts/activate          # activates but python still not found
+```
+
+**All Commands (use `./venv/Scripts/python.exe`):**
+
+```bash
+# Run the full daily workflow (fetch data + generate PDF)
+./venv/Scripts/python.exe -m duck_sun.scheduler
 
 # Test the NOAA provider directly
-python -m duck_sun.providers.noaa
+./venv/Scripts/python.exe -m duck_sun.providers.noaa
 
 # Test the Open-Meteo provider directly
-python -m duck_sun.providers.open_meteo
+./venv/Scripts/python.exe -m duck_sun.providers.open_meteo
+
+# Install dependencies (use Windows pip)
+./venv/Scripts/pip.exe install -r requirements.txt
 ```
 
 ## Environment Variables
@@ -81,7 +98,7 @@ The PDF report includes:
 ## Calibration Status (Dec 18, 2025)
 
 **Google MetNet-3 Integration Complete:**
-- **Google Weather:** MetNet-3 neural model via Maps Platform Weather API (HIGHEST weight - 10x)
+- **Google Weather:** MetNet-3 neural model via Maps Platform Weather API - Weight: 6x
 - **AccuWeather:** Direct API sourcing (matches accuweather.com) - Weight: 4x
 - **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov) - Weight: 3x
 - **Met.no:** ECMWF European model via Locationforecast 2.0 API - Weight: 3x
