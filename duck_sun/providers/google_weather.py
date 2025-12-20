@@ -7,7 +7,7 @@ Focus: Hyperlocal precision for Today + Next 3 Days (96 hours).
 API DOCS: https://developers.google.com/maps/documentation/weather
 
 WEIGHTING STRATEGY:
-- Days 0-3: Weight 10.0 (Primary Source - MetNet-3 Neural Model)
+- Days 0-3: Weight 6.0 (Primary Source - MetNet-3 Neural Model)
 - Superior short-term precision via real-time radar/satellite fusion
 - Best for "nowcasting" rather than physics simulations
 
@@ -64,7 +64,7 @@ class GoogleWeatherProvider:
     Powered by Google's MetNet-3 neural weather model which uses
     satellite imagery and radar fusion for hyperlocal predictions.
 
-    WEIGHT: 10.0 (Highest - Neural/Satellite Fusion)
+    WEIGHT: 6.0 (Highest - Neural/Satellite Fusion)
     - Best accuracy for 0-96 hour forecasts
     - Real-time data fusion vs physics-only models
     """

@@ -690,13 +690,13 @@ def generate_pdf_report(
     day_col = (usable_width - weight_col - source_col) / 8
     half_col, row_h = day_col / 2, 6
 
-    # Source weights for display (calibrated Dec 2025 + Google MetNet-3)
+    # Source weights for display (calibrated Dec 2025)
     SOURCE_WEIGHT_DISPLAY = {
         'OPEN-METEO': '1.0',
         'NOAA (GOV)': '3.0',
         'MET.NO (EU)': '3.0',
         'ACCU (COM)': '4.0',
-        'GOOGLE (AI)': '10.0',  # MetNet-3 neural model - HIGHEST
+        'GOOGLE (AI)': '6.0',
     }
 
     # Define alternating day column colors (pastels for readability)
