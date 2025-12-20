@@ -887,7 +887,7 @@ def generate_pdf_report(
 
     # ===================
     # WEIGHTED AVERAGES ROW
-    # Weights: OM(1), NOAA(3), Met.no(3), Accu(4), Google(10) - Dec 2025 + MetNet-3
+    # Weights: OM(1), NOAA(3), Met.no(3), Accu(4), Google(6) - Dec 2025
     # EXCLUDES HIGHEST HIGH VALUE(S) FROM CALCULATION
     # ===================
     logger.info("[generate_pdf_report] Calculating weighted averages (excluding max highs)...")
