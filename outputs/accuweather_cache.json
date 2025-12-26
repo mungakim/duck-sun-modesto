@@ -1,44 +1,35 @@
 {
-  "timestamp": "2025-12-25T13:24:36.029285",
+  "timestamp": "2025-12-26T13:25:15.134907",
   "location_key": "327145",
-  "call_date": "2025-12-25",
+  "call_date": "2025-12-26",
   "call_count": 1,
   "daily_limit": 42,
   "data": [
     {
-      "date": "2025-12-25",
-      "high_c": 15.56,
-      "low_c": 9.44,
-      "high_f": 60.0,
-      "low_f": 49.0,
-      "precip_prob": 91,
-      "condition": "Rain"
-    },
-    {
       "date": "2025-12-26",
-      "high_c": 15.0,
-      "low_c": 6.11,
-      "high_f": 59.0,
-      "low_f": 43.0,
+      "high_c": 14.44,
+      "low_c": 6.67,
+      "high_f": 58.0,
+      "low_f": 44.0,
       "precip_prob": 84,
       "condition": "Showers"
     },
     {
       "date": "2025-12-27",
       "high_c": 13.33,
-      "low_c": 2.78,
+      "low_c": 3.89,
       "high_f": 56.0,
-      "low_f": 37.0,
-      "precip_prob": 14,
+      "low_f": 39.0,
+      "precip_prob": 25,
       "condition": "Intermittent clouds"
     },
     {
       "date": "2025-12-28",
       "high_c": 12.22,
-      "low_c": 1.11,
+      "low_c": 2.22,
       "high_f": 54.0,
-      "low_f": 34.0,
-      "precip_prob": 5,
+      "low_f": 36.0,
+      "precip_prob": 2,
       "condition": "Partly sunny"
     },
     {
@@ -47,6 +38,15 @@
       "low_c": 2.78,
       "high_f": 53.0,
       "low_f": 37.0,
+      "precip_prob": 2,
+      "condition": "Partly sunny"
+    },
+    {
+      "date": "2025-12-30",
+      "high_c": 12.78,
+      "low_c": 3.89,
+      "high_f": 55.0,
+      "low_f": 39.0,
       "precip_prob": 2,
       "condition": "Partly sunny"
     }
