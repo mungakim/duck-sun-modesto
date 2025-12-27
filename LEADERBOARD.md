@@ -4,12 +4,12 @@
 
 | Rank | Source | High Error | Low Error | Samples |
 |------|--------|------------|-----------|---------|
-| #1 | Weather.com | 0.36°C | 5.34°C | 10 |
-| #2 | NWS | 1.77°C | 2.85°C | 10 |
-| #3 | AccuWeather | 1.84°C | 2.24°C | 24 |
-| #4 | Met.no | 2.02°C | 0.82°C | 24 |
-| #5 | NOAA | 2.46°C | 1.16°C | 14 |
-| #6 | Open-Meteo | 2.49°C | 0.77°C | 24 |
+| #1 | Weather.com | 0.73°C | 2.40°C | 3 |
+| #2 | NWS | 1.15°C | 2.44°C | 3 |
+| #3 | Met.no | 1.42°C | 0.62°C | 18 |
+| #4 | Open-Meteo | 1.74°C | 0.68°C | 18 |
+| #5 | AccuWeather | 2.20°C | 1.07°C | 18 |
+| #6 | NOAA | 2.40°C | 1.11°C | 15 |
 
 ---
-*Generated: 2025-12-26 13:25*
+*Generated: 2025-12-27 13:20*
