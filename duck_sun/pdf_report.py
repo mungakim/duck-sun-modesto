@@ -109,17 +109,18 @@ def calculate_weighted_average(values: List[Optional[float]], weights: List[floa
     return None
 
 
-def calculate_weighted_average_excluding_max(
+def calculate_weighted_average_excluding_om_max(
     values: List[Optional[float]],
     weights: List[float]
 ) -> tuple[Optional[int], set[int]]:
     """
-    Calculate weighted average excluding ONE highest value.
+    Calculate weighted average, excluding Open-Meteo (index 0) only if it has the max value.
 
-    If multiple sources have the same max, only exclude the first one found.
+    This prevents Open-Meteo's consistently high temperature predictions from
+    skewing the weighted average upward. Other sources are never excluded.
 
     Returns:
-        tuple: (weighted_average, set of indices that were excluded - always 0 or 1 element)
+        tuple: (weighted_average, set of indices that were excluded - {0} or empty)
     """
     # Find valid values with their indices
     valid_pairs = [(i, v) for i, v in enumerate(values) if v is not None]
@@ -127,17 +128,16 @@ def calculate_weighted_average_excluding_max(
     if not valid_pairs:
         return None, set()
 
-    # Find the maximum value and the FIRST index that has it
+    # Find the maximum value
     max_val = max(v for _, v in valid_pairs)
-    excluded_idx = None
-    for i, v in valid_pairs:
-        if v == max_val:
-            excluded_idx = i
-            break  # Only exclude the first one
 
-    excluded_indices = {excluded_idx} if excluded_idx is not None else set()
+    # Only exclude if Open-Meteo (index 0) has the max value
+    om_val = values[0]
+    excluded_indices = set()
+    if om_val is not None and om_val == max_val:
+        excluded_indices = {0}  # Exclude Open-Meteo only
 
-    # Calculate weighted average excluding ONE max value
+    # Calculate weighted average (excluding Open-Meteo if it was the max)
     total_val, total_weight = 0.0, 0.0
     for i, v in valid_pairs:
         if i not in excluded_indices:
@@ -146,11 +146,13 @@ def calculate_weighted_average_excluding_max(
 
     if total_weight > 0:
         result = round(total_val / total_weight)
-        logger.debug(f"[weighted_average_excl_max] values={values}, excluded={excluded_indices}, result={result}")
+        logger.debug(f"[weighted_average_excl_om] values={values}, excluded={excluded_indices}, result={result}")
         return result, excluded_indices
 
-    # Only one value existed - return it
-    return round(max_val), excluded_indices
+    # Only Open-Meteo existed and was excluded - return it anyway
+    if om_val is not None:
+        return round(om_val), excluded_indices
+    return None, set()
 
 
 def calculate_clear_sky_ghi(hour: int, day_of_year: int, lat: float = 37.6391) -> float:
@@ -808,32 +810,35 @@ def generate_pdf_report(
         pdf.cell(day_col, row_h-1, date_str, 1, 0, 'C', 1)
     pdf.ln()
 
-    # Pre-calculate which high value is excluded (highest) for each day
-    # excluded_highs[day_index] = set with ONE source index (0=OM, 1=NOAA, 2=Met.no, 3=Accu, 4=Google)
+    # Pre-calculate which high value is excluded for each day
+    # Only exclude if Open-Meteo (index 0) has the max high value
+    # excluded_highs[day_index] = {0} if Open-Meteo is max, else empty set
     excluded_highs = {}
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
         hi_vals = [
-            day.get('high_f'),
+            day.get('high_f'),  # index 0 = Open-Meteo
             noaa_daily.get(k, {}).get('high_f'),
             met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             google_daily.get(k, {}).get('high_f')
         ]
-        # Find max value and the FIRST index that has it (only exclude one)
+        # Find max value - only exclude if Open-Meteo has it
         valid_highs = [(idx, v) for idx, v in enumerate(hi_vals) if v is not None]
         if valid_highs:
             max_high = max(v for _, v in valid_highs)
-            for idx, v in valid_highs:
-                if v == max_high:
-                    excluded_highs[i] = {idx}  # Only exclude the first one
-                    break
+            om_high = hi_vals[0]  # Open-Meteo high
+            # Only exclude if Open-Meteo has the max value
+            if om_high is not None and om_high == max_high:
+                excluded_highs[i] = {0}  # Exclude Open-Meteo only
+            else:
+                excluded_highs[i] = set()
         else:
             excluded_highs[i] = set()
 
     def draw_row_colored(label: str, getter, source_idx: int):
         """Draw a single row with weight + source name + color-coded Hi/Lo cells.
-        Highlights excluded (max) high values in red."""
+        Shows '-' for excluded Open-Meteo high values (max outliers)."""
         pdf.set_text_color(0, 0, 0)
 
         # Weight column (light gray)
@@ -852,19 +857,18 @@ def generate_pdf_report(
         for i, d in enumerate(om_daily):
             v1, v2 = getter(d, d.get('date', ''))
 
-            # Check if this high value is excluded (max)
+            # Check if this high value is excluded (Open-Meteo max outlier)
             is_excluded_high = source_idx in excluded_highs.get(i, set())
 
-            # High cell - red background if excluded, else day color
+            # High cell - show "-" if excluded, else show value
+            day_color = DAY_COLORS[i % len(DAY_COLORS)]
+            pdf.set_fill_color(*day_color)
             if is_excluded_high and v1 is not None:
-                pdf.set_fill_color(255, 180, 180)  # Light red for excluded
+                pdf.cell(half_col, row_h, "-", 1, 0, 'C', 1)  # Dash for excluded
             else:
-                day_color = DAY_COLORS[i % len(DAY_COLORS)]
-                pdf.set_fill_color(*day_color)
-            pdf.cell(half_col, row_h, str(v1) if v1 else "--", 1, 0, 'C', 1)
+                pdf.cell(half_col, row_h, str(v1) if v1 else "--", 1, 0, 'C', 1)
 
             # Low cell - always day color
-            day_color = DAY_COLORS[i % len(DAY_COLORS)]
             pdf.set_fill_color(*day_color)
             pdf.cell(half_col, row_h, str(v2) if v2 else "--", 1, 0, 'C', 1)
         pdf.ln()
@@ -888,9 +892,9 @@ def generate_pdf_report(
     # ===================
     # WEIGHTED AVERAGES ROW
     # Weights: OM(1), NOAA(3), Met.no(3), Accu(4), Google(6) - Dec 2025
-    # EXCLUDES HIGHEST HIGH VALUE(S) FROM CALCULATION
+    # Excludes Open-Meteo high only if it's the max (OM often runs hot)
     # ===================
-    logger.info("[generate_pdf_report] Calculating weighted averages (excluding max highs)...")
+    logger.info("[generate_pdf_report] Calculating weighted averages (excluding OM max highs)...")
 
     pdf.set_font('Helvetica', 'B', 6)
     pdf.set_text_color(0, 0, 0)
@@ -924,8 +928,8 @@ def generate_pdf_report(
             google_daily.get(k, {}).get('low_f')
         ]
 
-        # Calculate high average EXCLUDING the max value(s)
-        avg_hi, excluded = calculate_weighted_average_excluding_max(hi_vals, weights)
+        # Calculate high average - exclude Open-Meteo only if it has the max
+        avg_hi, excluded = calculate_weighted_average_excluding_om_max(hi_vals, weights)
         # Low average uses all values (no exclusion)
         avg_lo = calculate_weighted_average(lo_vals, weights)
 
