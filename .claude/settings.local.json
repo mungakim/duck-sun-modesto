@@ -10,7 +10,8 @@
       "Bash(source:*)",
       "Bash(pip install:*)",
       "Bash(pip3.9 install:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git rebase:*)"
     ],
     "deny": [],
     "ask": []
