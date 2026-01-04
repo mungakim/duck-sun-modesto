@@ -4,10 +4,10 @@
 
 | Rank | Source | High Error | Low Error | Samples |
 |------|--------|------------|-----------|---------|
-| #1 | Met.no | 0.82°C | 0.65°C | 10 |
-| #2 | Open-Meteo | 1.00°C | 0.82°C | 10 |
-| #3 | NOAA | 1.43°C | 0.58°C | 10 |
-| #4 | AccuWeather | 1.77°C | 2.00°C | 8 |
+| #1 | Met.no | 0.72°C | 0.63°C | 12 |
+| #2 | Open-Meteo | 0.96°C | 0.72°C | 12 |
+| #3 | AccuWeather | 1.29°C | 1.82°C | 10 |
+| #4 | NOAA | 1.65°C | 0.50°C | 12 |
 
 ---
-*Generated: 2026-01-03 13:21*
+*Generated: 2026-01-04 13:22*
