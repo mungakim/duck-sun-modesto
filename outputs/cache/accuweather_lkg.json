@@ -1,51 +1,51 @@
 {
   "provider": "accuweather",
-  "timestamp": "2025-12-14T17:06:25.707375",
+  "timestamp": "2026-01-05T19:19:06.594252",
   "api_success": true,
   "data": [
     {
-      "date": "2025-12-14",
-      "high_c": 6.11,
-      "low_c": 2.78,
-      "high_f": 43.0,
-      "low_f": 37.0,
-      "precip_prob": 25,
-      "condition": "Cloudy"
-    },
-    {
-      "date": "2025-12-15",
-      "high_c": 10.56,
-      "low_c": 4.44,
-      "high_f": 51.0,
-      "low_f": 40.0,
-      "precip_prob": 0,
-      "condition": "Fog"
-    },
-    {
-      "date": "2025-12-16",
-      "high_c": 10.56,
-      "low_c": 8.89,
-      "high_f": 51.0,
-      "low_f": 48.0,
-      "precip_prob": 17,
-      "condition": "Dreary"
-    },
-    {
-      "date": "2025-12-17",
-      "high_c": 12.22,
-      "low_c": 8.33,
-      "high_f": 54.0,
-      "low_f": 47.0,
-      "precip_prob": 55,
-      "condition": "Mostly cloudy w/ showers"
-    },
-    {
-      "date": "2025-12-18",
-      "high_c": 13.89,
+      "date": "2026-01-05",
+      "high_c": 16.11,
       "low_c": 7.78,
-      "high_f": 57.0,
+      "high_f": 61.0,
       "low_f": 46.0,
-      "precip_prob": 7,
+      "precip_prob": 55,
+      "condition": "Showers"
+    },
+    {
+      "date": "2026-01-06",
+      "high_c": 16.67,
+      "low_c": 8.33,
+      "high_f": 62.0,
+      "low_f": 47.0,
+      "precip_prob": 8,
+      "condition": "Intermittent clouds"
+    },
+    {
+      "date": "2026-01-07",
+      "high_c": 15.0,
+      "low_c": 6.11,
+      "high_f": 59.0,
+      "low_f": 43.0,
+      "precip_prob": 60,
+      "condition": "Showers"
+    },
+    {
+      "date": "2026-01-08",
+      "high_c": 13.89,
+      "low_c": 2.22,
+      "high_f": 57.0,
+      "low_f": 36.0,
+      "precip_prob": 19,
+      "condition": "Mostly sunny"
+    },
+    {
+      "date": "2026-01-09",
+      "high_c": 12.22,
+      "low_c": 1.11,
+      "high_f": 54.0,
+      "low_f": 34.0,
+      "precip_prob": 4,
       "condition": "Partly sunny"
     }
   ]

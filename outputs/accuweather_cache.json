@@ -1,54 +1,54 @@
 {
-  "timestamp": "2026-01-01T19:49:30.928051",
+  "timestamp": "2026-01-05T19:19:06.589354",
   "location_key": "327145",
-  "call_date": "2026-01-01",
-  "call_count": 2,
+  "call_date": "2026-01-05",
+  "call_count": 5,
   "daily_limit": 42,
   "data": [
     {
-      "date": "2026-01-01",
-      "high_c": 15.56,
-      "low_c": 8.89,
-      "high_f": 60.0,
-      "low_f": 48.0,
-      "precip_prob": 96,
-      "condition": "Rain"
-    },
-    {
-      "date": "2026-01-02",
-      "high_c": 16.67,
-      "low_c": 12.78,
-      "high_f": 62.0,
-      "low_f": 55.0,
-      "precip_prob": 80,
-      "condition": "Cloudy"
-    },
-    {
-      "date": "2026-01-03",
-      "high_c": 16.67,
-      "low_c": 11.11,
-      "high_f": 62.0,
-      "low_f": 52.0,
-      "precip_prob": 91,
-      "condition": "Rain"
-    },
-    {
-      "date": "2026-01-04",
-      "high_c": 13.89,
-      "low_c": 9.44,
-      "high_f": 57.0,
-      "low_f": 49.0,
-      "precip_prob": 93,
-      "condition": "Rain"
-    },
-    {
       "date": "2026-01-05",
-      "high_c": 14.44,
+      "high_c": 16.11,
       "low_c": 7.78,
-      "high_f": 58.0,
+      "high_f": 61.0,
       "low_f": 46.0,
-      "precip_prob": 69,
-      "condition": "Rain"
+      "precip_prob": 55,
+      "condition": "Showers"
+    },
+    {
+      "date": "2026-01-06",
+      "high_c": 16.67,
+      "low_c": 8.33,
+      "high_f": 62.0,
+      "low_f": 47.0,
+      "precip_prob": 8,
+      "condition": "Intermittent clouds"
+    },
+    {
+      "date": "2026-01-07",
+      "high_c": 15.0,
+      "low_c": 6.11,
+      "high_f": 59.0,
+      "low_f": 43.0,
+      "precip_prob": 60,
+      "condition": "Showers"
+    },
+    {
+      "date": "2026-01-08",
+      "high_c": 13.89,
+      "low_c": 2.22,
+      "high_f": 57.0,
+      "low_f": 36.0,
+      "precip_prob": 19,
+      "condition": "Mostly sunny"
+    },
+    {
+      "date": "2026-01-09",
+      "high_c": 12.22,
+      "low_c": 1.11,
+      "high_f": 54.0,
+      "low_f": 34.0,
+      "precip_prob": 4,
+      "condition": "Partly sunny"
     }
   ]
 }

@@ -164,6 +164,26 @@ class CacheManager:
         """Get cache file path for a provider."""
         return self.CACHE_DIR / f"{provider}_lkg.json"
 
+    def invalidate_cache(self, provider: str) -> None:
+        """
+        Invalidate cache for a provider to force fresh fetch on next attempt.
+
+        Renames the cache file to .bak instead of deleting (for safety/debugging).
+
+        Args:
+            provider: Provider name to invalidate
+        """
+        cache_path = self._cache_path(provider)
+        if cache_path.exists():
+            try:
+                backup_path = cache_path.with_suffix('.json.bak')
+                cache_path.rename(backup_path)
+                logger.info(f"[CacheManager] Invalidated cache for {provider} (backed up to .bak)")
+            except Exception as e:
+                logger.warning(f"[CacheManager] Failed to invalidate cache for {provider}: {e}")
+        else:
+            logger.debug(f"[CacheManager] No cache to invalidate for {provider}")
+
     def _load_analytics(self) -> Dict[str, Any]:
         """Load analytics from lessons_learned.json."""
         if self.ANALYTICS_FILE.exists():

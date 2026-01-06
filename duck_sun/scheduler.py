@@ -20,7 +20,8 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -73,6 +74,28 @@ RETRY_CONFIG = RetryConfig(
     jitter=True
 )
 
+# Report-level retry configuration
+MAX_REPORT_RETRIES = 3        # Total validation attempts (initial + 2 retries)
+RETRY_DELAY_SECONDS = 23      # Wait between retries
+
+# Minimum expected days per provider
+EXPECTED_DAYS = {
+    "accuweather": 5,      # $2/mo tier
+    "google_weather": 4,   # 96 hours
+    "noaa": 5,             # Usually 7, but 5 minimum acceptable
+    "open_meteo": 8,       # Baseline - always needed
+    "met_no": 6,           # Usually 8+
+}
+
+
+@dataclass
+class ValidationResult:
+    """Result of data completeness validation."""
+    is_acceptable: bool
+    critical_failures: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    provider_day_counts: Dict[str, int] = field(default_factory=dict)
+
 
 def ensure_directories():
     """Create output directories if they don't exist."""
@@ -82,6 +105,137 @@ def ensure_directories():
     (OUTPUT_DIR / "cache").mkdir(exist_ok=True)
     logger.info(f"[ensure_directories] OUTPUT_DIR: {OUTPUT_DIR.absolute()}")
     logger.info(f"[ensure_directories] REPORT_DIR: {REPORT_DIR.absolute()}")
+
+
+def verify_data_completeness(results: Dict[str, 'FetchResult']) -> ValidationResult:
+    """
+    Verify all critical providers returned expected data.
+
+    Checks that high-weight providers (AccuWeather, Google, NOAA, Open-Meteo)
+    have returned the expected number of forecast days.
+
+    Returns:
+        ValidationResult with pass/fail status and details
+    """
+    critical_failures = []
+    warnings = []
+    day_counts = {}
+
+    # AccuWeather: Expect 5 days ($2/mo tier)
+    accu = results.get("accuweather")
+    if accu and accu.data:
+        accu_days = len(accu.data) if isinstance(accu.data, list) else 0
+        day_counts["AccuWeather"] = accu_days
+        if accu_days < EXPECTED_DAYS["accuweather"]:
+            critical_failures.append(f"AccuWeather: {accu_days}/{EXPECTED_DAYS['accuweather']} days")
+    else:
+        critical_failures.append("AccuWeather: No data")
+        day_counts["AccuWeather"] = 0
+
+    # Google Weather: Expect 4+ days (96 hours)
+    google = results.get("google_weather")
+    if google and google.data:
+        google_daily = google.data.get("daily", []) if isinstance(google.data, dict) else []
+        day_counts["Google"] = len(google_daily)
+        if len(google_daily) < EXPECTED_DAYS["google_weather"]:
+            critical_failures.append(f"Google: {len(google_daily)}/{EXPECTED_DAYS['google_weather']} days")
+    else:
+        critical_failures.append("Google: No data")
+        day_counts["Google"] = 0
+
+    # NOAA: Count unique days from hourly data
+    noaa = results.get("noaa")
+    if noaa and noaa.data:
+        noaa_days = _count_unique_days_noaa(noaa.data)
+        day_counts["NOAA"] = noaa_days
+        if noaa_days < EXPECTED_DAYS["noaa"]:
+            warnings.append(f"NOAA: {noaa_days}/{EXPECTED_DAYS['noaa']} days")
+    else:
+        warnings.append("NOAA: No data")
+        day_counts["NOAA"] = 0
+
+    # Open-Meteo: Expect 8 days (baseline - always needed)
+    om = results.get("open_meteo")
+    if om and om.data:
+        om_daily = om.data.get("daily_forecast", []) if isinstance(om.data, dict) else []
+        day_counts["Open-Meteo"] = len(om_daily)
+        if len(om_daily) < EXPECTED_DAYS["open_meteo"]:
+            critical_failures.append(f"Open-Meteo: {len(om_daily)}/{EXPECTED_DAYS['open_meteo']} days")
+    else:
+        critical_failures.append("Open-Meteo: No data")
+        day_counts["Open-Meteo"] = 0
+
+    # Met.no: Non-critical but tracked
+    met = results.get("met_no")
+    if met and met.data:
+        met_days = _count_unique_days_met(met.data)
+        day_counts["Met.no"] = met_days
+        if met_days < EXPECTED_DAYS["met_no"]:
+            warnings.append(f"Met.no: {met_days}/{EXPECTED_DAYS['met_no']} days")
+    else:
+        warnings.append("Met.no: No data")
+        day_counts["Met.no"] = 0
+
+    is_acceptable = len(critical_failures) == 0
+
+    return ValidationResult(
+        is_acceptable=is_acceptable,
+        critical_failures=critical_failures,
+        warnings=warnings,
+        provider_day_counts=day_counts
+    )
+
+
+def _count_unique_days_noaa(data: List[Dict]) -> int:
+    """Count unique days in NOAA hourly data."""
+    if not data or not isinstance(data, list):
+        return 0
+    dates = set()
+    for record in data:
+        if isinstance(record, dict):
+            # NOAA uses 'valid_time' or 'time' key
+            time_str = record.get('valid_time', record.get('time', ''))
+            if time_str:
+                dates.add(time_str[:10])  # Extract YYYY-MM-DD
+    return len(dates)
+
+
+def _count_unique_days_met(data: List[Dict]) -> int:
+    """Count unique days in Met.no data."""
+    if not data or not isinstance(data, list):
+        return 0
+    dates = set()
+    for record in data:
+        if isinstance(record, dict):
+            time_str = record.get('time', '')
+            if time_str:
+                dates.add(time_str[:10])  # Extract YYYY-MM-DD
+    return len(dates)
+
+
+def get_failed_provider_names(validation: ValidationResult) -> List[str]:
+    """
+    Extract provider names from validation failures for retry.
+
+    Maps display names (AccuWeather) back to internal names (accuweather).
+    """
+    name_map = {
+        "AccuWeather": "accuweather",
+        "Google": "google_weather",
+        "NOAA": "noaa",
+        "Open-Meteo": "open_meteo",
+        "Met.no": "met_no",
+    }
+
+    failed = []
+    for failure in validation.critical_failures:
+        # Extract provider name from failure string like "AccuWeather: 1/5 days"
+        provider_display = failure.split(":")[0].strip()
+        provider_internal = name_map.get(provider_display)
+        if provider_internal and provider_internal not in failed:
+            failed.append(provider_internal)
+
+    return failed
 
 
 async def fetch_with_retry(
@@ -239,6 +393,63 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     return results
 
 
+async def retry_single_provider(
+    provider_name: str,
+    cache_mgr: CacheManager
+) -> FetchResult:
+    """
+    Re-fetch a single provider that failed validation.
+
+    Maps provider names to their fetch functions and re-attempts the fetch.
+
+    Args:
+        provider_name: Internal provider name (e.g., "accuweather")
+        cache_mgr: CacheManager instance
+
+    Returns:
+        FetchResult from the retry attempt
+    """
+    logger.info(f"[retry_single_provider] Retrying {provider_name}...")
+
+    # Map provider names to their fetch functions
+    if provider_name == "accuweather":
+        async def _fetch():
+            provider = AccuWeatherProvider()
+            return await provider.fetch_forecast()
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "google_weather":
+        async def _fetch():
+            provider = GoogleWeatherProvider()
+            return await provider.fetch_forecast(hours=96)
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "noaa":
+        async def _fetch():
+            provider = NOAAProvider()
+            return await provider.fetch_async()
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "met_no":
+        async def _fetch():
+            provider = MetNoProvider()
+            return await provider.fetch_async()
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "open_meteo":
+        return await fetch_with_retry(
+            provider_name,
+            fetch_open_meteo,
+            cache_mgr,
+            days=8
+        )
+
+    else:
+        logger.warning(f"[retry_single_provider] Unknown provider: {provider_name}")
+        # Return a default FetchResult
+        return cache_mgr.get_with_fallback(provider_name, None, "Unknown provider")
+
+
 async def main():
     """Main scheduler entry point - Full Provider Edition."""
     pacific = ZoneInfo("America/Los_Angeles")
@@ -296,6 +507,44 @@ async def main():
         logger.info("-" * 40)
 
         results = await fetch_all_providers(cache_mgr)
+
+        # --- STEP 1b: Validate Data Completeness & Selective Retry ---
+        for attempt in range(MAX_REPORT_RETRIES):
+            validation = verify_data_completeness(results)
+
+            # Log validation results
+            logger.info(f"[main] Data validation (attempt {attempt + 1}/{MAX_REPORT_RETRIES}): {validation.provider_day_counts}")
+
+            if validation.is_acceptable:
+                logger.info("[main] All critical providers have complete data")
+                break
+
+            # Log failures
+            for failure in validation.critical_failures:
+                logger.warning(f"[main] INCOMPLETE: {failure}")
+            for warning in validation.warnings:
+                logger.info(f"[main] Warning: {warning}")
+
+            # Get list of failed provider names
+            failed_providers = get_failed_provider_names(validation)
+
+            # Retry ONLY failed providers (if not last attempt)
+            if attempt < MAX_REPORT_RETRIES - 1 and failed_providers:
+                logger.info(f"[main] Retrying {len(failed_providers)} failed providers in {RETRY_DELAY_SECONDS}s...")
+                await asyncio.sleep(RETRY_DELAY_SECONDS)
+
+                # Invalidate cache and re-fetch ONLY failed providers
+                for provider_name in failed_providers:
+                    cache_mgr.invalidate_cache(provider_name)
+                    new_result = await retry_single_provider(provider_name, cache_mgr)
+                    results[provider_name] = new_result
+                    data_count = len(new_result.data) if new_result.data and isinstance(new_result.data, (list, dict)) else 0
+                    if isinstance(new_result.data, dict):
+                        data_count = len(new_result.data.get("daily", new_result.data.get("daily_forecast", [])))
+                    logger.info(f"[main] Re-fetched {provider_name}: {data_count} records")
+            else:
+                if attempt == MAX_REPORT_RETRIES - 1:
+                    logger.warning("[main] Max retries reached - proceeding with best available data")
 
         # Extract data from results
         om_data = results["open_meteo"].data

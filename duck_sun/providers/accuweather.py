@@ -278,14 +278,15 @@ class AccuWeatherProvider:
                 
                 if resp.status_code == 503:
                     logger.warning("[AccuWeatherProvider] Quota exceeded (50/day limit)")
-                    # Return stale cache as fallback
-                    return self._get_stale_cache_fallback()
+                    # Return None - let CacheManager handle fallback with proper staleness tier
+                    return None
                 if resp.status_code == 401:
                     logger.warning("[AccuWeatherProvider] Unauthorized - check API key")
                     return None
                 if resp.status_code != 200:
                     logger.warning(f"[AccuWeatherProvider] HTTP {resp.status_code}: {resp.text[:100]}")
-                    return self._get_stale_cache_fallback()
+                    # Return None - let CacheManager handle fallback with proper staleness tier
+                    return None
 
                 data = resp.json()
                 daily_forecasts = data.get("DailyForecasts", [])
@@ -333,13 +334,16 @@ class AccuWeatherProvider:
 
         except httpx.TimeoutException:
             logger.error("[AccuWeatherProvider] Request timed out")
-            return self._get_stale_cache_fallback()
+            # Return None - let CacheManager handle fallback with proper staleness tier
+            return None
         except httpx.RequestError as e:
             logger.error(f"[AccuWeatherProvider] Request error: {e}")
-            return self._get_stale_cache_fallback()
+            # Return None - let CacheManager handle fallback with proper staleness tier
+            return None
         except Exception as e:
             logger.error(f"[AccuWeatherProvider] Fetch failed: {e}", exc_info=True)
-            return self._get_stale_cache_fallback()
+            # Return None - let CacheManager handle fallback with proper staleness tier
+            return None
     
     def _get_stale_cache_fallback(self) -> Optional[List[AccuWeatherDay]]:
         """

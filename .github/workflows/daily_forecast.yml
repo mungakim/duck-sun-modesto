@@ -2,10 +2,11 @@ name: Daily Duck Sun Forecast
 
 on:
   schedule:
-    # 4:55 AM Pacific Time (adjusts for daylight saving)
+    # 4:25 AM Pacific Time (adjusts for daylight saving)
+    # Moved 30 min earlier to ensure report ready by 5:30 AM PST
     # Both times trigger, but the job checks which one is valid
-    - cron: '55 12 * * *'  # 12:55 UTC = 4:55 AM PST (winter)
-    - cron: '55 11 * * *'  # 11:55 UTC = 4:55 AM PDT (summer)
+    - cron: '25 12 * * *'  # 12:25 UTC = 4:25 AM PST (winter)
+    - cron: '25 11 * * *'  # 11:25 UTC = 4:25 AM PDT (summer)
   workflow_dispatch:
 
 permissions:
