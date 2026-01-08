@@ -1,26 +1,17 @@
 {
-  "timestamp": "2026-01-08T04:50:50.640145",
+  "timestamp": "2026-01-08T13:11:33.619174",
   "location_key": "327145",
   "call_date": "2026-01-08",
-  "call_count": 3,
+  "call_count": 4,
   "daily_limit": 42,
   "data": [
-    {
-      "date": "2026-01-07",
-      "high_c": 15.56,
-      "low_c": 6.11,
-      "high_f": 60.0,
-      "low_f": 43.0,
-      "precip_prob": 25,
-      "condition": "Mostly cloudy"
-    },
     {
       "date": "2026-01-08",
       "high_c": 12.78,
       "low_c": 1.67,
       "high_f": 55.0,
       "low_f": 35.0,
-      "precip_prob": 11,
+      "precip_prob": 9,
       "condition": "Mostly sunny"
     },
     {
@@ -29,7 +20,7 @@
       "low_c": 0.0,
       "high_f": 54.0,
       "low_f": 32.0,
-      "precip_prob": 1,
+      "precip_prob": 0,
       "condition": "Partly sunny"
     },
     {
@@ -47,8 +38,17 @@
       "low_c": 1.67,
       "high_f": 56.0,
       "low_f": 35.0,
-      "precip_prob": 3,
+      "precip_prob": 2,
       "condition": "Intermittent clouds"
+    },
+    {
+      "date": "2026-01-12",
+      "high_c": 13.33,
+      "low_c": 3.33,
+      "high_f": 56.0,
+      "low_f": 38.0,
+      "precip_prob": 2,
+      "condition": "Partly sunny"
     }
   ]
 }
