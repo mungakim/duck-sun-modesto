@@ -1,0 +1,174 @@
+{
+  "generated_at": "2026-01-08T13:11:30.153774",
+  "location": "Modesto, CA",
+  "architecture": "Weighted Ensemble (Reliability-First)",
+  "sources": [
+    "Open-Meteo",
+    "NOAA",
+    "Met.no",
+    "AccuWeather",
+    "MID.org",
+    "AQI"
+  ],
+  "weights": {
+    "Google": 6,
+    "AccuWeather": 4,
+    "NOAA": 3,
+    "Met.no": 3,
+    "MID.org": 2,
+    "Open-Meteo": 1
+  },
+  "variance_report": {
+    "total": 192,
+    "variance_counts": {
+      "LOW": 59,
+      "MODERATE": 111,
+      "CRITICAL": 22
+    },
+    "total_outliers": 25,
+    "avg_confidence": 0.849,
+    "max_spread_f": 12.9,
+    "has_critical": true
+  },
+  "8_day_outlook": [
+    {
+      "date": "2026-01-08",
+      "temp_consensus_c": 6.8,
+      "avg_solar_raw": 135.0,
+      "avg_solar_adjusted": 101.0,
+      "avg_cloud_cover": 11.0,
+      "max_pm2_5": 10.1
+    },
+    {
+      "date": "2026-01-09",
+      "temp_consensus_c": 5.4,
+      "avg_solar_raw": 129.0,
+      "avg_solar_adjusted": 97.0,
+      "avg_cloud_cover": 21.0,
+      "max_pm2_5": 17.8
+    },
+    {
+      "date": "2026-01-10",
+      "temp_consensus_c": 5.7,
+      "avg_solar_raw": 125.0,
+      "avg_solar_adjusted": 94.0,
+      "avg_cloud_cover": 60.0,
+      "max_pm2_5": 26.0
+    },
+    {
+      "date": "2026-01-11",
+      "temp_consensus_c": 6.3,
+      "avg_solar_raw": 121.0,
+      "avg_solar_adjusted": 90.0,
+      "avg_cloud_cover": 86.0,
+      "max_pm2_5": 29.8
+    },
+    {
+      "date": "2026-01-12",
+      "temp_consensus_c": 7.3,
+      "avg_solar_raw": 130.0,
+      "avg_solar_adjusted": 97.0,
+      "avg_cloud_cover": 14.0,
+      "max_pm2_5": 27.2
+    },
+    {
+      "date": "2026-01-13",
+      "temp_consensus_c": 8.3,
+      "avg_solar_raw": 120.0,
+      "avg_solar_adjusted": 85.0,
+      "avg_cloud_cover": 22.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-14",
+      "temp_consensus_c": 9.1,
+      "avg_solar_raw": 129.0,
+      "avg_solar_adjusted": 97.0,
+      "avg_cloud_cover": 0.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-15",
+      "temp_consensus_c": 10.5,
+      "avg_solar_raw": 130.0,
+      "avg_solar_adjusted": 97.0,
+      "avg_cloud_cover": 0.0,
+      "max_pm2_5": 0.0
+    }
+  ],
+  "duck_curve_tomorrow": [
+    {
+      "time": "2026-01-09T09:00",
+      "temp_consensus": 3.888888888888889,
+      "solar_adjusted": 137.25,
+      "risk_level": "LOW",
+      "fog_probability": 0.17,
+      "pm2_5": 10.2
+    },
+    {
+      "time": "2026-01-09T10:00",
+      "temp_consensus": 7.0,
+      "solar_adjusted": 258.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 8.7
+    },
+    {
+      "time": "2026-01-09T11:00",
+      "temp_consensus": 8.5,
+      "solar_adjusted": 331.5,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 8.2
+    },
+    {
+      "time": "2026-01-09T12:00",
+      "temp_consensus": 9.8,
+      "solar_adjusted": 396.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 8.0
+    },
+    {
+      "time": "2026-01-09T13:00",
+      "temp_consensus": 10.7,
+      "solar_adjusted": 384.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 7.9
+    },
+    {
+      "time": "2026-01-09T14:00",
+      "temp_consensus": 10.998000000000001,
+      "solar_adjusted": 342.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 7.9
+    },
+    {
+      "time": "2026-01-09T15:00",
+      "temp_consensus": 10.998000000000001,
+      "solar_adjusted": 285.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 7.9
+    },
+    {
+      "time": "2026-01-09T16:00",
+      "temp_consensus": 7.332,
+      "solar_adjusted": 162.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.03,
+      "pm2_5": 8.0
+    }
+  ],
+  "current_metar": "2026/01/08 12:53\nKMOD 081253Z 30011KT 10SM CLR 08/03 A3012 RMK AO2 SLP199 T00830033",
+  "accuweather_available": true,
+  "mid_org_available": true,
+  "smoke_analysis": {
+    "max_pm2_5": 29.8,
+    "avg_pm2_5": 14.1,
+    "hours_above_50": 0,
+    "data_available": true
+  }
+}
