@@ -1,36 +1,27 @@
 {
-  "timestamp": "2026-01-09T13:10:50.517991",
+  "timestamp": "2026-01-10T13:04:06.852812",
   "location_key": "327145",
-  "call_date": "2026-01-09",
+  "call_date": "2026-01-10",
   "call_count": 1,
   "daily_limit": 42,
   "data": [
     {
-      "date": "2026-01-09",
-      "high_c": 12.22,
-      "low_c": 0.0,
-      "high_f": 54.0,
-      "low_f": 32.0,
-      "precip_prob": 0,
-      "condition": "Partly sunny"
-    },
-    {
       "date": "2026-01-10",
       "high_c": 13.33,
-      "low_c": 1.67,
+      "low_c": 1.11,
       "high_f": 56.0,
-      "low_f": 35.0,
+      "low_f": 34.0,
       "precip_prob": 0,
       "condition": "Intermittent clouds"
     },
     {
       "date": "2026-01-11",
-      "high_c": 13.33,
-      "low_c": 0.56,
-      "high_f": 56.0,
-      "low_f": 33.0,
-      "precip_prob": 1,
-      "condition": "Intermittent clouds"
+      "high_c": 13.89,
+      "low_c": 1.11,
+      "high_f": 57.0,
+      "low_f": 34.0,
+      "precip_prob": 0,
+      "condition": "Mostly sunny"
     },
     {
       "date": "2026-01-12",
@@ -38,17 +29,26 @@
       "low_c": 3.33,
       "high_f": 56.0,
       "low_f": 38.0,
-      "precip_prob": 2,
-      "condition": "Partly sunny"
+      "precip_prob": 0,
+      "condition": "Mostly sunny"
     },
     {
       "date": "2026-01-13",
       "high_c": 13.33,
-      "low_c": 2.78,
+      "low_c": 4.44,
       "high_f": 56.0,
-      "low_f": 37.0,
+      "low_f": 40.0,
       "precip_prob": 2,
-      "condition": "Intermittent clouds"
+      "condition": "Partly sunny"
+    },
+    {
+      "date": "2026-01-14",
+      "high_c": 13.33,
+      "low_c": 3.89,
+      "high_f": 56.0,
+      "low_f": 39.0,
+      "precip_prob": 1,
+      "condition": "Partly sunny"
     }
   ]
 }
