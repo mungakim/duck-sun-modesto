@@ -1,0 +1,174 @@
+{
+  "generated_at": "2026-01-13T13:12:53.656969",
+  "location": "Modesto, CA",
+  "architecture": "Weighted Ensemble (Reliability-First)",
+  "sources": [
+    "Open-Meteo",
+    "NOAA",
+    "Met.no",
+    "AccuWeather",
+    "MID.org",
+    "AQI"
+  ],
+  "weights": {
+    "Google": 6,
+    "AccuWeather": 4,
+    "NOAA": 3,
+    "Met.no": 3,
+    "MID.org": 2,
+    "Open-Meteo": 1
+  },
+  "variance_report": {
+    "total": 192,
+    "variance_counts": {
+      "LOW": 61,
+      "MODERATE": 107,
+      "CRITICAL": 24
+    },
+    "total_outliers": 26,
+    "avg_confidence": 0.859,
+    "max_spread_f": 14.2,
+    "has_critical": true
+  },
+  "8_day_outlook": [
+    {
+      "date": "2026-01-13",
+      "temp_consensus_c": 7.0,
+      "avg_solar_raw": 112.0,
+      "avg_solar_adjusted": 78.0,
+      "avg_cloud_cover": 49.0,
+      "max_pm2_5": 29.7
+    },
+    {
+      "date": "2026-01-14",
+      "temp_consensus_c": 7.7,
+      "avg_solar_raw": 112.0,
+      "avg_solar_adjusted": 57.0,
+      "avg_cloud_cover": 52.0,
+      "max_pm2_5": 36.2
+    },
+    {
+      "date": "2026-01-15",
+      "temp_consensus_c": 8.2,
+      "avg_solar_raw": 132.0,
+      "avg_solar_adjusted": 86.0,
+      "avg_cloud_cover": 21.0,
+      "max_pm2_5": 28.0
+    },
+    {
+      "date": "2026-01-16",
+      "temp_consensus_c": 9.5,
+      "avg_solar_raw": 134.0,
+      "avg_solar_adjusted": 100.0,
+      "avg_cloud_cover": 2.0,
+      "max_pm2_5": 31.0
+    },
+    {
+      "date": "2026-01-17",
+      "temp_consensus_c": 9.1,
+      "avg_solar_raw": 136.0,
+      "avg_solar_adjusted": 102.0,
+      "avg_cloud_cover": 0.0,
+      "max_pm2_5": 24.1
+    },
+    {
+      "date": "2026-01-18",
+      "temp_consensus_c": 9.4,
+      "avg_solar_raw": 110.0,
+      "avg_solar_adjusted": 82.0,
+      "avg_cloud_cover": 64.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-19",
+      "temp_consensus_c": 9.5,
+      "avg_solar_raw": 137.0,
+      "avg_solar_adjusted": 102.0,
+      "avg_cloud_cover": 25.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-20",
+      "temp_consensus_c": 10.2,
+      "avg_solar_raw": 135.0,
+      "avg_solar_adjusted": 70.0,
+      "avg_cloud_cover": 47.0,
+      "max_pm2_5": 0.0
+    }
+  ],
+  "duck_curve_tomorrow": [
+    {
+      "time": "2026-01-14T09:00",
+      "temp_consensus": 6.3,
+      "solar_adjusted": 33.2,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.26,
+      "pm2_5": 22.1
+    },
+    {
+      "time": "2026-01-14T10:00",
+      "temp_consensus": 7.0,
+      "solar_adjusted": 19.912499999999998,
+      "risk_level": "CRITICAL (TULE FOG)",
+      "fog_probability": 0.8600000000000001,
+      "pm2_5": 22.1
+    },
+    {
+      "time": "2026-01-14T11:00",
+      "temp_consensus": 8.88888888888889,
+      "solar_adjusted": 90.9,
+      "risk_level": "HIGH (TULE FOG RISK)",
+      "fog_probability": 0.73,
+      "pm2_5": 23.3
+    },
+    {
+      "time": "2026-01-14T12:00",
+      "temp_consensus": 11.11111111111111,
+      "solar_adjusted": 174.8,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.09,
+      "pm2_5": 24.7
+    },
+    {
+      "time": "2026-01-14T13:00",
+      "temp_consensus": 12.777777777777779,
+      "solar_adjusted": 216.8,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.0,
+      "pm2_5": 25.2
+    },
+    {
+      "time": "2026-01-14T14:00",
+      "temp_consensus": 13.2,
+      "solar_adjusted": 354.1125,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 25.1
+    },
+    {
+      "time": "2026-01-14T15:00",
+      "temp_consensus": 13.9,
+      "solar_adjusted": 283.5,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 25.0
+    },
+    {
+      "time": "2026-01-14T16:00",
+      "temp_consensus": 9.89,
+      "solar_adjusted": 162.45,
+      "risk_level": "LOW",
+      "fog_probability": 0.02,
+      "pm2_5": 25.8
+    }
+  ],
+  "current_metar": "2026/01/13 13:10\nKMOD 131310Z AUTO 00000KT 3SM BR CLR 03/02 A3030 RMK AO2 T00280022 $\n\u0000\u0000\u0000\u0000",
+  "accuweather_available": true,
+  "mid_org_available": true,
+  "smoke_analysis": {
+    "max_pm2_5": 36.2,
+    "avg_pm2_5": 19.8,
+    "hours_above_50": 0,
+    "data_available": true
+  }
+}
