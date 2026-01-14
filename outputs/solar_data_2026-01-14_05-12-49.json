@@ -1,0 +1,174 @@
+{
+  "generated_at": "2026-01-14T13:12:49.814506",
+  "location": "Modesto, CA",
+  "architecture": "Weighted Ensemble (Reliability-First)",
+  "sources": [
+    "Open-Meteo",
+    "NOAA",
+    "Met.no",
+    "AccuWeather",
+    "MID.org",
+    "AQI"
+  ],
+  "weights": {
+    "Google": 6,
+    "AccuWeather": 4,
+    "NOAA": 3,
+    "Met.no": 3,
+    "MID.org": 2,
+    "Open-Meteo": 1
+  },
+  "variance_report": {
+    "total": 192,
+    "variance_counts": {
+      "LOW": 63,
+      "MODERATE": 102,
+      "CRITICAL": 27
+    },
+    "total_outliers": 25,
+    "avg_confidence": 0.864,
+    "max_spread_f": 14.8,
+    "has_critical": true
+  },
+  "8_day_outlook": [
+    {
+      "date": "2026-01-14",
+      "temp_consensus_c": 7.5,
+      "avg_solar_raw": 125.0,
+      "avg_solar_adjusted": 93.0,
+      "avg_cloud_cover": 52.0,
+      "max_pm2_5": 28.3
+    },
+    {
+      "date": "2026-01-15",
+      "temp_consensus_c": 8.0,
+      "avg_solar_raw": 120.0,
+      "avg_solar_adjusted": 61.0,
+      "avg_cloud_cover": 53.0,
+      "max_pm2_5": 26.4
+    },
+    {
+      "date": "2026-01-16",
+      "temp_consensus_c": 7.9,
+      "avg_solar_raw": 134.0,
+      "avg_solar_adjusted": 100.0,
+      "avg_cloud_cover": 2.0,
+      "max_pm2_5": 30.6
+    },
+    {
+      "date": "2026-01-17",
+      "temp_consensus_c": 9.1,
+      "avg_solar_raw": 128.0,
+      "avg_solar_adjusted": 96.0,
+      "avg_cloud_cover": 41.0,
+      "max_pm2_5": 29.7
+    },
+    {
+      "date": "2026-01-18",
+      "temp_consensus_c": 9.9,
+      "avg_solar_raw": 124.0,
+      "avg_solar_adjusted": 93.0,
+      "avg_cloud_cover": 69.0,
+      "max_pm2_5": 25.7
+    },
+    {
+      "date": "2026-01-19",
+      "temp_consensus_c": 9.5,
+      "avg_solar_raw": 138.0,
+      "avg_solar_adjusted": 102.0,
+      "avg_cloud_cover": 1.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-20",
+      "temp_consensus_c": 10.3,
+      "avg_solar_raw": 139.0,
+      "avg_solar_adjusted": 69.0,
+      "avg_cloud_cover": 6.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-21",
+      "temp_consensus_c": 12.4,
+      "avg_solar_raw": 125.0,
+      "avg_solar_adjusted": 87.0,
+      "avg_cloud_cover": 94.0,
+      "max_pm2_5": 0.0
+    }
+  ],
+  "duck_curve_tomorrow": [
+    {
+      "time": "2026-01-15T09:00",
+      "temp_consensus": 6.2,
+      "solar_adjusted": 32.0,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.06,
+      "pm2_5": 15.0
+    },
+    {
+      "time": "2026-01-15T10:00",
+      "temp_consensus": 7.777777777777778,
+      "solar_adjusted": 82.0,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.08,
+      "pm2_5": 13.6
+    },
+    {
+      "time": "2026-01-15T11:00",
+      "temp_consensus": 9.8,
+      "solar_adjusted": 164.0,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.1,
+      "pm2_5": 13.2
+    },
+    {
+      "time": "2026-01-15T12:00",
+      "temp_consensus": 12.0,
+      "solar_adjusted": 176.0,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.01,
+      "pm2_5": 13.6
+    },
+    {
+      "time": "2026-01-15T13:00",
+      "temp_consensus": 13.333333333333334,
+      "solar_adjusted": 219.20000000000002,
+      "risk_level": "HIGH (PERSISTENT STRATUS)",
+      "fog_probability": 0.0,
+      "pm2_5": 13.6
+    },
+    {
+      "time": "2026-01-15T14:00",
+      "temp_consensus": 14.444444444444445,
+      "solar_adjusted": 385.5,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 13.5
+    },
+    {
+      "time": "2026-01-15T15:00",
+      "temp_consensus": 15.0,
+      "solar_adjusted": 295.5,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 13.7
+    },
+    {
+      "time": "2026-01-15T16:00",
+      "temp_consensus": 9.446,
+      "solar_adjusted": 69.9,
+      "risk_level": "HIGH (TULE FOG RISK)",
+      "fog_probability": 0.78,
+      "pm2_5": 15.4
+    }
+  ],
+  "current_metar": "2026/01/14 12:53\nKMOD 141253Z AUTO 11004KT 1/4SM FG VV011 03/03 A3028 RMK AO2 SLP252 T00330028",
+  "accuweather_available": true,
+  "mid_org_available": true,
+  "smoke_analysis": {
+    "max_pm2_5": 30.6,
+    "avg_pm2_5": 17.9,
+    "hours_above_50": 0,
+    "data_available": true
+  }
+}
