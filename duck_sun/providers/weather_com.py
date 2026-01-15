@@ -118,8 +118,10 @@ class WeatherComProvider:
                 }
                 response = session.get(url, headers=headers, timeout=30)
 
+            logger.info(f"[WeatherComProvider] API Response status: {response.status_code}")
+
             if response.status_code != 200:
-                logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
+                logger.error(f"[WeatherComProvider] API HTTP {response.status_code} - likely IP blocked or API key invalid")
                 # Fall back to scraping if API fails
                 return self._fetch_via_scraping()
 

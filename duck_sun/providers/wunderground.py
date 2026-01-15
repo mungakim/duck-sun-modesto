@@ -112,8 +112,12 @@ class WUndergroundProvider:
             with Session(impersonate="firefox135") as session:
                 response = session.get(self.URL, timeout=30)
 
+            logger.info(f"[WUndergroundProvider] Response status: {response.status_code}")
+
             if response.status_code != 200:
-                logger.error(f"[WUndergroundProvider] HTTP {response.status_code}")
+                logger.error(f"[WUndergroundProvider] HTTP {response.status_code} - likely IP blocked")
+                # Log first 500 chars of response for debugging
+                logger.debug(f"[WUndergroundProvider] Response preview: {response.text[:500]}")
                 return None
 
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -194,7 +198,87 @@ class WUndergroundProvider:
             return results
 
         except Exception as e:
-            logger.error(f"[WUndergroundProvider] Fetch failed: {e}", exc_info=True)
+            logger.error(f"[WUndergroundProvider] curl_cffi fetch failed: {e}")
+            # Try httpx as fallback
+            return self._fetch_via_httpx()
+
+    def _fetch_via_httpx(self) -> Optional[List[WUndergroundDay]]:
+        """Fallback to httpx if curl_cffi fails."""
+        logger.info("[WUndergroundProvider] Trying httpx fallback...")
+        try:
+            import httpx
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+
+            with httpx.Client(follow_redirects=True, timeout=30) as client:
+                response = client.get(self.URL, headers=headers)
+
+            logger.info(f"[WUndergroundProvider] httpx status: {response.status_code}")
+
+            if response.status_code != 200:
+                logger.error(f"[WUndergroundProvider] httpx also blocked: {response.status_code}")
+                return None
+
+            if not HAS_BS4:
+                return None
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Same parsing logic
+            scripts = soup.find_all('script')
+            forecast_data = None
+
+            for script in scripts:
+                if script.string and 'dayOfWeek' in script.string and 'temperatureMax' in script.string:
+                    forecast_data = script.string
+                    break
+
+            if not forecast_data:
+                logger.error("[WUndergroundProvider] httpx: No forecast data in page")
+                return None
+
+            days_of_week = self._extract_array(r'"dayOfWeek":\[([^\]]+)\]', forecast_data, is_numeric=False)
+            max_temps = self._extract_array(r'"temperatureMax":\[([^\]]+)\]', forecast_data)
+            min_temps = self._extract_array(r'"temperatureMin":\[([^\]]+)\]', forecast_data)
+
+            if not days_of_week or not max_temps or not min_temps:
+                return None
+
+            results: List[WUndergroundDay] = []
+            num_days = min(10, len(days_of_week), len(max_temps), len(min_temps))
+
+            for i in range(num_days):
+                high_f = max_temps[i]
+                low_f = min_temps[i]
+
+                if high_f is None or low_f is None:
+                    continue
+
+                high_c = (high_f - 32) * 5 / 9
+                low_c = (low_f - 32) * 5 / 9
+                day_abbrev = days_of_week[i][:3] if days_of_week[i] else f"D{i}"
+                date_str = self._get_date_for_day(i)
+
+                results.append({
+                    "date": date_str,
+                    "day_name": day_abbrev,
+                    "high_f": float(high_f),
+                    "low_f": float(low_f),
+                    "high_c": round(high_c, 2),
+                    "low_c": round(low_c, 2),
+                    "condition": "Unknown",
+                    "precip_prob": 0
+                })
+
+            logger.info(f"[WUndergroundProvider] httpx: Retrieved {len(results)} days")
+            return results if results else None
+
+        except Exception as e:
+            logger.error(f"[WUndergroundProvider] httpx fallback failed: {e}")
             return None
 
     async def fetch_async(self) -> Optional[List[WUndergroundDay]]:

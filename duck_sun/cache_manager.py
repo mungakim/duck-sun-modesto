@@ -139,6 +139,8 @@ class CacheManager:
             {"date": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"), "high_f": 56, "low_f": 41, "condition": "Default"},
             {"date": (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"), "high_f": 57, "low_f": 42, "condition": "Default"},
         ],
+        "weather_com": [],  # Web scraping - often blocked, empty is OK
+        "wunderground": [],  # Web scraping - often blocked, empty is OK
         "mid_org": {
             "today": {"high": "55", "low": "40", "condition": "Default"},
             "yesterday": {"high": "54", "low": "39", "condition": "Default"}
