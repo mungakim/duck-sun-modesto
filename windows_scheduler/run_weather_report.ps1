@@ -58,7 +58,7 @@ function Invoke-GitPushWithRetry {
     for ($i = 0; $i -lt $MaxRetries; $i++) {
         Write-Log "Git push attempt $($i + 1)/$MaxRetries..."
         $ErrorActionPreference = "Continue"
-        $output = & git push origin main 2>&1
+        $output = & git push 2>&1
         $pushExitCode = $LASTEXITCODE
         $ErrorActionPreference = $originalErrorPref
 
@@ -115,7 +115,7 @@ try {
     Write-Log "Pulling latest changes from origin..."
     try {
         $ErrorActionPreference = "Continue"
-        $pullOutput = & git pull origin main 2>&1
+        $pullOutput = & git pull 2>&1
         $ErrorActionPreference = "Stop"
         $pullOutput | ForEach-Object { Write-Log "  $_" }
         if ($LASTEXITCODE -ne 0) {
