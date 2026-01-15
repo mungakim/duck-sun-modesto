@@ -1,6 +1,6 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-01-15T13:17:19.960031",
+  "timestamp": "2026-01-15T13:46:28.321026",
   "api_success": true,
   "data": [
     {
@@ -10,13 +10,13 @@
       "high_f": 57.0,
       "low_f": 37.0,
       "precip_prob": 25,
-      "condition": "Mostly cloudy"
+      "condition": "Intermittent clouds"
     },
     {
       "date": "2026-01-16",
-      "high_c": 15.56,
+      "high_c": 15.0,
       "low_c": 3.33,
-      "high_f": 60.0,
+      "high_f": 59.0,
       "low_f": 38.0,
       "precip_prob": 0,
       "condition": "Mostly sunny"
