@@ -1,36 +1,36 @@
 {
   "provider": "weather_com",
-  "timestamp": "2026-01-15T11:02:04.165059",
+  "timestamp": "2026-01-15T13:17:20.580482",
   "api_success": true,
   "data": [
     {
       "date": "2026-01-15",
       "day_name": "Thu",
-      "high_f": 60.0,
-      "low_f": 37.0,
-      "high_c": 15.56,
-      "low_c": 2.78,
-      "condition": "Clouds giving way to sun . Highs in the low 60s an",
+      "high_f": 58.0,
+      "low_f": 38.0,
+      "high_c": 14.44,
+      "low_c": 3.33,
+      "condition": "Mostly cloudy. Highs in the upper 50s and lows in ",
       "precip_prob": 0
     },
     {
       "date": "2026-01-16",
       "day_name": "Fri",
-      "high_f": 60.0,
-      "low_f": 38.0,
-      "high_c": 15.56,
-      "low_c": 3.33,
+      "high_f": 58.0,
+      "low_f": 37.0,
+      "high_c": 14.44,
+      "low_c": 2.78,
       "condition": "Morning fog followed by afternoon sun. Highs in th",
       "precip_prob": 0
     },
     {
       "date": "2026-01-17",
       "day_name": "Sat",
-      "high_f": 59.0,
+      "high_f": 57.0,
       "low_f": 40.0,
-      "high_c": 15.0,
+      "high_c": 13.89,
       "low_c": 4.44,
-      "condition": "Morning fog followed by afternoon sun. Highs in th",
+      "condition": "Areas of morning fog, then some sun. Highs in the ",
       "precip_prob": 0
     },
     {
@@ -40,7 +40,7 @@
       "low_f": 39.0,
       "high_c": 13.89,
       "low_c": 3.89,
-      "condition": "Morning fog followed by afternoon sun. Highs in th",
+      "condition": "Morning clouds followed by afternoon sun. Highs in",
       "precip_prob": 0
     },
     {
@@ -70,7 +70,7 @@
       "low_f": 41.0,
       "high_c": 14.44,
       "low_c": 5.0,
-      "condition": "Mix of sun and clouds. Highs in the upper 50s and ",
+      "condition": "Partly cloudy. Highs in the upper 50s and lows in ",
       "precip_prob": 0
     },
     {
@@ -90,7 +90,7 @@
       "low_f": 39.0,
       "high_c": 16.11,
       "low_c": 3.89,
-      "condition": "Plenty of sun. Highs in the low 60s and lows in th",
+      "condition": "Mostly sunny. Highs in the low 60s and lows in the",
       "precip_prob": 0
     },
     {
@@ -100,7 +100,7 @@
       "low_f": 41.0,
       "high_c": 16.11,
       "low_c": 5.0,
-      "condition": "Times of sun and clouds. Highs in the low 60s and ",
+      "condition": "Mix of sun and clouds. Highs in the low 60s and lo",
       "precip_prob": 0
     }
   ]
