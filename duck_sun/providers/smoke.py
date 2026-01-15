@@ -75,7 +75,7 @@ class SmokeProvider:
         logger.debug(f"[SmokeProvider] Request params: {params}")
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
                 logger.debug(f"[SmokeProvider] Sending GET request to {self.URL}")
                 resp = await client.get(self.URL, params=params)
                 

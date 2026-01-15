@@ -240,7 +240,7 @@ class GoogleWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
                 all_forecasts = []
                 next_page_token = None
                 page_count = 0

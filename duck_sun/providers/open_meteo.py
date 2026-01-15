@@ -135,7 +135,7 @@ async def fetch_open_meteo(days: int = 8) -> ForecastResult:
     
     logger.debug(f"[fetch_open_meteo] Request params: {params}")
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=False) as client:
         logger.info(f"[fetch_open_meteo] Making request to Open-Meteo API...")
         resp = await client.get(url, params=params, timeout=30.0)
         logger.info(f"[fetch_open_meteo] Response status: {resp.status_code}")
@@ -365,7 +365,7 @@ async def fetch_hrrr_forecast(force_refresh: bool = False) -> Optional[HRRRForec
     }
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             logger.info(f"[HRRR] Making request to Open-Meteo (model=hrrr)...")
             resp = await client.get(url, params=params, timeout=30.0)
             logger.info(f"[HRRR] Response status: {resp.status_code}")
