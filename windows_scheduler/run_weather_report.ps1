@@ -111,10 +111,16 @@ try {
 
     # Pull latest changes first (avoid conflicts)
     Write-Log "Pulling latest changes from origin..."
-    $pullOutput = & git pull origin main 2>&1
-    $pullOutput | ForEach-Object { Write-Log "  $_" }
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "Git pull failed (non-fatal, continuing...)" "WARNING"
+    try {
+        $ErrorActionPreference = "Continue"
+        $pullOutput = & git pull origin main 2>&1
+        $ErrorActionPreference = "Stop"
+        $pullOutput | ForEach-Object { Write-Log "  $_" }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Git pull failed (non-fatal, continuing...)" "WARNING"
+        }
+    } catch {
+        Write-Log "Git pull warning: $_" "WARNING"
     }
 
     # ========================================================================
