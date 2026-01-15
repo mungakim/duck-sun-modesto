@@ -35,6 +35,8 @@ from duck_sun.providers.google_weather import GoogleWeatherProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.smoke import SmokeProvider
+from duck_sun.providers.weather_com import WeatherComProvider
+from duck_sun.providers.wunderground import WUndergroundProvider
 
 # Processing
 from duck_sun.uncanniness import UncannyEngine
@@ -297,7 +299,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     """
     results: Dict[str, FetchResult] = {}
 
-    logger.info("[fetch_all_providers] Starting fetch from 9 providers...")
+    logger.info("[fetch_all_providers] Starting fetch from 11 providers...")
 
     # 1. Open-Meteo (primary source - required)
     logger.info("[fetch_all_providers] Fetching Open-Meteo...")
@@ -352,7 +354,25 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["google_weather"] = await fetch_with_retry("google_weather", _fetch_google, cache_mgr)
 
-    # 7. MID.org (local ground truth)
+    # 7. Weather.com (commercial - weight 4x)
+    logger.info("[fetch_all_providers] Fetching Weather.com...")
+
+    async def _fetch_weather_com():
+        wcom = WeatherComProvider()
+        return wcom.fetch_sync()  # curl_cffi is sync
+
+    results["weather_com"] = await fetch_with_retry("weather_com", _fetch_weather_com, cache_mgr)
+
+    # 8. Weather Underground (commercial - weight 4x)
+    logger.info("[fetch_all_providers] Fetching Weather Underground...")
+
+    async def _fetch_wunderground():
+        wunder = WUndergroundProvider()
+        return wunder.fetch_sync()  # curl_cffi is sync
+
+    results["wunderground"] = await fetch_with_retry("wunderground", _fetch_wunderground, cache_mgr)
+
+    # 9. MID.org (local ground truth - weight 2x)
     logger.info("[fetch_all_providers] Fetching MID.org...")
 
     async def _fetch_mid():
@@ -553,6 +573,8 @@ async def main():
         met_data = results["met_no"].data
         accu_data = results["accuweather"].data
         google_data = results["google_weather"].data
+        weather_com_data = results["weather_com"].data
+        wunderground_data = results["wunderground"].data
         mid_data = results["mid_org"].data
         metar_data = results["metar"].data
         smoke_data = results["smoke"].data
@@ -725,6 +747,8 @@ async def main():
             met_data=met_data,
             accu_data=accu_data,
             google_data=google_data,
+            weather_com_data=weather_com_data,
+            wunderground_data=wunderground_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical_hours,
             output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.pdf",
@@ -757,7 +781,7 @@ async def main():
             logger.info(f"  PDF:  {pdf_path}")
         else:
             logger.warning("  PDF:  Generation skipped (fpdf2 not installed)")
-        logger.info(f"  Providers: {len(active_sources)}/9 active")
+        logger.info(f"  Providers: {len(active_sources)}/11 active")
         if degraded:
             logger.warning(f"  Degraded: {', '.join(degraded)}")
         logger.info(f"  Duration: {duration:.2f} seconds")
