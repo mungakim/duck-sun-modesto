@@ -111,7 +111,11 @@ try {
 
     # Pull latest changes first (avoid conflicts)
     Write-Log "Pulling latest changes from origin..."
-    git pull origin main 2>&1 | ForEach-Object { Write-Log "  $_" }
+    $pullOutput = & git pull origin main 2>&1
+    $pullOutput | ForEach-Object { Write-Log "  $_" }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "Git pull failed (non-fatal, continuing...)" "WARNING"
+    }
 
     # ========================================================================
     # STEP 1: Run the weather report scheduler
