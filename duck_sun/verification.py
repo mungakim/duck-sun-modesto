@@ -510,7 +510,7 @@ async def fetch_yesterday_actuals() -> Optional[Dict[str, Any]]:
     logger.debug(f"[fetch_yesterday_actuals] Request params: {params}")
     
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
             resp = await client.get(URL, params=params)
             logger.info(f"[fetch_yesterday_actuals] Response status: {resp.status_code}")
             
