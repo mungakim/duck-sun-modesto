@@ -53,23 +53,25 @@ function Invoke-GitPushWithRetry {
         [int[]]$DelaySeconds = @(2, 4, 8, 16)
     )
 
+    $originalErrorPref = $ErrorActionPreference
+
     for ($i = 0; $i -lt $MaxRetries; $i++) {
-        try {
-            Write-Log "Git push attempt $($i + 1)/$MaxRetries..."
-            $output = git push origin main 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Log "Git push successful" "SUCCESS"
-                return $true
-            }
-            throw "Git push failed with exit code $LASTEXITCODE`: $output"
+        Write-Log "Git push attempt $($i + 1)/$MaxRetries..."
+        $ErrorActionPreference = "Continue"
+        $output = & git push origin main 2>&1
+        $pushExitCode = $LASTEXITCODE
+        $ErrorActionPreference = $originalErrorPref
+
+        if ($pushExitCode -eq 0) {
+            Write-Log "Git push successful" "SUCCESS"
+            return $true
         }
-        catch {
-            Write-Log "Git push failed: $_" "WARNING"
-            if ($i -lt $MaxRetries - 1) {
-                $delay = $DelaySeconds[$i]
-                Write-Log "Retrying in $delay seconds..."
-                Start-Sleep -Seconds $delay
-            }
+
+        Write-Log "Git push failed: $output" "WARNING"
+        if ($i -lt $MaxRetries - 1) {
+            $delay = $DelaySeconds[$i]
+            Write-Log "Retrying in $delay seconds..."
+            Start-Sleep -Seconds $delay
         }
     }
 
@@ -157,31 +159,37 @@ try {
     Write-Log "-" * 40
 
     # Configure git user (for this repo only)
-    git config user.name "DuckSunBot"
-    git config user.email "ducksunbot@local"
+    $ErrorActionPreference = "Continue"
+    & git config user.name "DuckSunBot" 2>&1 | Out-Null
+    & git config user.email "ducksunbot@local" 2>&1 | Out-Null
+    $ErrorActionPreference = "Stop"
 
-    # Stage the output files
+    # Stage the output files (excluding logs - they're gitignored)
     $filesToStage = @(
         "reports/*.pdf",
         "reports/**/*.pdf",
         "outputs/*.json",
         "verification.db",
-        "LEADERBOARD.md",
-        "logs/duck_sun.log"
+        "LEADERBOARD.md"
     )
 
     $stagedAny = $false
+    $ErrorActionPreference = "Continue"
     foreach ($pattern in $filesToStage) {
         $files = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue -Recurse
         if ($files) {
-            git add $pattern 2>&1 | Out-Null
+            & git add $pattern 2>&1 | Out-Null
             $stagedAny = $true
             Write-Log "Staged: $pattern ($($files.Count) files)"
         }
     }
+    $ErrorActionPreference = "Stop"
 
     # Check if there are any changes to commit
-    $status = git status --porcelain 2>&1
+    $ErrorActionPreference = "Continue"
+    $status = & git status --porcelain 2>&1
+    $ErrorActionPreference = "Stop"
+
     if ([string]::IsNullOrWhiteSpace($status)) {
         Write-Log "No changes to commit - all up to date" "SUCCESS"
     }
@@ -191,9 +199,13 @@ try {
         $commitMsg = [char]0x2600 + " Forecast: $today"  # Sun emoji + date
 
         Write-Log "Changes detected, creating commit..."
-        git commit -m $commitMsg 2>&1 | ForEach-Object { Write-Log "  $_" }
+        $ErrorActionPreference = "Continue"
+        $commitOutput = & git commit -m $commitMsg 2>&1
+        $commitExitCode = $LASTEXITCODE
+        $ErrorActionPreference = "Stop"
+        $commitOutput | ForEach-Object { Write-Log "  $_" }
 
-        if ($LASTEXITCODE -ne 0) {
+        if ($commitExitCode -ne 0) {
             Write-Log "Git commit failed (may be no changes)" "WARNING"
         }
         else {
