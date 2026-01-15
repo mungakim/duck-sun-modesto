@@ -17,7 +17,7 @@
 # ============================================================================
 # CONFIGURATION - UPDATE THIS PATH TO YOUR PROJECT LOCATION
 # ============================================================================
-$ProjectDir = "C:\Users\YourUsername\duck-sun-modesto"  # <-- UPDATE THIS!
+$ProjectDir = "C:\Projects\duck-sun-modesto"
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
