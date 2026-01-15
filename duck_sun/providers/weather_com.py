@@ -116,7 +116,8 @@ class WeatherComProvider:
                     "Referer": "https://weather.com/",
                     "Origin": "https://weather.com",
                 }
-                response = session.get(url, headers=headers, timeout=30)
+                # verify=False bypasses SSL cert issues on Windows corporate networks
+                response = session.get(url, headers=headers, timeout=30, verify=False)
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
@@ -194,11 +195,11 @@ class WeatherComProvider:
             with Session(impersonate="chrome110") as session:
                 # First request to get cookies
                 logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
-                home_resp = session.get("https://weather.com/", timeout=15)
+                home_resp = session.get("https://weather.com/", timeout=15, verify=False)
                 logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
 
                 # Now fetch the forecast page with cookies
-                response = session.get(scrape_url, timeout=30)
+                response = session.get(scrape_url, timeout=30, verify=False)
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] Scraping HTTP {response.status_code}")

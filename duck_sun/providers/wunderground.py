@@ -110,7 +110,8 @@ class WUndergroundProvider:
             from curl_cffi.requests import Session
 
             with Session(impersonate="firefox135") as session:
-                response = session.get(self.URL, timeout=30)
+                # verify=False bypasses SSL cert issues on Windows corporate networks
+                response = session.get(self.URL, timeout=30, verify=False)
 
             if response.status_code != 200:
                 logger.error(f"[WUndergroundProvider] HTTP {response.status_code}")
