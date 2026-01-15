@@ -8,10 +8,12 @@ from multiple sources for the Weighted Ensemble Consensus Model:
 2. NOAA - National Oceanic and Atmospheric Administration (official US forecast) - Weight: 3x
 3. Met.no - Norwegian Met Institute (ECMWF European model) - Weight: 3x
 4. AccuWeather - Commercial provider (5-day forecast) - Weight: 4x
-5. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 6x
-6. MID.org - Modesto Irrigation District local data - Weight: 2x
-7. METAR - Real-time airport ground truth observations
-8. Smoke - Open-Meteo Air Quality API (PM2.5/AQI for wildfire smoke)
+5. Weather.com - The Weather Channel (10-day forecast) - Weight: 4x
+6. Weather Underground - IBM/TWC (10-day forecast) - Weight: 4x
+7. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 6x
+8. MID.org - Modesto Irrigation District local data - Weight: 2x
+9. METAR - Real-time airport ground truth observations
+10. Smoke - Open-Meteo Air Quality API (PM2.5/AQI for wildfire smoke)
 
 RELIABILITY IS KING - Google MetNet-3 neural model leads the weighted ensemble.
 """
@@ -60,6 +62,16 @@ from duck_sun.providers.smoke import (
     SmokeMetrics,
 )
 
+from duck_sun.providers.weather_com import (
+    WeatherComProvider,
+    WeatherComDay,
+)
+
+from duck_sun.providers.wunderground import (
+    WUndergroundProvider,
+    WUndergroundDay,
+)
+
 __all__ = [
     # Open-Meteo (fallback source, weight: 1x)
     "fetch_open_meteo",
@@ -89,5 +101,11 @@ __all__ = [
     # Smoke (air quality/wildfire)
     "SmokeProvider",
     "SmokeMetrics",
+    # Weather.com (commercial, weight: 4x) - Web scraping
+    "WeatherComProvider",
+    "WeatherComDay",
+    # Weather Underground (commercial, weight: 4x) - Web scraping
+    "WUndergroundProvider",
+    "WUndergroundDay",
 ]
 

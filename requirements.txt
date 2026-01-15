@@ -29,3 +29,7 @@ fpdf2>=2.7.0
 # Testing (Truth Tracker verification system)
 pytest>=9.0.0
 pytest-asyncio>=1.3.0
+
+# Web scraping for Weather.com and Weather Underground
+curl-cffi>=0.7.0
+beautifulsoup4>=4.12.0

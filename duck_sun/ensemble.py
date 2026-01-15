@@ -10,9 +10,11 @@ Key Features:
 3. Variance classification (LOW/MODERATE/CRITICAL)
 4. Confidence scoring based on source agreement
 
-WEIGHTS (Calibrated Dec 2025):
+WEIGHTS (Calibrated Jan 2026):
 - Google: 6.0 (MetNet-3 neural model - satellite/radar fusion)
 - AccuWeather: 4.0 (Commercial provider)
+- Weather.com: 4.0 (The Weather Channel - scraped)
+- WUnderground: 4.0 (Weather Underground/IBM - scraped)
 - NOAA: 3.0 (Government source)
 - Met.no: 3.0 (ECMWF model)
 - MID.org: 2.0 (Local microclimate)
@@ -55,10 +57,12 @@ class WeightedEnsembleEngine:
     is a "warn only" system that never blocks operations.
     """
 
-    # Source weights (calibrated Dec 2025)
+    # Source weights (calibrated Jan 2026)
     SOURCE_WEIGHTS = {
         "Google": 6.0,        # MetNet-3 neural model - satellite/radar fusion
         "AccuWeather": 4.0,   # Commercial provider
+        "Weather.com": 4.0,   # The Weather Channel (scraped)
+        "WUnderground": 4.0,  # Weather Underground/IBM (scraped)
         "NOAA": 3.0,          # Government source
         "Met.no": 3.0,        # ECMWF model
         "MID.org": 2.0,       # Local microclimate
@@ -353,6 +357,8 @@ def quick_consensus(
     google: Optional[float] = None,
     noaa: Optional[float] = None,
     accuweather: Optional[float] = None,
+    weather_com: Optional[float] = None,
+    wunderground: Optional[float] = None,
     met_no: Optional[float] = None,
     mid_org: Optional[float] = None,
     open_meteo: Optional[float] = None,
@@ -370,6 +376,8 @@ def quick_consensus(
         "Google": google,
         "NOAA": noaa,
         "AccuWeather": accuweather,
+        "Weather.com": weather_com,
+        "WUnderground": wunderground,
         "Met.no": met_no,
         "MID.org": mid_org,
         "Open-Meteo": open_meteo

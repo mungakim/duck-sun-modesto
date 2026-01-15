@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 9 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
+Duck Sun Modesto is a daily solar forecasting agent for Modesto, CA power system scheduling. It fetches weather data from 11 sources, computes deterministic solar factors, and generates PDF reports for Power System Schedulers.
 
-**Current Status:** Production Ready - Google MetNet-3 Neural Model Integration (Dec 18, 2025)
+**Current Status:** Production Ready - 11-Source Weighted Ensemble (Jan 15, 2026)
 
 ## Architecture
 
@@ -19,7 +19,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 1. **Source Replication:** Each provider fetches from the exact same API endpoint that powers the official website, ensuring organic alignment without hardcoding.
 2. **Deterministic Solar Math:** Solar factor calculation is done in Python for 100% accuracy.
-3. **Weighted Ensemble:** Google(6x) > AccuWeather(4x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
+3. **Weighted Ensemble:** Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
 
 ### Data Sourcing Strategy
 
@@ -27,11 +27,15 @@ The project follows a **Source Replication** approach (not Model Approximation):
 |----------|-------------|------------------|--------|
 | **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **6x** |
 | **AccuWeather** | Official 5-day API | accuweather.com | 4x |
+| **Weather.com** | Web scraping (curl_cffi) | weather.com | 4x |
+| **Weather Underground** | Web scraping (curl_cffi) | wunderground.com | 4x |
 | **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website | 3x |
 | **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute | 3x |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) | 1x |
 
 **Google Weather (MetNet-3):** The primary source uses Google's neural weather model which fuses satellite imagery and radar data for hyperlocal 0-96 hour predictions. Superior short-term accuracy compared to pure physics models.
+
+**Weather.com & Weather Underground:** Both sources are scraped using curl_cffi with browser impersonation. They share data from The Weather Company (IBM) but may show slight variations. Note: Weather.com has aggressive anti-bot protection and may not work in all environments (cloud/container IPs are often blocked).
 
 **NOAA Organic Sourcing:** The NOAA provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official weather.gov website exactly.
 
@@ -89,23 +93,26 @@ Required in `.env`:
 ## PDF Report Structure
 
 The PDF report includes:
-- 8-day temperature grid from 5 sources with weighted consensus
+- 8-day temperature grid from 7 sources with weighted consensus
 - MID Weather 48-hour summary with historical records
 - Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
 - 3-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
-## Calibration Status (Dec 18, 2025)
+## Calibration Status (Jan 15, 2026)
 
-**Google MetNet-3 Integration Complete:**
+**11-Source Weighted Ensemble:**
 - **Google Weather:** MetNet-3 neural model via Maps Platform Weather API - Weight: 6x
 - **AccuWeather:** Direct API sourcing (matches accuweather.com) - Weight: 4x
+- **Weather.com:** Web scraping via curl_cffi - Weight: 4x
+- **Weather Underground:** Web scraping via curl_cffi - Weight: 4x
 - **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov) - Weight: 3x
 - **Met.no:** ECMWF European model via Locationforecast 2.0 API - Weight: 3x
 - **Open-Meteo:** Independent physics model (provides "second opinion") - Weight: 1x
 
 **Weight Rationale:**
 - Google MetNet-3 uses real-time radar/satellite fusion for superior 0-96 hour accuracy
+- Weather.com and Weather Underground (both IBM/TWC) provide additional commercial-grade forecasts
 - Neural model "nowcasts" rather than just physics simulations
 - Best for hyperlocal, short-term predictions (ideal for duck curve forecasting)
 
