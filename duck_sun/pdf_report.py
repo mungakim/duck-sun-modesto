@@ -554,19 +554,6 @@ def generate_pdf_report(
     pdf.ln(2)
 
     # ===================
-    # DATA QUALITY WARNING BANNER (if degraded sources)
-    # ===================
-    if degraded_sources:
-        pdf.set_fill_color(255, 230, 230)  # Light red background
-        pdf.set_draw_color(200, 100, 100)
-        pdf.set_text_color(139, 0, 0)  # Dark red text
-        pdf.set_font('Helvetica', 'B', 7)
-        warning_text = f"DATA QUALITY: {', '.join(degraded_sources)} using cached/stale data"
-        pdf.cell(0, 5, warning_text, 1, 1, 'C', fill=True)
-        pdf.set_text_color(0, 0, 0)  # Reset text color
-        pdf.ln(1)
-
-    # ===================
     # TOP ROW: Manual Entry Fields (left) + MID Weather 48-Hour Summary (right)
     # ===================
     top_row_y = pdf.get_y()
