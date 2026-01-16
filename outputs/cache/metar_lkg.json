@@ -1,6 +1,6 @@
 {
   "provider": "metar",
-  "timestamp": "2026-01-16T13:18:09.924769",
+  "timestamp": "2026-01-16T13:50:36.401271",
   "api_success": true,
   "data": {
     "raw": "KMOD 162111Z 10005KT 1 1/4SM BR SCT004 10/09 A3009 RMK AO2 T01000089",
