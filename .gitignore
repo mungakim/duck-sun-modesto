@@ -41,6 +41,9 @@ venv.bak/
 *.swo
 *~
 
+# Excel temporary/lock files
+~$*
+
 # Logs
 *.log
 duck_sun_scheduler.log
