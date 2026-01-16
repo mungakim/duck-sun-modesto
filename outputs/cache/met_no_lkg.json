@@ -1,12 +1,8 @@
 {
   "provider": "met_no",
-  "timestamp": "2026-01-15T20:30:06.082831",
+  "timestamp": "2026-01-15T21:42:58.966313",
   "api_success": true,
   "data": [
-    {
-      "time": "2026-01-16T04:00:00Z",
-      "temp_c": 7.7
-    },
     {
       "time": "2026-01-16T05:00:00Z",
       "temp_c": 6.4
