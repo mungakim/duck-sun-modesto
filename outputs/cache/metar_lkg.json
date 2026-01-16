@@ -1,6 +1,6 @@
 {
   "provider": "metar",
-  "timestamp": "2026-01-16T07:01:08.572891",
+  "timestamp": "2026-01-16T07:25:28.520712",
   "api_success": true,
   "data": {
     "raw": "KMOD 161453Z 07003KT M1/4SM FG VV001 04/04 A3011 RMK AO2 SLP196 T00390039 51012",

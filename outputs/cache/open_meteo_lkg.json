@@ -1,9 +1,9 @@
 {
   "provider": "open_meteo",
-  "timestamp": "2026-01-16T07:01:04.839623",
+  "timestamp": "2026-01-16T07:25:24.771243",
   "api_success": true,
   "data": {
-    "generated_at": "2026-01-16T07:01:04.838860",
+    "generated_at": "2026-01-16T07:25:24.770419",
     "location": "Modesto, CA",
     "daily_summary": [
       {
@@ -2012,7 +2012,7 @@
         "low_c": 7.5,
         "high_f": 61,
         "low_f": 46,
-        "precip_prob": 6,
+        "precip_prob": 7,
         "weather_code": 2,
         "condition": "Partly Cloudy"
       }
