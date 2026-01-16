@@ -420,28 +420,28 @@ def generate_excel_report(
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
     ws.print_options.horizontalCentered = True
-    ws.print_options.verticalCentered = True
+    ws.print_options.verticalCentered = False  # Disabled to push content to TOP of page
 
     # =====================
-    # ROW 2: Title (CENTERED across full width)
+    # ROW 1: Title (CENTERED across full width) - moved up from row 2
     # =====================
-    ws.merge_cells(f'{col(1)}2:{col(18)}2')
-    title_cell = ws[f'{col(1)}2']
+    ws.merge_cells(f'{col(1)}1:{col(18)}1')
+    title_cell = ws[f'{col(1)}1']
     title_cell.value = "MODESTO, CA - DAILY WEATHER FORECAST"
     title_cell.font = Font(name='Arial', size=14, bold=True, color='003C78')
     title_cell.alignment = center_align
 
     # =====================
-    # ROW 3: Timestamp (CENTERED)
+    # ROW 2: Timestamp (CENTERED) - moved up from row 3
     # =====================
-    ws.merge_cells(f'{col(1)}3:{col(18)}3')
-    ts_cell = ws[f'{col(1)}3']
+    ws.merge_cells(f'{col(1)}2:{col(18)}2')
+    ts_cell = ws[f'{col(1)}2']
     ts_cell.value = timestamp_str
     ts_cell.font = Font(name='Arial', size=11, bold=True)
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 5: PGE CITYGATE - FULLY ENCLOSED label cell + input cell
+    # ROW 4: PGE CITYGATE - FULLY ENCLOSED label cell + input cell (moved up from row 5)
     # =====================
     # Create explicit border for PGE CITYGATE label (all 4 sides)
     pge_label_border = Border(
@@ -450,25 +450,25 @@ def generate_excel_report(
         top=Side(style='medium'),
         bottom=Side(style='medium')
     )
-    pge_label = ws[f'{col(1)}5']
+    pge_label = ws[f'{col(1)}4']
     pge_label.value = "PGE CITYGATE:"
     pge_label.font = Font(name='Arial', size=8, bold=True)
     pge_label.alignment = center_align
     pge_label.border = pge_label_border  # FULLY ENCLOSE with all 4 sides
     # Input cell for PGE CITYGATE (single wide cell for 5-decimal values)
-    pge_input = ws[f'{col(2)}5']
+    pge_input = ws[f'{col(2)}4']
     pge_input.border = pge_label_border  # Same full border
     pge_input.alignment = center_align
 
     # =====================
-    # ROW 6-8: MID GAS NOM (left side) - 6 cells (2 columns x 3 rows), wider
+    # ROW 5-7: MID GAS NOM (left side) - 6 cells (2 columns x 3 rows), wider
     # =====================
-    ws[f'{col(1)}6'] = "MID GAS NOM:"
-    ws[f'{col(1)}6'].font = Font(name='Arial', size=8, bold=True)
-    ws[f'{col(1)}6'].alignment = left_align
+    ws[f'{col(1)}5'] = "MID GAS NOM:"
+    ws[f'{col(1)}5'].font = Font(name='Arial', size=8, bold=True)
+    ws[f'{col(1)}5'].alignment = left_align
 
     # Create 3 rows of cells (2 columns x 3 rows = 6 boxes)
-    for row_idx in range(7, 10):
+    for row_idx in range(6, 9):
         for c in range(1, 3):  # Only 2 columns now
             cell = ws[f'{col(c)}{row_idx}']
             cell.border = thick_border
@@ -477,8 +477,8 @@ def generate_excel_report(
     # =====================
     # MID WEATHER 48-HOUR SUMMARY (right side) - Extended range to fit title
     # =====================
-    ws.merge_cells(f'{col(11)}5:{col(17)}5')
-    mid_header = ws[f'{col(11)}5']
+    ws.merge_cells(f'{col(11)}4:{col(17)}4')
+    mid_header = ws[f'{col(11)}4']
     mid_header.value = "MID WEATHER 48-HOUR SUMMARY"
     mid_header.font = Font(name='Arial', size=9, bold=True, color='003C78')
     mid_header.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
@@ -486,11 +486,11 @@ def generate_excel_report(
     mid_header.border = thin_border
     # Apply border to all cells in merged range
     for c in range(11, 18):
-        ws[f'{col(c)}5'].border = thin_border
+        ws[f'{col(c)}4'].border = thin_border
 
     # Headers: High, Low, Rain (no empty cell before High)
     for c, label in [(14, 'High'), (15, 'Low'), (16, 'Rain')]:
-        cell = ws[f'{col(c)}6']
+        cell = ws[f'{col(c)}5']
         cell.value = label
         cell.font = Font(name='Arial', size=7, bold=True)
         cell.alignment = center_align
@@ -501,53 +501,53 @@ def generate_excel_report(
         yest_data = mid_data.get('yesterday', {})
 
         # TODAY row
+        ws.merge_cells(f'{col(12)}6:{col(13)}6')
+        ws[f'{col(12)}6'] = "TODAY"
+        ws[f'{col(12)}6'].font = Font(name='Arial', size=7, bold=True)
+        ws[f'{col(12)}6'].alignment = center_align
+        ws[f'{col(12)}6'].border = thin_border
+        ws[f'{col(13)}6'].border = thin_border
+
+        ws[f'{col(14)}6'] = f"{today_data.get('high', '--')}F"
+        ws[f'{col(14)}6'].fill = PatternFill(start_color="FFC8B4", end_color="FFC8B4", fill_type="solid")
+        ws[f'{col(14)}6'].alignment = center_align
+        ws[f'{col(14)}6'].border = thin_border
+
+        ws[f'{col(15)}6'] = f"{today_data.get('low', '--')}F"
+        ws[f'{col(15)}6'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
+        ws[f'{col(15)}6'].alignment = center_align
+        ws[f'{col(15)}6'].border = thin_border
+
+        ws[f'{col(16)}6'] = f"{today_data.get('rain', '0.00')}\""
+        ws[f'{col(16)}6'].alignment = center_align
+        ws[f'{col(16)}6'].border = thin_border
+
+        # YEST row
         ws.merge_cells(f'{col(12)}7:{col(13)}7')
-        ws[f'{col(12)}7'] = "TODAY"
+        ws[f'{col(12)}7'] = "YEST"
         ws[f'{col(12)}7'].font = Font(name='Arial', size=7, bold=True)
         ws[f'{col(12)}7'].alignment = center_align
         ws[f'{col(12)}7'].border = thin_border
         ws[f'{col(13)}7'].border = thin_border
 
-        ws[f'{col(14)}7'] = f"{today_data.get('high', '--')}F"
+        ws[f'{col(14)}7'] = f"{yest_data.get('high', '--')}F"
         ws[f'{col(14)}7'].fill = PatternFill(start_color="FFC8B4", end_color="FFC8B4", fill_type="solid")
         ws[f'{col(14)}7'].alignment = center_align
         ws[f'{col(14)}7'].border = thin_border
 
-        ws[f'{col(15)}7'] = f"{today_data.get('low', '--')}F"
+        ws[f'{col(15)}7'] = f"{yest_data.get('low', '--')}F"
         ws[f'{col(15)}7'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
         ws[f'{col(15)}7'].alignment = center_align
         ws[f'{col(15)}7'].border = thin_border
 
-        ws[f'{col(16)}7'] = f"{today_data.get('rain', '0.00')}\""
+        ws[f'{col(16)}7'] = f"{yest_data.get('rain', '0.00')}\""
         ws[f'{col(16)}7'].alignment = center_align
         ws[f'{col(16)}7'].border = thin_border
 
-        # YEST row
-        ws.merge_cells(f'{col(12)}8:{col(13)}8')
-        ws[f'{col(12)}8'] = "YEST"
-        ws[f'{col(12)}8'].font = Font(name='Arial', size=7, bold=True)
-        ws[f'{col(12)}8'].alignment = center_align
-        ws[f'{col(12)}8'].border = thin_border
-        ws[f'{col(13)}8'].border = thin_border
-
-        ws[f'{col(14)}8'] = f"{yest_data.get('high', '--')}F"
-        ws[f'{col(14)}8'].fill = PatternFill(start_color="FFC8B4", end_color="FFC8B4", fill_type="solid")
-        ws[f'{col(14)}8'].alignment = center_align
-        ws[f'{col(14)}8'].border = thin_border
-
-        ws[f'{col(15)}8'] = f"{yest_data.get('low', '--')}F"
-        ws[f'{col(15)}8'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
-        ws[f'{col(15)}8'].alignment = center_align
-        ws[f'{col(15)}8'].border = thin_border
-
-        ws[f'{col(16)}8'] = f"{yest_data.get('rain', '0.00')}\""
-        ws[f'{col(16)}8'].alignment = center_align
-        ws[f'{col(16)}8'].border = thin_border
-
         # Records row
         if 'record_high_temp' in mid_data:
-            ws.merge_cells(f'{col(12)}9:{col(16)}9')
-            rec_cell = ws[f'{col(12)}9']
+            ws.merge_cells(f'{col(12)}8:{col(16)}8')
+            rec_cell = ws[f'{col(12)}8']
             rec_hi = mid_data.get('record_high_temp', '--')
             rec_hi_yr = mid_data.get('record_high_year', '')
             rec_lo = mid_data.get('record_low_temp', '--')
@@ -557,10 +557,10 @@ def generate_excel_report(
             rec_cell.alignment = center_align
             # Apply border to all cells in merged range
             for c in range(12, 17):
-                ws[f'{col(c)}9'].border = thin_border
+                ws[f'{col(c)}8'].border = thin_border
 
     # =====================
-    # TEMPERATURE GRID starting at Row 11
+    # TEMPERATURE GRID starting at Row 10 (moved up from row 11)
     # =====================
     SOURCE_WEIGHT_DISPLAY = {
         'OPEN-METEO': '1.0',
@@ -599,12 +599,11 @@ def generate_excel_report(
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
 
-    # Row 11: Condition descriptors
-    grid_row = 11
+    # Row 10: Condition descriptors - NO borders on first two empty cells
+    grid_row = 10
     ws[f'{col(1)}{grid_row}'] = ""
     ws[f'{col(2)}{grid_row}'] = ""
-    ws[f'{col(1)}{grid_row}'].border = thin_border
-    ws[f'{col(2)}{grid_row}'].border = thin_border
+    # Removed borders from col(1) and col(2) - they should be blank with no borders
 
     for i, day in enumerate(om_daily):
         date_key = day.get('date', '')
@@ -625,8 +624,8 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Row 12: Day names header
-    grid_row = 12
+    # Row 11: Day names header
+    grid_row = 11
     ws[f'{col(1)}{grid_row}'] = ""
     ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
     ws[f'{col(1)}{grid_row}'].border = thin_border
@@ -652,8 +651,8 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Row 13: Dates
-    grid_row = 13
+    # Row 12: Dates
+    grid_row = 12
     ws[f'{col(1)}{grid_row}'] = ""
     ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="466EA0", end_color="466EA0", fill_type="solid")
     ws[f'{col(1)}{grid_row}'].border = thin_border
@@ -716,7 +715,7 @@ def generate_excel_report(
     ]
 
     for src_idx, (label, getter, source_index) in enumerate(sources):
-        grid_row = 14 + src_idx
+        grid_row = 13 + src_idx
         weight_val = SOURCE_WEIGHT_DISPLAY.get(label, '')
 
         ws[f'{col(1)}{grid_row}'] = weight_val
@@ -759,7 +758,7 @@ def generate_excel_report(
             cell_lo.border = thin_border
 
     # Weighted Averages row
-    grid_row = 21
+    grid_row = 20
     ws[f'{col(1)}{grid_row}'] = ""
     ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
     ws[f'{col(1)}{grid_row}'].border = thin_border
@@ -812,7 +811,7 @@ def generate_excel_report(
         cell_lo.border = thin_border
 
     # PRECIP % row - WITH FULL BORDERS
-    grid_row = 22
+    grid_row = 21
     ws[f'{col(1)}{grid_row}'] = ""
     ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
     ws[f'{col(1)}{grid_row}'].border = thin_border
@@ -854,7 +853,7 @@ def generate_excel_report(
         cell_lo_ref.border = thin_border
 
     # Precip source note
-    grid_row = 23
+    grid_row = 22
     ws.merge_cells(f'{col(12)}{grid_row}:{col(18)}{grid_row}')
     note_cell = ws[f'{col(12)}{grid_row}']
     note_cell.value = "PRECIP = Google (0-72hr) > AccuWeather (72hr+) > Open-Meteo"
@@ -864,7 +863,7 @@ def generate_excel_report(
     # =====================
     # SOLAR FORECAST GRID (also centered)
     # =====================
-    grid_row = 25
+    grid_row = 24
     ws[f'{col(1)}{grid_row}'] = "SOLAR FORECAST (GOOGLE AI WEATHER API) - W/m² Irradiance"
     ws[f'{col(1)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
@@ -944,7 +943,7 @@ def generate_excel_report(
             duck_data[today].sort(key=lambda x: x['hour'])
 
     # Solar header row
-    grid_row = 26
+    grid_row = 25
     header_labels = ['DATE', '9AM', '10', '11', '12PM', '1', '2', '3', '4PM']
     for col_idx, label in enumerate(header_labels):
         col_letter = col(1 + col_idx)
@@ -957,7 +956,7 @@ def generate_excel_report(
 
     # Solar data rows
     for date_idx, d in enumerate(forecast_dates):
-        grid_row = 27 + date_idx * 2
+        grid_row = 26 + date_idx * 2
 
         date_obj = datetime.strptime(d, '%Y-%m-%d')
         day_name = date_obj.strftime('%A')
@@ -997,7 +996,7 @@ def generate_excel_report(
             desc_cell.alignment = center_align
             desc_cell.border = thin_border
 
-    # Legend row
+    # Legend row - row 35 with empty row 34 as gap after solar forecast
     grid_row = 35
     legend_items = [
         ("Cloudy", "DCDCDC"),
