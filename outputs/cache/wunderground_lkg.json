@@ -1,6 +1,6 @@
 {
   "provider": "wunderground",
-  "timestamp": "2026-01-16T06:55:04.170916",
+  "timestamp": "2026-01-16T07:01:08.272776",
   "api_success": true,
   "data": [
     {
@@ -26,9 +26,9 @@
     {
       "date": "2026-01-18",
       "day_name": "Sun",
-      "high_f": 59.0,
+      "high_f": 60.0,
       "low_f": 40.0,
-      "high_c": 15.0,
+      "high_c": 15.56,
       "low_c": 4.44,
       "condition": "Unknown",
       "precip_prob": 0
