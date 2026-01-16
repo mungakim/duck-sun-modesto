@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-01-15T13:56:23.660813",
+  "timestamp": "2026-01-15T20:30:06.451300",
   "location_key": "327145",
   "call_date": "2026-01-15",
-  "call_count": 6,
+  "call_count": 7,
   "daily_limit": 42,
   "data": [
     {
       "date": "2026-01-15",
-      "high_c": 13.89,
+      "high_c": 16.67,
       "low_c": 2.78,
-      "high_f": 57.0,
+      "high_f": 62.0,
       "low_f": 37.0,
       "precip_prob": 25,
       "condition": "Intermittent clouds"
