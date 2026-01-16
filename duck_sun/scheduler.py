@@ -41,6 +41,7 @@ from duck_sun.providers.wunderground import WUndergroundProvider
 # Processing
 from duck_sun.uncanniness import UncannyEngine
 from duck_sun.pdf_report import generate_pdf_report
+from duck_sun.excel_report import generate_excel_report
 
 # Resilience infrastructure
 from duck_sun.resilience import with_retry, RetryConfig, categorize_error
@@ -760,6 +761,27 @@ async def main():
             report_timestamp=start_time
         )
 
+        # --- STEP 3b: Generate Excel Report ---
+        logger.info("")
+        logger.info("STEP 3b: Generating Excel Report...")
+        logger.info("-" * 40)
+
+        excel_path = generate_excel_report(
+            om_data=om_data,
+            noaa_data=noaa_data,
+            met_data=met_data,
+            accu_data=accu_data,
+            google_data=google_data,
+            weather_com_data=weather_com_data,
+            wunderground_data=wunderground_data,
+            df_analyzed=df_analyzed,
+            output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.xlsx",
+            mid_data=mid_data,
+            precip_data=precip_data,
+            noaa_daily_periods=noaa_daily_periods if noaa_daily_periods else None,
+            report_timestamp=start_time
+        )
+
         duration = (datetime.now(pacific) - start_time).total_seconds()
 
         # --- STEP 4: Summary ---
@@ -776,11 +798,15 @@ async def main():
         logger.info("")
         logger.info("=" * 60)
         logger.info("SUCCESS!")
-        logger.info(f"  JSON: {json_path}")
+        logger.info(f"  JSON:  {json_path}")
         if pdf_path:
-            logger.info(f"  PDF:  {pdf_path}")
+            logger.info(f"  PDF:   {pdf_path}")
         else:
-            logger.warning("  PDF:  Generation skipped (fpdf2 not installed)")
+            logger.warning("  PDF:   Generation skipped (fpdf2 not installed)")
+        if excel_path:
+            logger.info(f"  Excel: {excel_path}")
+        else:
+            logger.warning("  Excel: Generation skipped (openpyxl not installed)")
         logger.info(f"  Providers: {len(active_sources)}/11 active")
         if degraded:
             logger.warning(f"  Degraded: {', '.join(degraded)}")
