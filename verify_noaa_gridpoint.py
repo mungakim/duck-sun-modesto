@@ -17,6 +17,10 @@ If there's a mismatch, the script will show the correct gridpoint to use.
 import asyncio
 import httpx
 import sys
+import warnings
+
+# Suppress SSL warnings when using verify=False
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 
 # KMOD Airport Coordinates (official weather station for Modesto)
@@ -56,7 +60,7 @@ async def verify_gridpoint():
     print()
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
             resp = await client.get(points_url, headers=HEADERS)
 
             if resp.status_code != 200:
@@ -123,7 +127,7 @@ async def fetch_and_compare_forecasts():
     forecast_url = f"{gridpoint_url}/forecast"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
             # Fetch forecast periods (matches weather.gov)
             print(f"Fetching forecast periods...")
             print(f"  URL: {forecast_url}")
