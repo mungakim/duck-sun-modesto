@@ -403,13 +403,13 @@ def generate_excel_report(
     for i in range(3, 20):
         ws.column_dimensions[col(i)].width = 7.5
 
-    # Page setup: 0.1" top margin to move report up, LANDSCAPE, fit to ONE page
+    # Page setup: ZERO top margin to move report up, LANDSCAPE, fit to ONE page
     ws.page_margins = PageMargins(
         left=0.25,
         right=0.25,
-        top=0.1,
+        top=0,
         bottom=0.5,
-        header=0.1,
+        header=0,
         footer=0.1
     )
     # Force landscape orientation
@@ -441,16 +441,23 @@ def generate_excel_report(
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 5: PGE CITYGATE (above MID GAS NOM) - ENCLOSED label + input cell
+    # ROW 5: PGE CITYGATE - FULLY ENCLOSED label cell + input cell
     # =====================
+    # Create explicit border for PGE CITYGATE label (all 4 sides)
+    pge_label_border = Border(
+        left=Side(style='medium'),
+        right=Side(style='medium'),
+        top=Side(style='medium'),
+        bottom=Side(style='medium')
+    )
     pge_label = ws[f'{col(1)}5']
     pge_label.value = "PGE CITYGATE:"
     pge_label.font = Font(name='Arial', size=8, bold=True)
     pge_label.alignment = center_align
-    pge_label.border = thick_border  # ENCLOSE the label cell
+    pge_label.border = pge_label_border  # FULLY ENCLOSE with all 4 sides
     # Input cell for PGE CITYGATE (single wide cell for 5-decimal values)
     pge_input = ws[f'{col(2)}5']
-    pge_input.border = thick_border
+    pge_input.border = pge_label_border  # Same full border
     pge_input.alignment = center_align
 
     # =====================
