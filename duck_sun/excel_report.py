@@ -453,7 +453,7 @@ def generate_excel_report(
         bottom=Side(style='medium')
     )
     pge_label = ws[f'{col(1)}3']
-    pge_label.value = "PGE CITYGATE:"
+    pge_label.value = "PGE CITYGATE:   "
     pge_label.font = Font(name='Arial', size=8, bold=True)
     pge_label.alignment = center_align
     # NO border on the label cell
