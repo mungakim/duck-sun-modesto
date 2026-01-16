@@ -1,6 +1,6 @@
 {
   "provider": "google_weather",
-  "timestamp": "2026-01-16T09:23:27.183939",
+  "timestamp": "2026-01-16T09:27:23.344694",
   "api_success": true,
   "data": {
     "hourly": [
@@ -1282,7 +1282,7 @@
         "high_f": 58,
         "low_f": 38,
         "precip_prob": 20,
-        "condition": "Sunny"
+        "condition": "Mostly cloudy"
       },
       {
         "date": "2026-01-17",
@@ -1322,6 +1322,6 @@
       }
     ],
     "source": "Google Weather API (MetNet-3)",
-    "fetched_at": "2026-01-16T09:23:27.183496"
+    "fetched_at": "2026-01-16T09:27:23.344205"
   }
 }
