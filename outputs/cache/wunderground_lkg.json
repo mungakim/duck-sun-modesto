@@ -1,24 +1,24 @@
 {
   "provider": "wunderground",
-  "timestamp": "2026-01-16T07:25:28.221704",
+  "timestamp": "2026-01-16T07:34:20.772430",
   "api_success": true,
   "data": [
     {
       "date": "2026-01-16",
       "day_name": "Fri",
       "high_f": 58.0,
-      "low_f": 38.0,
+      "low_f": 37.0,
       "high_c": 14.44,
-      "low_c": 3.33,
+      "low_c": 2.78,
       "condition": "Unknown",
       "precip_prob": 0
     },
     {
       "date": "2026-01-17",
       "day_name": "Sat",
-      "high_f": 55.0,
+      "high_f": 56.0,
       "low_f": 40.0,
-      "high_c": 12.78,
+      "high_c": 13.33,
       "low_c": 4.44,
       "condition": "Unknown",
       "precip_prob": 0
@@ -26,9 +26,9 @@
     {
       "date": "2026-01-18",
       "day_name": "Sun",
-      "high_f": 59.0,
+      "high_f": 57.0,
       "low_f": 40.0,
-      "high_c": 15.0,
+      "high_c": 13.89,
       "low_c": 4.44,
       "condition": "Unknown",
       "precip_prob": 0
@@ -46,9 +46,9 @@
     {
       "date": "2026-01-20",
       "day_name": "Tue",
-      "high_f": 58.0,
+      "high_f": 59.0,
       "low_f": 40.0,
-      "high_c": 14.44,
+      "high_c": 15.0,
       "low_c": 4.44,
       "condition": "Unknown",
       "precip_prob": 0
