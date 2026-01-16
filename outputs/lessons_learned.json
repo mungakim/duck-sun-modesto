@@ -1,16 +1,16 @@
 {
   "version": "1.0",
-  "last_updated": "2026-01-16T06:25:46.351573",
-  "total_runs": 23,
+  "last_updated": "2026-01-16T06:42:06.081377",
+  "total_runs": 24,
   "providers": {
     "open_meteo": {
-      "total_fetches": 22,
-      "api_successes": 17,
+      "total_fetches": 23,
+      "api_successes": 18,
       "cache_hits": 5,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 17,
+        "FRESH": 18,
         "ACCEPTABLE": 0,
         "STALE_WARN": 1,
         "STALE_ERROR": 4,
@@ -18,13 +18,13 @@
       }
     },
     "hrrr": {
-      "total_fetches": 22,
-      "api_successes": 20,
+      "total_fetches": 23,
+      "api_successes": 21,
       "cache_hits": 2,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 20,
+        "FRESH": 21,
         "ACCEPTABLE": 0,
         "STALE_WARN": 2,
         "STALE_ERROR": 0,
@@ -46,13 +46,13 @@
       }
     },
     "met_no": {
-      "total_fetches": 22,
-      "api_successes": 17,
+      "total_fetches": 23,
+      "api_successes": 18,
       "cache_hits": 5,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 17,
+        "FRESH": 18,
         "ACCEPTABLE": 0,
         "STALE_WARN": 1,
         "STALE_ERROR": 4,
@@ -60,13 +60,13 @@
       }
     },
     "accuweather": {
-      "total_fetches": 22,
-      "api_successes": 18,
+      "total_fetches": 23,
+      "api_successes": 19,
       "cache_hits": 4,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 18,
+        "FRESH": 19,
         "ACCEPTABLE": 0,
         "STALE_WARN": 0,
         "STALE_ERROR": 4,
@@ -88,13 +88,13 @@
       }
     },
     "mid_org": {
-      "total_fetches": 21,
-      "api_successes": 20,
+      "total_fetches": 22,
+      "api_successes": 21,
       "cache_hits": 1,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 20,
+        "FRESH": 21,
         "ACCEPTABLE": 0,
         "STALE_WARN": 1,
         "STALE_ERROR": 0,
@@ -102,13 +102,13 @@
       }
     },
     "metar": {
-      "total_fetches": 21,
-      "api_successes": 16,
+      "total_fetches": 22,
+      "api_successes": 17,
       "cache_hits": 5,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 16,
+        "FRESH": 17,
         "ACCEPTABLE": 0,
         "STALE_WARN": 1,
         "STALE_ERROR": 4,
@@ -116,27 +116,27 @@
       }
     },
     "smoke": {
-      "total_fetches": 21,
+      "total_fetches": 22,
       "api_successes": 11,
-      "cache_hits": 10,
+      "cache_hits": 11,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
         "FRESH": 11,
         "ACCEPTABLE": 0,
-        "STALE_WARN": 2,
+        "STALE_WARN": 3,
         "STALE_ERROR": 8,
         "DEFAULT": 0
       }
     },
     "noaa": {
-      "total_fetches": 19,
-      "api_successes": 14,
+      "total_fetches": 20,
+      "api_successes": 15,
       "cache_hits": 5,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 14,
+        "FRESH": 15,
         "ACCEPTABLE": 0,
         "STALE_WARN": 1,
         "STALE_ERROR": 4,
@@ -144,13 +144,13 @@
       }
     },
     "google_weather": {
-      "total_fetches": 19,
-      "api_successes": 10,
+      "total_fetches": 20,
+      "api_successes": 11,
       "cache_hits": 9,
       "default_fallbacks": 0,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 10,
+        "FRESH": 11,
         "ACCEPTABLE": 0,
         "STALE_WARN": 1,
         "STALE_ERROR": 8,
@@ -158,13 +158,13 @@
       }
     },
     "weather_com": {
-      "total_fetches": 15,
-      "api_successes": 6,
+      "total_fetches": 16,
+      "api_successes": 7,
       "cache_hits": 6,
       "default_fallbacks": 3,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 6,
+        "FRESH": 7,
         "ACCEPTABLE": 0,
         "STALE_WARN": 6,
         "STALE_ERROR": 0,
@@ -172,13 +172,13 @@
       }
     },
     "wunderground": {
-      "total_fetches": 15,
-      "api_successes": 6,
+      "total_fetches": 16,
+      "api_successes": 7,
       "cache_hits": 6,
       "default_fallbacks": 3,
       "error_types": {},
       "staleness_distribution": {
-        "FRESH": 6,
+        "FRESH": 7,
         "ACCEPTABLE": 0,
         "STALE_WARN": 6,
         "STALE_ERROR": 0,
