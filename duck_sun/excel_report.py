@@ -398,9 +398,11 @@ def generate_excel_report(
     ws.column_dimensions['A'].width = 1   # Left margin spacer
     ws.column_dimensions['B'].width = 1   # Left margin spacer
     ws.column_dimensions[col(1)].width = 11  # PGE CITYGATE / MID GAS NOM label column (C) - wider for labels
-    ws.column_dimensions[col(2)].width = 12  # Source column / PGE CITYGATE input (D) - wide for 5-decimal values
-    # All data columns - width 7.5 for wider solar forecast
-    for i in range(3, 20):
+    # Solar forecast columns (9AM-4PM) = col(2) through col(9) - UNIFORM width
+    for i in range(2, 10):
+        ws.column_dimensions[col(i)].width = 8  # Uniform width for solar columns
+    # Remaining data columns
+    for i in range(10, 20):
         ws.column_dimensions[col(i)].width = 7.5
 
     # Page setup: ZERO top margin to move report up, LANDSCAPE, fit to ONE page
@@ -441,7 +443,7 @@ def generate_excel_report(
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 4: PGE CITYGATE - FULLY ENCLOSED label cell + input cell (moved up from row 5)
+    # ROW 4: PGE CITYGATE - FULLY ENCLOSED label cell + MERGED input cell (D+E)
     # =====================
     # Create explicit border for PGE CITYGATE label (all 4 sides)
     pge_label_border = Border(
@@ -455,24 +457,37 @@ def generate_excel_report(
     pge_label.font = Font(name='Arial', size=8, bold=True)
     pge_label.alignment = center_align
     pge_label.border = pge_label_border  # FULLY ENCLOSE with all 4 sides
-    # Input cell for PGE CITYGATE (single wide cell for 5-decimal values)
+    # Input cell for PGE CITYGATE - MERGE col(2) and col(3) for wider cell
+    ws.merge_cells(f'{col(2)}4:{col(3)}4')
     pge_input = ws[f'{col(2)}4']
     pge_input.border = pge_label_border  # Same full border
     pge_input.alignment = center_align
+    pge_input.number_format = '"$"#,##0.00'  # Currency format with $
+    # Apply border to merged range
+    ws[f'{col(3)}4'].border = pge_label_border
 
     # =====================
-    # ROW 5-7: MID GAS NOM (left side) - 6 cells (2 columns x 3 rows), wider
+    # ROW 5-8: MID GAS NOM - Left column dates (MM/DD/YY), Right column MERGED (D+E)
     # =====================
     ws[f'{col(1)}5'] = "MID GAS NOM:"
     ws[f'{col(1)}5'].font = Font(name='Arial', size=8, bold=True)
     ws[f'{col(1)}5'].alignment = left_align
 
-    # Create 3 rows of cells (2 columns x 3 rows = 6 boxes)
+    # Create 3 rows of cells with merged right column
     for row_idx in range(6, 9):
-        for c in range(1, 3):  # Only 2 columns now
-            cell = ws[f'{col(c)}{row_idx}']
-            cell.border = thick_border
-            cell.alignment = center_align
+        # Left column - date cells with MM/DD/YY format
+        cell_left = ws[f'{col(1)}{row_idx}']
+        cell_left.border = thick_border
+        cell_left.alignment = center_align
+        cell_left.number_format = 'MM/DD/YY'  # Date format: 11/09/26
+
+        # Right column - MERGE col(2) and col(3) for wider cell
+        ws.merge_cells(f'{col(2)}{row_idx}:{col(3)}{row_idx}')
+        cell_right = ws[f'{col(2)}{row_idx}']
+        cell_right.border = thick_border
+        cell_right.alignment = center_align
+        # Apply border to merged range
+        ws[f'{col(3)}{row_idx}'].border = thick_border
 
     # =====================
     # MID WEATHER 48-HOUR SUMMARY (right side) - Extended range to fit title
