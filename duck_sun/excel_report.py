@@ -18,6 +18,7 @@ try:
         NamedStyle
     )
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.page import PageMargins
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
@@ -390,14 +391,33 @@ def generate_excel_report(
         report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
     timestamp_str = report_time.strftime("%A, %B %d, %Y %H:%M:%S")
 
-    # Set column widths - columns A-B are spacers for centering
-    ws.column_dimensions['A'].width = 3   # Left margin
-    ws.column_dimensions['B'].width = 3   # Left margin
-    ws.column_dimensions[col(1)].width = 6   # Weight column (C)
-    ws.column_dimensions[col(2)].width = 14  # Source column (D)
-    # Temperature columns (E onwards)
+    # Set column widths - NARROW to fit on one landscape page
+    ws.column_dimensions['A'].width = 1   # Left margin spacer
+    ws.column_dimensions['B'].width = 1   # Left margin spacer
+    ws.column_dimensions[col(1)].width = 4.5   # Weight/DATE column (C)
+    ws.column_dimensions[col(2)].width = 10  # Source column (D)
+    # All data columns - uniform narrow width
     for i in range(3, 20):
-        ws.column_dimensions[col(i)].width = 6
+        ws.column_dimensions[col(i)].width = 5
+
+    # Page setup: 0.25 inch margins, LANDSCAPE, fit to ONE page
+    ws.page_margins = PageMargins(
+        left=0.25,
+        right=0.25,
+        top=0.25,
+        bottom=0.25,
+        header=0.1,
+        footer=0.1
+    )
+    # Force landscape orientation
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = ws.page_setup.PAPERSIZE_LETTER
+    # Fit to exactly one page
+    ws.page_setup.fitToPage = True
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+    ws.print_options.horizontalCentered = True
+    ws.print_options.verticalCentered = True
 
     # =====================
     # ROW 2: Title (CENTERED across full width)
@@ -418,37 +438,42 @@ def generate_excel_report(
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 5-9: MID GAS BURN (left side) with thick border
+    # ROW 5: PGE CITYGATE (above MID GAS NOM)
     # =====================
-    ws[f'{col(1)}5'] = "MID GAS BURN:"
+    ws[f'{col(1)}5'] = "PGE CITYGATE:"
     ws[f'{col(1)}5'].font = Font(name='Arial', size=8, bold=True)
+    ws[f'{col(2)}5'].border = thick_border
+    ws[f'{col(2)}5'].alignment = center_align
+
+    # =====================
+    # ROW 6-9: MID GAS NOM (left side) with thick border
+    # =====================
+    ws[f'{col(1)}6'] = "MID GAS NOM:"
+    ws[f'{col(1)}6'].font = Font(name='Arial', size=8, bold=True)
 
     # Create 3 rows of cells for date/MMBtu
-    for row_idx in range(6, 9):
+    for row_idx in range(7, 10):
         for c in range(1, 4):
             cell = ws[f'{col(c)}{row_idx}']
             cell.border = thick_border
             cell.alignment = center_align
 
-    # PGE CITYGATE row
-    ws[f'{col(1)}10'] = "PGE CITYGATE:"
-    ws[f'{col(1)}10'].font = Font(name='Arial', size=8, bold=True)
-    ws[f'{col(2)}10'].border = thick_border
-    ws[f'{col(2)}10'].alignment = center_align
-
     # =====================
     # MID WEATHER 48-HOUR SUMMARY (right side)
     # =====================
-    ws.merge_cells(f'{col(12)}5:{col(18)}5')
+    ws.merge_cells(f'{col(12)}5:{col(16)}5')
     mid_header = ws[f'{col(12)}5']
     mid_header.value = "MID WEATHER 48-HOUR SUMMARY"
     mid_header.font = Font(name='Arial', size=9, bold=True, color='003C78')
     mid_header.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
     mid_header.alignment = center_align
-    mid_header.border = thick_border
+    mid_header.border = thin_border
+    # Apply border to all cells in merged range
+    for c in range(12, 17):
+        ws[f'{col(c)}5'].border = thin_border
 
     # Headers: High, Low, Rain
-    for c, label in [(14, 'High'), (15, 'Low'), (16, 'Rain')]:
+    for c, label in [(13, ''), (14, 'High'), (15, 'Low'), (16, 'Rain')]:
         cell = ws[f'{col(c)}6']
         cell.value = label
         cell.font = Font(name='Arial', size=7, bold=True)
@@ -460,48 +485,52 @@ def generate_excel_report(
         yest_data = mid_data.get('yesterday', {})
 
         # TODAY row
+        ws.merge_cells(f'{col(12)}7:{col(13)}7')
         ws[f'{col(12)}7'] = "TODAY"
         ws[f'{col(12)}7'].font = Font(name='Arial', size=7, bold=True)
-        ws[f'{col(12)}7'].alignment = left_align
-        ws[f'{col(12)}7'].border = thick_border
+        ws[f'{col(12)}7'].alignment = center_align
+        ws[f'{col(12)}7'].border = thin_border
+        ws[f'{col(13)}7'].border = thin_border
 
         ws[f'{col(14)}7'] = f"{today_data.get('high', '--')}F"
         ws[f'{col(14)}7'].fill = PatternFill(start_color="FFC8B4", end_color="FFC8B4", fill_type="solid")
         ws[f'{col(14)}7'].alignment = center_align
-        ws[f'{col(14)}7'].border = thick_border
+        ws[f'{col(14)}7'].border = thin_border
 
         ws[f'{col(15)}7'] = f"{today_data.get('low', '--')}F"
         ws[f'{col(15)}7'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
         ws[f'{col(15)}7'].alignment = center_align
-        ws[f'{col(15)}7'].border = thick_border
+        ws[f'{col(15)}7'].border = thin_border
 
         ws[f'{col(16)}7'] = f"{today_data.get('rain', '0.00')}\""
         ws[f'{col(16)}7'].alignment = center_align
-        ws[f'{col(16)}7'].border = thick_border
+        ws[f'{col(16)}7'].border = thin_border
 
         # YEST row
+        ws.merge_cells(f'{col(12)}8:{col(13)}8')
         ws[f'{col(12)}8'] = "YEST"
         ws[f'{col(12)}8'].font = Font(name='Arial', size=7, bold=True)
-        ws[f'{col(12)}8'].alignment = left_align
-        ws[f'{col(12)}8'].border = thick_border
+        ws[f'{col(12)}8'].alignment = center_align
+        ws[f'{col(12)}8'].border = thin_border
+        ws[f'{col(13)}8'].border = thin_border
 
         ws[f'{col(14)}8'] = f"{yest_data.get('high', '--')}F"
         ws[f'{col(14)}8'].fill = PatternFill(start_color="FFC8B4", end_color="FFC8B4", fill_type="solid")
         ws[f'{col(14)}8'].alignment = center_align
-        ws[f'{col(14)}8'].border = thick_border
+        ws[f'{col(14)}8'].border = thin_border
 
         ws[f'{col(15)}8'] = f"{yest_data.get('low', '--')}F"
         ws[f'{col(15)}8'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
         ws[f'{col(15)}8'].alignment = center_align
-        ws[f'{col(15)}8'].border = thick_border
+        ws[f'{col(15)}8'].border = thin_border
 
         ws[f'{col(16)}8'] = f"{yest_data.get('rain', '0.00')}\""
         ws[f'{col(16)}8'].alignment = center_align
-        ws[f'{col(16)}8'].border = thick_border
+        ws[f'{col(16)}8'].border = thin_border
 
         # Records row
         if 'record_high_temp' in mid_data:
-            ws.merge_cells(f'{col(12)}9:{col(18)}9')
+            ws.merge_cells(f'{col(12)}9:{col(16)}9')
             rec_cell = ws[f'{col(12)}9']
             rec_hi = mid_data.get('record_high_temp', '--')
             rec_hi_yr = mid_data.get('record_high_year', '')
@@ -510,6 +539,9 @@ def generate_excel_report(
             rec_cell.value = f"Records: Hi {rec_hi}F({rec_hi_yr}) Lo {rec_lo}F({rec_lo_yr})"
             rec_cell.font = Font(name='Arial', size=6, italic=True)
             rec_cell.alignment = center_align
+            # Apply border to all cells in merged range
+            for c in range(12, 17):
+                ws[f'{col(c)}9'].border = thin_border
 
     # =====================
     # TEMPERATURE GRID starting at Row 11
@@ -574,6 +606,8 @@ def generate_excel_report(
         cell.font = Font(name='Arial', size=7)
         cell.alignment = center_align
         cell.border = thin_border
+        # Apply border to second cell of merged range
+        ws[f'{col_lo}{grid_row}'].border = thin_border
 
     # Row 12: Day names header
     grid_row = 12
@@ -599,6 +633,8 @@ def generate_excel_report(
         cell.font = Font(name='Arial', size=8, bold=True, color='FFFFFF')
         cell.alignment = center_align
         cell.border = thin_border
+        # Apply border to second cell of merged range
+        ws[f'{col_lo}{grid_row}'].border = thin_border
 
     # Row 13: Dates
     grid_row = 13
@@ -624,6 +660,8 @@ def generate_excel_report(
         cell.font = Font(name='Arial', size=7, color='FFFFFF')
         cell.alignment = center_align
         cell.border = thin_border
+        # Apply border to second cell of merged range
+        ws[f'{col_lo}{grid_row}'].border = thin_border
 
     # Pre-calculate excluded highs
     weights = [1.0, 3.0, 3.0, 4.0, 4.0, 4.0, 6.0]
@@ -915,6 +953,8 @@ def generate_excel_report(
         date_cell.font = Font(name='Arial', size=7, bold=True)
         date_cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         date_cell.border = thin_border
+        # Apply border to bottom cell of merged range
+        ws[f'{col(1)}{grid_row + 1}'].border = thin_border
 
         hours_dict = {h['hour']: h for h in duck_data.get(d, [])}
 

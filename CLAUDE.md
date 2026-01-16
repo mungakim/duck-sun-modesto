@@ -41,7 +41,37 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 ## Commands
 
-**CRITICAL: WSL/Windows Python Environment**
+### Default Workflow: Run and Push
+
+The primary command runs the forecast, commits outputs, and pushes to GitHub in one step:
+
+```bash
+# DEFAULT - Run forecast + commit + push (recommended)
+./run_and_push.sh          # From WSL/Bash
+.\run_and_push.ps1         # From Windows PowerShell
+```
+
+This script:
+1. Runs `./venv/Scripts/python.exe -m duck_sun.scheduler`
+2. Stages `outputs/` and `reports/` folders
+3. Commits with message "Forecast: YYYY-MM-DD"
+4. Pushes to GitHub
+
+### Other Commands
+
+```bash
+# Run forecast only (no commit/push)
+./venv/Scripts/python.exe -m duck_sun.scheduler
+
+# Test individual providers
+./venv/Scripts/python.exe -m duck_sun.providers.noaa
+./venv/Scripts/python.exe -m duck_sun.providers.open_meteo
+
+# Install dependencies
+./venv/Scripts/pip.exe install -r requirements.txt
+```
+
+### WSL/Windows Python Environment
 
 This project runs on Windows filesystem (`/mnt/c/...`) accessed via WSL. The virtual environment was created with Windows Python, so you MUST use the Windows Python executable directly. **Do NOT try to `source activate`** - it won't work.
 
@@ -54,22 +84,6 @@ This project runs on Windows filesystem (`/mnt/c/...`) accessed via WSL. The vir
 # python3 -m duck_sun.scheduler         # uses system Python, missing deps
 # source venv/bin/activate              # path doesn't exist (Windows venv)
 # source venv/Scripts/activate          # activates but python still not found
-```
-
-**All Commands (use `./venv/Scripts/python.exe`):**
-
-```bash
-# Run the full daily workflow (fetch data + generate PDF)
-./venv/Scripts/python.exe -m duck_sun.scheduler
-
-# Test the NOAA provider directly
-./venv/Scripts/python.exe -m duck_sun.providers.noaa
-
-# Test the Open-Meteo provider directly
-./venv/Scripts/python.exe -m duck_sun.providers.open_meteo
-
-# Install dependencies (use Windows pip)
-./venv/Scripts/pip.exe install -r requirements.txt
 ```
 
 ## Environment Variables
