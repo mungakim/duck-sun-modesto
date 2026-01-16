@@ -1,0 +1,351 @@
+{
+  "generated_at": "2026-01-15T21:49:16.629390",
+  "location": "Modesto, CA",
+  "sources": [
+    "open_meteo",
+    "hrrr",
+    "noaa",
+    "met_no",
+    "accuweather",
+    "google_weather",
+    "weather_com",
+    "wunderground",
+    "mid_org",
+    "metar",
+    "smoke"
+  ],
+  "provider_count": 11,
+  "8_day_outlook": [
+    {
+      "date": "2026-01-15",
+      "temp_consensus_c": 8.0,
+      "avg_solar_raw": 99.0,
+      "avg_solar_adjusted": 63.0,
+      "avg_cloud_cover": 53.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-16",
+      "temp_consensus_c": 8.1,
+      "avg_solar_raw": 97.0,
+      "avg_solar_adjusted": 87.0,
+      "avg_cloud_cover": 59.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-17",
+      "temp_consensus_c": 8.8,
+      "avg_solar_raw": 109.0,
+      "avg_solar_adjusted": 76.0,
+      "avg_cloud_cover": 99.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-18",
+      "temp_consensus_c": 9.2,
+      "avg_solar_raw": 130.0,
+      "avg_solar_adjusted": 69.0,
+      "avg_cloud_cover": 72.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-19",
+      "temp_consensus_c": 8.5,
+      "avg_solar_raw": 136.0,
+      "avg_solar_adjusted": 104.0,
+      "avg_cloud_cover": 8.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-20",
+      "temp_consensus_c": 9.2,
+      "avg_solar_raw": 139.0,
+      "avg_solar_adjusted": 74.0,
+      "avg_cloud_cover": 2.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-21",
+      "temp_consensus_c": 9.5,
+      "avg_solar_raw": 107.0,
+      "avg_solar_adjusted": 55.0,
+      "avg_cloud_cover": 72.0,
+      "max_pm2_5": 0.0
+    },
+    {
+      "date": "2026-01-22",
+      "temp_consensus_c": 10.9,
+      "avg_solar_raw": 138.0,
+      "avg_solar_adjusted": 103.0,
+      "avg_cloud_cover": 44.0,
+      "max_pm2_5": 0.0
+    }
+  ],
+  "duck_curve_tomorrow": [
+    {
+      "time": "2026-01-16T09:00",
+      "temp_consensus": 6.111111111111111,
+      "solar_adjusted": 89.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.18,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T10:00",
+      "temp_consensus": 8.333333333333334,
+      "solar_adjusted": 172.2,
+      "risk_level": "LOW",
+      "fog_probability": 0.28,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T11:00",
+      "temp_consensus": 10.0,
+      "solar_adjusted": 129.45600000000002,
+      "risk_level": "LOW",
+      "fog_probability": 0.25,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T12:00",
+      "temp_consensus": 11.666666666666666,
+      "solar_adjusted": 271.928,
+      "risk_level": "LOW",
+      "fog_probability": 0.13,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T13:00",
+      "temp_consensus": 13.333333333333334,
+      "solar_adjusted": 337.77299999999997,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T14:00",
+      "temp_consensus": 13.833,
+      "solar_adjusted": 419.39099999999996,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T15:00",
+      "temp_consensus": 14.3,
+      "solar_adjusted": 387.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    },
+    {
+      "time": "2026-01-16T16:00",
+      "temp_consensus": 14.1,
+      "solar_adjusted": 237.0,
+      "risk_level": "LOW",
+      "fog_probability": 0.0,
+      "pm2_5": 0.0
+    }
+  ],
+  "reliability": {
+    "generated_at": "2026-01-15T21:49:20.559084",
+    "total_runs": 22,
+    "provider_stats": {
+      "open_meteo": {
+        "total_fetches": 21,
+        "api_success_rate": 76.2,
+        "cache_hit_rate": 23.8,
+        "default_rate": 0.0,
+        "reliability_score": 85.7,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 16,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 4,
+          "DEFAULT": 0
+        }
+      },
+      "hrrr": {
+        "total_fetches": 21,
+        "api_success_rate": 90.5,
+        "cache_hit_rate": 9.5,
+        "default_rate": 0.0,
+        "reliability_score": 94.3,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 19,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 2,
+          "STALE_ERROR": 0,
+          "DEFAULT": 0
+        }
+      },
+      "nws": {
+        "total_fetches": 3,
+        "api_success_rate": 100.0,
+        "cache_hit_rate": 0.0,
+        "default_rate": 0.0,
+        "reliability_score": 100.0,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 3,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 0,
+          "STALE_ERROR": 0,
+          "DEFAULT": 0
+        }
+      },
+      "met_no": {
+        "total_fetches": 21,
+        "api_success_rate": 76.2,
+        "cache_hit_rate": 23.8,
+        "default_rate": 0.0,
+        "reliability_score": 85.7,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 16,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 4,
+          "DEFAULT": 0
+        }
+      },
+      "accuweather": {
+        "total_fetches": 21,
+        "api_success_rate": 81.0,
+        "cache_hit_rate": 19.0,
+        "default_rate": 0.0,
+        "reliability_score": 88.6,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 17,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 0,
+          "STALE_ERROR": 4,
+          "DEFAULT": 0
+        }
+      },
+      "weathercom": {
+        "total_fetches": 3,
+        "api_success_rate": 100.0,
+        "cache_hit_rate": 0.0,
+        "default_rate": 0.0,
+        "reliability_score": 100.0,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 3,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 0,
+          "STALE_ERROR": 0,
+          "DEFAULT": 0
+        }
+      },
+      "mid_org": {
+        "total_fetches": 20,
+        "api_success_rate": 95.0,
+        "cache_hit_rate": 5.0,
+        "default_rate": 0.0,
+        "reliability_score": 97.0,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 19,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 0,
+          "DEFAULT": 0
+        }
+      },
+      "metar": {
+        "total_fetches": 20,
+        "api_success_rate": 75.0,
+        "cache_hit_rate": 25.0,
+        "default_rate": 0.0,
+        "reliability_score": 85.0,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 15,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 4,
+          "DEFAULT": 0
+        }
+      },
+      "smoke": {
+        "total_fetches": 20,
+        "api_success_rate": 55.0,
+        "cache_hit_rate": 45.0,
+        "default_rate": 0.0,
+        "reliability_score": 73.0,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 11,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 8,
+          "DEFAULT": 0
+        }
+      },
+      "noaa": {
+        "total_fetches": 18,
+        "api_success_rate": 72.2,
+        "cache_hit_rate": 27.8,
+        "default_rate": 0.0,
+        "reliability_score": 83.3,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 13,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 4,
+          "DEFAULT": 0
+        }
+      },
+      "google_weather": {
+        "total_fetches": 18,
+        "api_success_rate": 50.0,
+        "cache_hit_rate": 50.0,
+        "default_rate": 0.0,
+        "reliability_score": 70.0,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 9,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 1,
+          "STALE_ERROR": 8,
+          "DEFAULT": 0
+        }
+      },
+      "weather_com": {
+        "total_fetches": 14,
+        "api_success_rate": 35.7,
+        "cache_hit_rate": 42.9,
+        "default_rate": 21.4,
+        "reliability_score": 52.9,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 5,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 6,
+          "STALE_ERROR": 0,
+          "DEFAULT": 3
+        }
+      },
+      "wunderground": {
+        "total_fetches": 14,
+        "api_success_rate": 35.7,
+        "cache_hit_rate": 42.9,
+        "default_rate": 21.4,
+        "reliability_score": 52.9,
+        "error_types": {},
+        "staleness_distribution": {
+          "FRESH": 5,
+          "ACCEPTABLE": 0,
+          "STALE_WARN": 6,
+          "STALE_ERROR": 0,
+          "DEFAULT": 3
+        }
+      }
+    }
+  }
+}
