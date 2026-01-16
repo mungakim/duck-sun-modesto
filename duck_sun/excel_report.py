@@ -462,7 +462,7 @@ def generate_excel_report(
     pge_input = ws[f'{col(2)}3']
     pge_input.border = pge_input_border  # Border only on input cell
     pge_input.alignment = center_align
-    pge_input.font = Font(name='Arial', size=8, bold=True, color='C65911')  # Bold, Orange Accent 6 Darker 50%
+    pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
     pge_input.number_format = '"$"0.##########'  # Dollar sign without rounding
     # Apply border to merged range
     ws[f'{col(3)}3'].border = pge_input_border
@@ -480,6 +480,7 @@ def generate_excel_report(
         cell_left = ws[f'{col(1)}{row_idx}']
         cell_left.border = thick_border
         cell_left.alignment = center_align
+        cell_left.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
         cell_left.number_format = 'MM/DD/YY'  # Date format: 11/09/26
 
         # Right column - MERGE col(2) and col(3) for wider cell
@@ -487,7 +488,7 @@ def generate_excel_report(
         cell_right = ws[f'{col(2)}{row_idx}']
         cell_right.border = thick_border
         cell_right.alignment = center_align
-        cell_right.font = Font(name='Arial', size=8, bold=True, color='C65911')  # Bold, Orange Accent 6 Darker 50%
+        cell_right.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
         cell_right.number_format = '#,##0" MMBtus"'  # Format: 8,000 MMBtus
         # Apply border to merged range
         ws[f'{col(3)}{row_idx}'].border = thick_border
