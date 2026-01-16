@@ -57,3 +57,6 @@ Thumbs.db
 # Jupyter Notebooks checkpoints
 .ipynb_checkpoints/
 
+
+# Excel temporary/lock files
+~$*
