@@ -165,43 +165,46 @@ def estimate_irradiance_from_cloud_cover(cloud_cover: int, hour: int, day_of_yea
 
 
 def get_solar_color_and_desc(risk_level: str, solar_value: float, condition: str = None) -> tuple:
-    """Get cell color AND description based on solar conditions."""
+    """Get cell color AND short description based on solar conditions.
+
+    Descriptions are kept SHORT to fit in narrow Excel columns (max ~8 chars).
+    """
     risk_upper = risk_level.upper()
 
     if 'TULE FOG' in risk_upper:
-        return "B4A0C8", "TULE FOG"
+        return "B4A0C8", "Tule Fog"
 
     if 'CRITICAL' in risk_upper or 'ACTIVE FOG' in risk_upper:
-        return "FFB4B4", "Dense Fog"
+        return "FFB4B4", "Fog"
     elif 'HIGH' in risk_upper or 'STRATUS' in risk_upper:
-        return "FFD2A0", "Heavy Clouds"
+        return "FFD2A0", "Overcast"
     elif 'MODERATE' in risk_upper:
-        return "FFFFB4", "Fog Possible"
+        return "FFFFB4", "Fog?"
 
     if condition and condition not in ('Unknown', 'Open-Meteo'):
         cond_lower = condition.lower()
         if 'rain' in cond_lower or 'storm' in cond_lower or 'shower' in cond_lower:
-            desc = "Light rain" if 'light' in cond_lower else "Rain" if 'rain' in cond_lower else "Storms"
+            desc = "Lt rain" if 'light' in cond_lower else "Rain" if 'rain' in cond_lower else "Storms"
             return "FFD2A0", desc
         elif 'fog' in cond_lower or 'mist' in cond_lower:
-            return "FFFFB4", "Fog Possible"
+            return "FFFFB4", "Fog?"
         elif 'cloudy' in cond_lower:
             if 'partly' in cond_lower:
-                return "C8E6FF", "Partly cloudy"
+                return "C8E6FF", "P cloudy"
             elif 'mostly' in cond_lower:
                 if solar_value < 50:
-                    return "DCDCDC", "Mostly cloudy"
+                    return "DCDCDC", "M cloudy"
                 else:
-                    return "C8E6FF", "Mostly cloudy"
+                    return "C8E6FF", "M cloudy"
             else:
                 return "DCDCDC", "Cloudy"
         elif 'clear' in cond_lower or 'sunny' in cond_lower:
             if solar_value >= 400:
-                return "90EE90", "Clear, sunny"
+                return "90EE90", "Sunny"
             elif solar_value >= 150:
-                return "C8FFC8", "Clear, sunny"
+                return "C8FFC8", "Sunny"
             else:
-                return "C8E6FF", "Clear, sunny"
+                return "C8E6FF", "Sunny"
 
     if solar_value < 50:
         return "DCDCDC", "Cloudy"
@@ -391,14 +394,14 @@ def generate_excel_report(
         report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
     timestamp_str = report_time.strftime("%A, %B %d, %Y %H:%M:%S")
 
-    # Set column widths - NARROW to fit on one landscape page
+    # Set column widths - balanced to fit on one landscape page with readable text
     ws.column_dimensions['A'].width = 1   # Left margin spacer
     ws.column_dimensions['B'].width = 1   # Left margin spacer
-    ws.column_dimensions[col(1)].width = 4.5   # Weight/DATE column (C)
+    ws.column_dimensions[col(1)].width = 6   # Weight/DATE column (C)
     ws.column_dimensions[col(2)].width = 10  # Source column (D)
-    # All data columns - uniform narrow width
+    # All data columns - width 6.5 to fit short descriptions like "M cloudy"
     for i in range(3, 20):
-        ws.column_dimensions[col(i)].width = 5
+        ws.column_dimensions[col(i)].width = 6.5
 
     # Page setup: 0.25 inch margins, LANDSCAPE, fit to ONE page
     ws.page_margins = PageMargins(
@@ -438,20 +441,25 @@ def generate_excel_report(
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 5: PGE CITYGATE (above MID GAS NOM)
+    # ROW 5: PGE CITYGATE (above MID GAS NOM) - with input boxes
     # =====================
     ws[f'{col(1)}5'] = "PGE CITYGATE:"
     ws[f'{col(1)}5'].font = Font(name='Arial', size=8, bold=True)
-    ws[f'{col(2)}5'].border = thick_border
-    ws[f'{col(2)}5'].alignment = center_align
+    ws[f'{col(1)}5'].alignment = left_align
+    # Input boxes for PGE CITYGATE (2 cells)
+    for c in range(2, 4):
+        cell = ws[f'{col(c)}5']
+        cell.border = thick_border
+        cell.alignment = center_align
 
     # =====================
     # ROW 6-9: MID GAS NOM (left side) with thick border
     # =====================
     ws[f'{col(1)}6'] = "MID GAS NOM:"
     ws[f'{col(1)}6'].font = Font(name='Arial', size=8, bold=True)
+    ws[f'{col(1)}6'].alignment = left_align
 
-    # Create 3 rows of cells for date/MMBtu
+    # Create 3 rows of cells for date/MMBtu (3 columns x 3 rows = 9 boxes)
     for row_idx in range(7, 10):
         for c in range(1, 4):
             cell = ws[f'{col(c)}{row_idx}']
@@ -459,17 +467,17 @@ def generate_excel_report(
             cell.alignment = center_align
 
     # =====================
-    # MID WEATHER 48-HOUR SUMMARY (right side)
+    # MID WEATHER 48-HOUR SUMMARY (right side) - Extended range to fit title
     # =====================
-    ws.merge_cells(f'{col(12)}5:{col(16)}5')
-    mid_header = ws[f'{col(12)}5']
+    ws.merge_cells(f'{col(11)}5:{col(17)}5')
+    mid_header = ws[f'{col(11)}5']
     mid_header.value = "MID WEATHER 48-HOUR SUMMARY"
     mid_header.font = Font(name='Arial', size=9, bold=True, color='003C78')
     mid_header.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
     mid_header.alignment = center_align
     mid_header.border = thin_border
     # Apply border to all cells in merged range
-    for c in range(12, 17):
+    for c in range(11, 18):
         ws[f'{col(c)}5'].border = thin_border
 
     # Headers: High, Low, Rain
