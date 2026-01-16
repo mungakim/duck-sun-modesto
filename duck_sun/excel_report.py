@@ -391,32 +391,33 @@ def generate_excel_report(
         report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
     timestamp_str = report_time.strftime("%A, %B %d, %Y %H:%M:%S")
 
-    # Set column widths - columns A-B are spacers for centering
-    ws.column_dimensions['A'].width = 2   # Left margin
-    ws.column_dimensions['B'].width = 2   # Left margin
-    ws.column_dimensions[col(1)].width = 6   # Weight/DATE column (C)
-    ws.column_dimensions[col(2)].width = 11  # Source/9AM column (D)
-    # Solar hour columns need to fit descriptions like "Clear, sunny", "Mostly cloudy"
-    for i in range(3, 10):
-        ws.column_dimensions[col(i)].width = 9  # Wider for solar descriptions
-    # Temperature columns (10 onwards) - narrower for hi/lo values
-    for i in range(10, 20):
-        ws.column_dimensions[col(i)].width = 5.5
+    # Set column widths - NARROW to fit on one landscape page
+    ws.column_dimensions['A'].width = 1   # Left margin spacer
+    ws.column_dimensions['B'].width = 1   # Left margin spacer
+    ws.column_dimensions[col(1)].width = 4.5   # Weight/DATE column (C)
+    ws.column_dimensions[col(2)].width = 10  # Source column (D)
+    # All data columns - uniform narrow width
+    for i in range(3, 20):
+        ws.column_dimensions[col(i)].width = 5
 
-    # Page setup: 0.2 inch margins and fit to one page
+    # Page setup: 0.25 inch margins, LANDSCAPE, fit to ONE page
     ws.page_margins = PageMargins(
-        left=0.2,
-        right=0.2,
-        top=0.2,
-        bottom=0.2,
+        left=0.25,
+        right=0.25,
+        top=0.25,
+        bottom=0.25,
         header=0.1,
         footer=0.1
     )
+    # Force landscape orientation
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = ws.page_setup.PAPERSIZE_LETTER
+    # Fit to exactly one page
     ws.page_setup.fitToPage = True
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
-    ws.page_setup.orientation = 'landscape'
     ws.print_options.horizontalCentered = True
+    ws.print_options.verticalCentered = True
 
     # =====================
     # ROW 2: Title (CENTERED across full width)
