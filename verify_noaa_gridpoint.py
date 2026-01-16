@@ -28,10 +28,10 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 KMOD_LAT = 37.62549
 KMOD_LON = -120.9549
 
-# Current hardcoded values in noaa.py
+# Corrected values in noaa.py (verified 2026-01-16)
 EXPECTED_GRID_ID = "STO"
-EXPECTED_GRID_X = 45
-EXPECTED_GRID_Y = 63
+EXPECTED_GRID_X = 51
+EXPECTED_GRID_Y = 22
 
 HEADERS = {
     "User-Agent": "(duck-sun-modesto, github.com/user/duck-sun-modesto)",

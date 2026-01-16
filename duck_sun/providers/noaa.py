@@ -53,10 +53,11 @@ class NOAAProvider:
     POINTS_URL = f"https://api.weather.gov/points/{KMOD_LAT},{KMOD_LON}"
 
     # Modesto Gridpoint (Sacramento Weather Forecast Office)
-    # These should match what POINTS_URL returns for KMOD coordinates
+    # Verified 2026-01-16 via: https://api.weather.gov/points/37.62549,-120.9549
+    # KMOD coordinates return: gridId=STO, gridX=51, gridY=22
     EXPECTED_GRID_ID = "STO"
-    EXPECTED_GRID_X = 45
-    EXPECTED_GRID_Y = 63
+    EXPECTED_GRID_X = 51
+    EXPECTED_GRID_Y = 22
 
     GRIDPOINT_URL = f"https://api.weather.gov/gridpoints/{EXPECTED_GRID_ID}/{EXPECTED_GRID_X},{EXPECTED_GRID_Y}"
     # The Source of Truth endpoint (matches website)
@@ -78,7 +79,7 @@ class NOAAProvider:
 
     async def verify_gridpoint(self) -> Dict[str, Any]:
         """
-        Verify that the hardcoded gridpoint (STO/45,63) matches KMOD coordinates.
+        Verify that the hardcoded gridpoint (STO/51,22) matches KMOD coordinates.
 
         Calls the NOAA Points API to look up the gridpoint for KMOD lat/lon
         and compares against our expected values.
@@ -87,7 +88,7 @@ class NOAAProvider:
             Dict with verification results:
             {
                 'verified': bool,
-                'expected': {'gridId': 'STO', 'gridX': 45, 'gridY': 63},
+                'expected': {'gridId': 'STO', 'gridX': 51, 'gridY': 22},
                 'actual': {'gridId': str, 'gridX': int, 'gridY': int},
                 'coordinates': {'lat': float, 'lon': float},
                 'message': str
