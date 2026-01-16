@@ -462,7 +462,7 @@ def generate_excel_report(
     pge_input = ws[f'{col(2)}4']
     pge_input.border = pge_label_border  # Same full border
     pge_input.alignment = center_align
-    pge_input.number_format = '"$"#,##0.00'  # Currency format with $
+    pge_input.number_format = '"$"0.##########'  # Dollar sign without rounding
     # Apply border to merged range
     ws[f'{col(3)}4'].border = pge_label_border
 
@@ -486,6 +486,7 @@ def generate_excel_report(
         cell_right = ws[f'{col(2)}{row_idx}']
         cell_right.border = thick_border
         cell_right.alignment = center_align
+        cell_right.number_format = '#,##0" MMBtus"'  # Format: 8,000 MMBtus
         # Apply border to merged range
         ws[f'{col(3)}{row_idx}'].border = thick_border
 
@@ -614,11 +615,11 @@ def generate_excel_report(
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
 
-    # Row 10: Condition descriptors - NO borders on first two empty cells
+    # Row 10: Condition descriptors - NO borders on merged empty cells
     grid_row = 10
+    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
     ws[f'{col(1)}{grid_row}'] = ""
-    ws[f'{col(2)}{grid_row}'] = ""
-    # Removed borders from col(1) and col(2) - they should be blank with no borders
+    # Merged col(1)+col(2) - no borders for this empty area
 
     for i, day in enumerate(om_daily):
         date_key = day.get('date', '')
@@ -639,16 +640,15 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Row 11: Day names header
+    # Row 11: Day names header - MERGED col(1)+col(2) for wider SOURCE label
     grid_row = 11
-    ws[f'{col(1)}{grid_row}'] = ""
-    ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
-    ws[f'{col(1)}{grid_row}'].border = thin_border
-
-    ws[f'{col(2)}{grid_row}'] = "SOURCE"
-    ws[f'{col(2)}{grid_row}'].fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
-    ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=8, bold=True, color='FFFFFF')
-    ws[f'{col(2)}{grid_row}'].alignment = center_align
+    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
+    source_header = ws[f'{col(1)}{grid_row}']
+    source_header.value = "SOURCE"
+    source_header.fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
+    source_header.font = Font(name='Arial', size=8, bold=True, color='FFFFFF')
+    source_header.alignment = center_align
+    source_header.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
     for i, day in enumerate(om_daily):
@@ -666,16 +666,15 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Row 12: Dates
+    # Row 12: Dates - MERGED col(1)+col(2) for wider DATE label
     grid_row = 12
-    ws[f'{col(1)}{grid_row}'] = ""
-    ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="466EA0", end_color="466EA0", fill_type="solid")
-    ws[f'{col(1)}{grid_row}'].border = thin_border
-
-    ws[f'{col(2)}{grid_row}'] = "DATE"
-    ws[f'{col(2)}{grid_row}'].fill = PatternFill(start_color="466EA0", end_color="466EA0", fill_type="solid")
-    ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=7, color='FFFFFF')
-    ws[f'{col(2)}{grid_row}'].alignment = center_align
+    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
+    date_header = ws[f'{col(1)}{grid_row}']
+    date_header.value = "DATE"
+    date_header.fill = PatternFill(start_color="466EA0", end_color="466EA0", fill_type="solid")
+    date_header.font = Font(name='Arial', size=7, color='FFFFFF')
+    date_header.alignment = center_align
+    date_header.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
     for i, day in enumerate(om_daily):
@@ -733,16 +732,14 @@ def generate_excel_report(
         grid_row = 13 + src_idx
         weight_val = SOURCE_WEIGHT_DISPLAY.get(label, '')
 
-        ws[f'{col(1)}{grid_row}'] = weight_val
-        ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="E6E6E6", end_color="E6E6E6", fill_type="solid")
-        ws[f'{col(1)}{grid_row}'].font = Font(name='Arial', size=7)
-        ws[f'{col(1)}{grid_row}'].alignment = center_align
-        ws[f'{col(1)}{grid_row}'].border = thin_border
-
-        ws[f'{col(2)}{grid_row}'] = label
-        ws[f'{col(2)}{grid_row}'].fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
-        ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=7, bold=True)
-        ws[f'{col(2)}{grid_row}'].alignment = center_align
+        # MERGED col(1)+col(2) for wider source label with weight
+        ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
+        source_cell = ws[f'{col(1)}{grid_row}']
+        source_cell.value = f"{weight_val}  {label}"  # Combined: "1.0  OPEN-METEO"
+        source_cell.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+        source_cell.font = Font(name='Arial', size=7, bold=True)
+        source_cell.alignment = Alignment(horizontal='left', vertical='center')
+        source_cell.border = thin_border
         ws[f'{col(2)}{grid_row}'].border = thin_border
 
         for i, day in enumerate(om_daily):
@@ -772,16 +769,15 @@ def generate_excel_report(
             cell_lo.alignment = center_align
             cell_lo.border = thin_border
 
-    # Weighted Averages row
+    # Weighted Averages row - MERGED col(1)+col(2) for wider label
     grid_row = 20
-    ws[f'{col(1)}{grid_row}'] = ""
-    ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
-    ws[f'{col(1)}{grid_row}'].border = thin_border
-
-    ws[f'{col(2)}{grid_row}'] = "Wtd. Averages"
-    ws[f'{col(2)}{grid_row}'].fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
-    ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=7, bold=True)
-    ws[f'{col(2)}{grid_row}'].alignment = center_align
+    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
+    wtd_cell = ws[f'{col(1)}{grid_row}']
+    wtd_cell.value = "Wtd. Average"
+    wtd_cell.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
+    wtd_cell.font = Font(name='Arial', size=7, bold=True)
+    wtd_cell.alignment = center_align
+    wtd_cell.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
     for i, day in enumerate(om_daily):
@@ -825,16 +821,15 @@ def generate_excel_report(
         cell_lo.alignment = center_align
         cell_lo.border = thin_border
 
-    # PRECIP % row - WITH FULL BORDERS
+    # PRECIP % row - MERGED col(1)+col(2) for wider label
     grid_row = 21
-    ws[f'{col(1)}{grid_row}'] = ""
-    ws[f'{col(1)}{grid_row}'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
-    ws[f'{col(1)}{grid_row}'].border = thin_border
-
-    ws[f'{col(2)}{grid_row}'] = "PRECIP %"
-    ws[f'{col(2)}{grid_row}'].fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
-    ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=7, bold=True)
-    ws[f'{col(2)}{grid_row}'].alignment = center_align
+    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
+    precip_cell = ws[f'{col(1)}{grid_row}']
+    precip_cell.value = "PRECIP %"
+    precip_cell.fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
+    precip_cell.font = Font(name='Arial', size=7, bold=True)
+    precip_cell.alignment = center_align
+    precip_cell.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
     for i, day in enumerate(om_daily):
