@@ -411,7 +411,7 @@ def generate_excel_report(
     )
     # Force landscape orientation
     ws.page_setup.orientation = 'landscape'
-    ws.page_setup.paperSize = ws.page_setup.PAPERSIZE_LETTER
+    ws.page_setup.paperSize = 1  # 1 = Letter size in openpyxl
     # Fit to exactly one page
     ws.page_setup.fitToPage = True
     ws.page_setup.fitToWidth = 1
