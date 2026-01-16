@@ -729,6 +729,10 @@ def generate_excel_report(
         ('GOOGLE (AI)', lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 6),
     ]
 
+    # Track max/min temps for each day column to highlight later
+    # Structure: {day_index: {'hi': [(row, val), ...], 'lo': [(row, val), ...]}}
+    day_temps = {i: {'hi': [], 'lo': []} for i in range(len(om_daily))}
+
     for src_idx, (label, getter, source_index) in enumerate(sources):
         grid_row = 13 + src_idx
 
@@ -756,18 +760,47 @@ def generate_excel_report(
             if is_excluded_high and v1 is not None:
                 cell_hi.value = "-"
             else:
-                cell_hi.value = str(v1) if v1 else "--"
+                # Store as number for Excel formulas to work
+                cell_hi.value = v1 if v1 is not None else "--"
+                # Track for max highlighting
+                if v1 is not None:
+                    day_temps[i]['hi'].append((grid_row, col_hi, v1))
             cell_hi.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_hi.font = Font(name='Arial', size=9)
             cell_hi.alignment = center_align
             cell_hi.border = thin_border
 
             cell_lo = ws[f'{col_lo}{grid_row}']
-            cell_lo.value = str(v2) if v2 else "--"
+            # Store as number for Excel formulas to work
+            cell_lo.value = v2 if v2 is not None else "--"
+            # Track for min highlighting
+            if v2 is not None:
+                day_temps[i]['lo'].append((grid_row, col_lo, v2))
             cell_lo.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_lo.font = Font(name='Arial', size=9)
             cell_lo.alignment = center_align
             cell_lo.border = thin_border
+
+    # Apply max/min highlighting per day column
+    # Max (highest high temp): Warm saturated orange
+    # Min (lowest low temp): Cool saturated blue
+    MAX_FILL = PatternFill(start_color="FFB366", end_color="FFB366", fill_type="solid")  # Saturated warm orange
+    MIN_FILL = PatternFill(start_color="99CCFF", end_color="99CCFF", fill_type="solid")  # Saturated cool blue
+
+    for i in range(len(om_daily)):
+        # Highlight highest high temp
+        if day_temps[i]['hi']:
+            max_hi = max(v for _, _, v in day_temps[i]['hi'])
+            for row, col_letter, val in day_temps[i]['hi']:
+                if val == max_hi:
+                    ws[f'{col_letter}{row}'].fill = MAX_FILL
+
+        # Highlight lowest low temp
+        if day_temps[i]['lo']:
+            min_lo = min(v for _, _, v in day_temps[i]['lo'])
+            for row, col_letter, val in day_temps[i]['lo']:
+                if val == min_lo:
+                    ws[f'{col_letter}{row}'].fill = MIN_FILL
 
     # Weighted Averages row - MERGED col(1)+col(2) for wider label
     grid_row = 20
@@ -780,42 +813,32 @@ def generate_excel_report(
     wtd_cell.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
+    # Weights array for Excel formula: {1;3;3;4;4;4;6} (semicolons for array in formulas)
+    weights_array = "{1;3;3;4;4;4;6}"
+
     for i, day in enumerate(om_daily):
-        k = day.get('date', '')
-        hi_vals = [
-            day.get('high_f'),
-            noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
-            accu_daily.get(k, {}).get('high_f'),
-            weather_com_daily.get(k, {}).get('high_f'),
-            wunderground_daily.get(k, {}).get('high_f'),
-            google_daily.get(k, {}).get('high_f')
-        ]
-        lo_vals = [
-            day.get('low_f'),
-            noaa_daily.get(k, {}).get('low_f'),
-            met_daily.get(k, {}).get('low_f'),
-            accu_daily.get(k, {}).get('low_f'),
-            weather_com_daily.get(k, {}).get('low_f'),
-            wunderground_daily.get(k, {}).get('low_f'),
-            google_daily.get(k, {}).get('low_f')
-        ]
-
-        avg_hi, _ = calculate_weighted_average_excluding_om_max(hi_vals, weights)
-        avg_lo = calculate_weighted_average(lo_vals, weights)
-
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
+        # Build Excel formula for weighted average
+        # Source rows are 13-19, so range is like E13:E19 for high temps
+        hi_range = f"{col_hi}13:{col_hi}19"
+        lo_range = f"{col_lo}13:{col_lo}19"
+
+        # Formula: =IFERROR(ROUND(SUMPRODUCT(--(ISNUMBER(range)),range,{weights})/SUMPRODUCT(--(ISNUMBER(range)),{weights}),0),"--")
+        # This calculates weighted average only for numeric cells, recalculates when values are deleted
+        hi_formula = f'=IFERROR(ROUND(SUMPRODUCT(--(ISNUMBER({hi_range})),{hi_range},{weights_array})/SUMPRODUCT(--(ISNUMBER({hi_range})),{weights_array}),0),"--")'
+        lo_formula = f'=IFERROR(ROUND(SUMPRODUCT(--(ISNUMBER({lo_range})),{lo_range},{weights_array})/SUMPRODUCT(--(ISNUMBER({lo_range})),{weights_array}),0),"--")'
+
         cell_hi = ws[f'{col_hi}{grid_row}']
-        cell_hi.value = str(avg_hi) if avg_hi else "--"
+        cell_hi.value = hi_formula
         cell_hi.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_hi.font = Font(name='Arial', size=9, bold=True)
         cell_hi.alignment = center_align
         cell_hi.border = thin_border
 
         cell_lo = ws[f'{col_lo}{grid_row}']
-        cell_lo.value = str(avg_lo) if avg_lo else "--"
+        cell_lo.value = lo_formula
         cell_lo.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_lo.font = Font(name='Arial', size=9, bold=True)
         cell_lo.alignment = center_align
