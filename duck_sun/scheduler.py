@@ -4,11 +4,11 @@ Duck Sun Modesto Scheduler - Full Provider Edition
 Orchestrates the daily solar forecasting workflow:
 1. Fetch weather data from ALL 9 providers with retry + fallback
 2. Run physics engine for solar/fog analysis
-3. Generate the PDF Report (The Gold Bar) for Power System Schedulers
+3. Generate the Excel Report for Power System Schedulers
 
 Features:
 - Resilient fetching with 2 retries per provider
-- Last Known Good (LKG) cache ensures PDF never shows "--"
+- Last Known Good (LKG) cache ensures report never shows "--"
 - Lessons learned tracking for reliability analysis
 """
 
@@ -40,7 +40,6 @@ from duck_sun.providers.wunderground import WUndergroundProvider
 
 # Processing
 from duck_sun.uncanniness import UncannyEngine
-from duck_sun.pdf_report import generate_pdf_report
 from duck_sun.excel_report import generate_excel_report
 
 # Resilience infrastructure
@@ -669,9 +668,9 @@ async def main():
 
         logger.info(f"[main] ✓ Raw data saved to: {json_path}")
 
-        # --- STEP 3: Generate PDF ---
+        # --- STEP 3: Generate Excel Report ---
         logger.info("")
-        logger.info("STEP 3: Generating PDF Report...")
+        logger.info("STEP 3: Generating Excel Report...")
         logger.info("-" * 40)
 
         # Get degraded providers for warning banner
@@ -742,30 +741,6 @@ async def main():
         om_days = sum(1 for v in precip_data.values() if v.get('source') == 'Open-Meteo')
         logger.info(f"[main] PRECIP sources: Google={google_days} (days 0-2), AccuWeather={accu_days} (days 3+), Open-Meteo={om_days}")
 
-        pdf_path = generate_pdf_report(
-            om_data=om_data,
-            noaa_data=noaa_data,
-            met_data=met_data,
-            accu_data=accu_data,
-            google_data=google_data,
-            weather_com_data=weather_com_data,
-            wunderground_data=wunderground_data,
-            df_analyzed=df_analyzed,
-            fog_critical_hours=critical_hours,
-            output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.pdf",
-            mid_data=mid_data,
-            hrrr_data=hrrr_data,
-            precip_data=precip_data,
-            degraded_sources=degraded if degraded else None,
-            noaa_daily_periods=noaa_daily_periods if noaa_daily_periods else None,
-            report_timestamp=start_time
-        )
-
-        # --- STEP 3b: Generate Excel Report ---
-        logger.info("")
-        logger.info("STEP 3b: Generating Excel Report...")
-        logger.info("-" * 40)
-
         excel_path = generate_excel_report(
             om_data=om_data,
             noaa_data=noaa_data,
@@ -799,10 +774,6 @@ async def main():
         logger.info("=" * 60)
         logger.info("SUCCESS!")
         logger.info(f"  JSON:  {json_path}")
-        if pdf_path:
-            logger.info(f"  PDF:   {pdf_path}")
-        else:
-            logger.warning("  PDF:   Generation skipped (fpdf2 not installed)")
         if excel_path:
             logger.info(f"  Excel: {excel_path}")
         else:
