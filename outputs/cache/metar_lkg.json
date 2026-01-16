@@ -1,15 +1,15 @@
 {
   "provider": "metar",
-  "timestamp": "2026-01-16T06:43:13.658654",
+  "timestamp": "2026-01-16T06:55:04.453845",
   "api_success": true,
   "data": {
-    "raw": "KMOD 161426Z 09003KT 1/4SM FG VV001 04/04 A3010 RMK AO2 T00390039",
+    "raw": "KMOD 161450Z 06003KT M1/4SM FG VV001 04/04 A3011 RMK AO2",
     "station": "KMOD",
-    "observation_time": "2026/01/16 14:26",
+    "observation_time": "2026/01/16 14:50",
     "temp_c": 4,
     "dewpoint_c": 4,
     "wind_speed_kt": 3,
-    "wind_dir": 90,
+    "wind_dir": 60,
     "visibility_sm": 4.0,
     "sky_condition": "FOG - Vertical Visibility (Fog/Low Clouds)"
   }
