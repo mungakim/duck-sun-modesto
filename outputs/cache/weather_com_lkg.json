@@ -1,31 +1,21 @@
 {
   "provider": "weather_com",
-  "timestamp": "2026-01-16T09:32:49.270305",
+  "timestamp": "2026-01-16T13:18:07.339807",
   "api_success": true,
   "data": [
     {
       "date": "2026-01-16",
       "day_name": "Fri",
       "high_f": 59.0,
-      "low_f": 38.0,
+      "low_f": 39.0,
       "high_c": 15.0,
-      "low_c": 3.33,
-      "condition": "Morning fog followed by afternoon sun. Highs in th",
+      "low_c": 3.89,
+      "condition": "Occasional drizzle. Highs in the upper 50s and low",
       "precip_prob": 0
     },
     {
       "date": "2026-01-17",
       "day_name": "Sat",
-      "high_f": 56.0,
-      "low_f": 40.0,
-      "high_c": 13.33,
-      "low_c": 4.44,
-      "condition": "Morning fog followed by afternoon sun. Highs in th",
-      "precip_prob": 0
-    },
-    {
-      "date": "2026-01-18",
-      "day_name": "Sun",
       "high_f": 55.0,
       "low_f": 40.0,
       "high_c": 12.78,
@@ -34,33 +24,43 @@
       "precip_prob": 0
     },
     {
-      "date": "2026-01-19",
-      "day_name": "Mon",
-      "high_f": 57.0,
+      "date": "2026-01-18",
+      "day_name": "Sun",
+      "high_f": 55.0,
       "low_f": 39.0,
-      "high_c": 13.89,
+      "high_c": 12.78,
       "low_c": 3.89,
       "condition": "Areas of morning fog, then some sun. Highs in the ",
+      "precip_prob": 0
+    },
+    {
+      "date": "2026-01-19",
+      "day_name": "Mon",
+      "high_f": 58.0,
+      "low_f": 39.0,
+      "high_c": 14.44,
+      "low_c": 3.89,
+      "condition": "Morning fog followed by afternoon sun. Highs in th",
       "precip_prob": 0
     },
     {
       "date": "2026-01-20",
       "day_name": "Tue",
       "high_f": 59.0,
-      "low_f": 40.0,
+      "low_f": 39.0,
       "high_c": 15.0,
-      "low_c": 4.44,
-      "condition": "Morning fog followed by afternoon sun. Highs in th",
+      "low_c": 3.89,
+      "condition": "Plenty of sun. Highs in the upper 50s and lows in ",
       "precip_prob": 0
     },
     {
       "date": "2026-01-21",
       "day_name": "Wed",
       "high_f": 59.0,
-      "low_f": 41.0,
+      "low_f": 40.0,
       "high_c": 15.0,
-      "low_c": 5.0,
-      "condition": "Times of sun and clouds. Highs in the upper 50s an",
+      "low_c": 4.44,
+      "condition": "Partly cloudy. Highs in the upper 50s and lows in ",
       "precip_prob": 0
     },
     {
@@ -76,21 +76,21 @@
     {
       "date": "2026-01-23",
       "day_name": "Fri",
-      "high_f": 60.0,
-      "low_f": 40.0,
-      "high_c": 15.56,
-      "low_c": 4.44,
-      "condition": "A few clouds. Highs in the low 60s and lows in the",
+      "high_f": 61.0,
+      "low_f": 41.0,
+      "high_c": 16.11,
+      "low_c": 5.0,
+      "condition": "More sun than clouds. Highs in the low 60s and low",
       "precip_prob": 0
     },
     {
       "date": "2026-01-24",
       "day_name": "Sat",
-      "high_f": 60.0,
+      "high_f": 61.0,
       "low_f": 40.0,
-      "high_c": 15.56,
+      "high_c": 16.11,
       "low_c": 4.44,
-      "condition": "Times of sun and clouds. Highs in the low 60s and ",
+      "condition": "A few clouds. Highs in the low 60s and lows in the",
       "precip_prob": 0
     },
     {
@@ -100,7 +100,7 @@
       "low_f": 41.0,
       "high_c": 15.56,
       "low_c": 5.0,
-      "condition": "Times of sun and clouds. Highs in the low 60s and ",
+      "condition": "Partly cloudy. Highs in the low 60s and lows in th",
       "precip_prob": 0
     }
   ]

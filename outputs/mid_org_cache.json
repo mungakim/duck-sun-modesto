@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-01-16T08:38:40.703813",
+  "timestamp": "2026-01-16T13:18:09.001502",
   "source": "midapi.websupport.expert",
   "data": {
     "today": {
       "rain": "0.00",
-      "high": "49",
+      "high": "53",
       "low": "39",
       "datestring": "Friday January  16,  2026"
     },
