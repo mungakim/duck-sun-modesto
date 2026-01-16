@@ -1010,16 +1010,13 @@ def generate_excel_report(
     ]
 
     for col_idx, (label, color) in enumerate(legend_items):
-        col_letter = col(1 + col_idx)
+        col_letter = col(2 + col_idx)  # Shifted right by 1 to align with values above
         cell = ws[f'{col_letter}{grid_row}']
         cell.value = label
         cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
         cell.font = Font(name='Arial', size=6)
         cell.alignment = center_align
         cell.border = thin_border
-
-    ws[f'{col(9)}{grid_row}'] = "(values = W/m²)"
-    ws[f'{col(9)}{grid_row}'].font = Font(name='Arial', size=5, italic=True, color='505050')
 
     # Save workbook
     if output_path is None:
