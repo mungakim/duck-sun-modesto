@@ -4,6 +4,8 @@ Step-by-step instructions for installing and running Duck Sun Modesto on Windows
 
 **Target install location:** `C:\Professional Projects\duck-sun-modesto`
 
+**Prerequisites:** Git installed (https://git-scm.com/download/win)
+
 ---
 
 ## Step 1: Install Python
@@ -40,32 +42,83 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 
 ---
 
-## Step 2: Open Command Prompt in Project Folder
+## Step 2: Clone the Repository from GitHub
 
-### 2.1 Navigate to Project Folder
+### 2.1 Open Command Prompt
 
 1. Press `Windows + R` to open Run dialog
 2. Type `cmd` and press Enter
-3. In the command prompt, type exactly:
-   ```
-   cd "C:\Professional Projects\duck-sun-modesto"
-   ```
-4. Press Enter
 
-### 2.2 Verify You're in the Right Folder
+### 2.2 Navigate to Parent Folder
+
+1. In the command prompt, type:
+   ```
+   cd "C:\Professional Projects"
+   ```
+2. Press Enter
+
+### 2.3 Verify Parent Folder Exists
 
 1. Type:
    ```
    dir
    ```
 2. Press Enter
+3. If you get "The system cannot find the path specified", create it first:
+   ```
+   mkdir "C:\Professional Projects"
+   cd "C:\Professional Projects"
+   ```
+
+### 2.4 Clone the Repository
+
+1. Type:
+   ```
+   git clone https://github.com/mungakim/duck-sun-modesto.git
+   ```
+2. Press Enter
+3. Wait for download to complete (you'll see progress messages)
+4. When done, you'll see: `Cloning into 'duck-sun-modesto'...` followed by `done.`
+
+### 2.5 Verify Clone Succeeded
+
+1. Type:
+   ```
+   dir duck-sun-modesto
+   ```
+2. Press Enter
 3. You should see files like `requirements.txt`, `main.py`, `CLAUDE.md`
 
 ---
 
-## Step 3: Create Virtual Environment
+## Step 3: Navigate into Project Folder
 
-### 3.1 Create the Virtual Environment
+### 3.1 Change Directory
+
+1. In the same command prompt, type:
+   ```
+   cd duck-sun-modesto
+   ```
+2. Press Enter
+3. Your prompt should now show:
+   ```
+   C:\Professional Projects\duck-sun-modesto>
+   ```
+
+### 3.2 Verify You're in the Right Folder
+
+1. Type:
+   ```
+   dir
+   ```
+2. Press Enter
+3. You should see files like `requirements.txt`, `main.py`, `CLAUDE.md`, `duck_sun` folder
+
+---
+
+## Step 4: Create Virtual Environment
+
+### 4.1 Create the Virtual Environment
 
 1. In the same command prompt, type:
    ```
@@ -74,7 +127,7 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 2. Press Enter
 3. Wait 10-30 seconds (no output means success)
 
-### 3.2 Verify Virtual Environment Was Created
+### 4.2 Verify Virtual Environment Was Created
 
 1. Type:
    ```
@@ -85,9 +138,9 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 
 ---
 
-## Step 4: Activate Virtual Environment
+## Step 5: Activate Virtual Environment
 
-### 4.1 Activate
+### 5.1 Activate
 
 1. In the same command prompt, type:
    ```
@@ -103,9 +156,9 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 
 ---
 
-## Step 5: Install Dependencies
+## Step 6: Install Dependencies
 
-### 5.1 Install Required Packages
+### 6.1 Install Required Packages
 
 1. With `(venv)` showing in your prompt, type:
    ```
@@ -115,7 +168,7 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 3. Wait for packages to download and install (1-3 minutes)
 4. You'll see many lines of output ending with "Successfully installed..."
 
-### 5.2 Verify Installation
+### 6.2 Verify Installation
 
 1. Type:
    ```
@@ -126,9 +179,9 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 
 ---
 
-## Step 6: Create the .env File
+## Step 7: Create the .env File
 
-### 6.1 Create the File
+### 7.1 Create the File
 
 1. Open Notepad (press `Windows`, type `notepad`, press Enter)
 2. In Notepad, type the following exactly:
@@ -143,7 +196,7 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 6. Navigate to: `C:\Professional Projects\duck-sun-modesto`
 7. Click Save
 
-### 6.2 Verify the .env File Exists
+### 7.2 Verify the .env File Exists
 
 1. Back in your command prompt, type:
    ```
@@ -152,7 +205,7 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 2. Press Enter
 3. You should see the `.env` file listed
 
-### 6.3 Get Your API Keys
+### 7.3 Get Your API Keys
 
 **Google Maps Weather API Key:**
 1. Go to: https://console.cloud.google.com/
@@ -174,7 +227,7 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 6. Click "Create App"
 7. Copy the API Key and paste it into your `.env` file replacing `your_accuweather_key_here`
 
-### 6.4 Edit the .env File with Real Keys
+### 7.4 Edit the .env File with Real Keys
 
 1. In File Explorer, navigate to `C:\Professional Projects\duck-sun-modesto`
 2. Right-click on `.env` and select "Open with" > "Notepad"
@@ -184,9 +237,9 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 
 ---
 
-## Step 7: Run the Forecast
+## Step 8: Run the Forecast
 
-### 7.1 Run the Scheduler
+### 8.1 Run the Scheduler
 
 1. Make sure your command prompt shows `(venv)` and you're in the project folder
 2. Type:
@@ -196,7 +249,7 @@ If you see `'python' is not recognized`, close the command prompt and reopen it 
 3. Press Enter
 4. Wait for the forecast to run (30 seconds to 2 minutes)
 
-### 7.2 Find Your Output
+### 8.2 Find Your Output
 
 1. Open File Explorer
 2. Navigate to: `C:\Professional Projects\duck-sun-modesto\reports`
