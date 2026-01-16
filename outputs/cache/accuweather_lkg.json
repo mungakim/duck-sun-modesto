@@ -1,17 +1,8 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-01-15T21:49:17.601648",
+  "timestamp": "2026-01-16T06:25:41.208958",
   "api_success": true,
   "data": [
-    {
-      "date": "2026-01-15",
-      "high_c": 16.67,
-      "low_c": 2.78,
-      "high_f": 62.0,
-      "low_f": 37.0,
-      "precip_prob": 25,
-      "condition": "Intermittent clouds"
-    },
     {
       "date": "2026-01-16",
       "high_c": 15.0,
@@ -23,9 +14,9 @@
     },
     {
       "date": "2026-01-17",
-      "high_c": 15.0,
+      "high_c": 14.44,
       "low_c": 5.0,
-      "high_f": 59.0,
+      "high_f": 58.0,
       "low_f": 41.0,
       "precip_prob": 0,
       "condition": "Partly sunny"
@@ -36,7 +27,7 @@
       "low_c": 4.44,
       "high_f": 61.0,
       "low_f": 40.0,
-      "precip_prob": 2,
+      "precip_prob": 0,
       "condition": "Partly sunny"
     },
     {
@@ -45,7 +36,16 @@
       "low_c": 5.0,
       "high_f": 56.0,
       "low_f": 41.0,
-      "precip_prob": 3,
+      "precip_prob": 2,
+      "condition": "Partly sunny"
+    },
+    {
+      "date": "2026-01-20",
+      "high_c": 13.33,
+      "low_c": 5.0,
+      "high_f": 56.0,
+      "low_f": 41.0,
+      "precip_prob": 4,
       "condition": "Partly sunny"
     }
   ]
