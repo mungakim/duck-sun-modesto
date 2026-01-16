@@ -397,18 +397,18 @@ def generate_excel_report(
     # Set column widths - balanced to fit on one landscape page with readable text
     ws.column_dimensions['A'].width = 1   # Left margin spacer
     ws.column_dimensions['B'].width = 1   # Left margin spacer
-    ws.column_dimensions[col(1)].width = 6   # Weight/DATE column (C)
-    ws.column_dimensions[col(2)].width = 10  # Source column (D)
-    # All data columns - width 6.5 to fit short descriptions like "M cloudy"
+    ws.column_dimensions[col(1)].width = 11  # PGE CITYGATE / MID GAS NOM label column (C) - wider for labels
+    ws.column_dimensions[col(2)].width = 12  # Source column / PGE CITYGATE input (D) - wide for 5-decimal values
+    # All data columns - width 7.5 for wider solar forecast
     for i in range(3, 20):
-        ws.column_dimensions[col(i)].width = 6.5
+        ws.column_dimensions[col(i)].width = 7.5
 
-    # Page setup: 0.25 inch margins, LANDSCAPE, fit to ONE page
+    # Page setup: 0.1" top margin to move report up, LANDSCAPE, fit to ONE page
     ws.page_margins = PageMargins(
         left=0.25,
         right=0.25,
-        top=0.25,
-        bottom=0.25,
+        top=0.1,
+        bottom=0.5,
         header=0.1,
         footer=0.1
     )
@@ -441,27 +441,28 @@ def generate_excel_report(
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 5: PGE CITYGATE (above MID GAS NOM) - with input boxes
+    # ROW 5: PGE CITYGATE (above MID GAS NOM) - ENCLOSED label + input cell
     # =====================
-    ws[f'{col(1)}5'] = "PGE CITYGATE:"
-    ws[f'{col(1)}5'].font = Font(name='Arial', size=8, bold=True)
-    ws[f'{col(1)}5'].alignment = left_align
-    # Input boxes for PGE CITYGATE (2 cells)
-    for c in range(2, 4):
-        cell = ws[f'{col(c)}5']
-        cell.border = thick_border
-        cell.alignment = center_align
+    pge_label = ws[f'{col(1)}5']
+    pge_label.value = "PGE CITYGATE:"
+    pge_label.font = Font(name='Arial', size=8, bold=True)
+    pge_label.alignment = center_align
+    pge_label.border = thick_border  # ENCLOSE the label cell
+    # Input cell for PGE CITYGATE (single wide cell for 5-decimal values)
+    pge_input = ws[f'{col(2)}5']
+    pge_input.border = thick_border
+    pge_input.alignment = center_align
 
     # =====================
-    # ROW 6-9: MID GAS NOM (left side) with thick border
+    # ROW 6-8: MID GAS NOM (left side) - 6 cells (2 columns x 3 rows), wider
     # =====================
     ws[f'{col(1)}6'] = "MID GAS NOM:"
     ws[f'{col(1)}6'].font = Font(name='Arial', size=8, bold=True)
     ws[f'{col(1)}6'].alignment = left_align
 
-    # Create 3 rows of cells for date/MMBtu (3 columns x 3 rows = 9 boxes)
+    # Create 3 rows of cells (2 columns x 3 rows = 6 boxes)
     for row_idx in range(7, 10):
-        for c in range(1, 4):
+        for c in range(1, 3):  # Only 2 columns now
             cell = ws[f'{col(c)}{row_idx}']
             cell.border = thick_border
             cell.alignment = center_align
@@ -480,8 +481,8 @@ def generate_excel_report(
     for c in range(11, 18):
         ws[f'{col(c)}5'].border = thin_border
 
-    # Headers: High, Low, Rain
-    for c, label in [(13, ''), (14, 'High'), (15, 'Low'), (16, 'Rain')]:
+    # Headers: High, Low, Rain (no empty cell before High)
+    for c, label in [(14, 'High'), (15, 'Low'), (16, 'Rain')]:
         cell = ws[f'{col(c)}6']
         cell.value = label
         cell.font = Font(name='Arial', size=7, bold=True)
