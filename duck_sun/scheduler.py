@@ -759,8 +759,11 @@ async def main():
         )
 
         # Copy xlsx to network drive (X:\Operatns\Pwrsched\Weather) with same folder structure
+        # Skip if DUCK_SUN_SKIP_NETWORK_COPY is set (exe running from network drive)
         network_excel_path = None
-        if excel_path and excel_path.exists():
+        if os.environ.get("DUCK_SUN_SKIP_NETWORK_COPY"):
+            logger.info("[main] Skipping network copy (already on network drive)")
+        elif excel_path and excel_path.exists():
             try:
                 network_subdir = NETWORK_REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d")
                 network_subdir.mkdir(parents=True, exist_ok=True)
