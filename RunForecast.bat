@@ -28,7 +28,7 @@ echo Committing to GitHub...
 git add outputs/ reports/
 git diff --cached --quiet
 if %ERRORLEVEL% neq 0 (
-    for /f "tokens=*" %%i in ('powershell -command "Get-Date -Format 'yyyy-MM-dd'"') do set TODAY=%%i
+    for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set TODAY=%%i
     git commit -m "Forecast: %TODAY%"
     git push origin main
 ) else (
