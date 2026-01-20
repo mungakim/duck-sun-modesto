@@ -24,6 +24,20 @@ def main():
     os.chdir(script_dir)
     print(f"Working directory: {script_dir}")
 
+    # Load .env file BEFORE importing scheduler
+    env_file = script_dir / ".env"
+    if env_file.exists():
+        print(f"Loading .env from: {env_file}")
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+        print("API keys loaded")
+    else:
+        print(f"WARNING: .env file not found at {env_file}")
+
     # Check if we're running from the network drive
     # If so, disable the duplicate network copy in scheduler
     script_path_str = str(script_dir).upper()
@@ -45,7 +59,7 @@ def main():
 
         if result != 0:
             print()
-            print("[ERROR] Forecast failed!")
+            print(f"[ERROR] Forecast failed with code {result}")
             input("Press Enter to exit...")
             return 1
 
