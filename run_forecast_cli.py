@@ -5,6 +5,7 @@ Git operations are skipped (not needed for coworkers).
 """
 import os
 import sys
+import subprocess
 from pathlib import Path
 
 def main():
@@ -23,30 +24,6 @@ def main():
 
     os.chdir(script_dir)
     print(f"Working directory: {script_dir}")
-
-    # Load .env file BEFORE importing scheduler
-    env_file = script_dir / ".env"
-    if env_file.exists():
-        print(f"Loading .env from: {env_file}")
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
-        print("API keys loaded")
-    else:
-        print(f"WARNING: .env file not found at {env_file}")
-
-    # Check if we're running from the network drive
-    # If so, disable the duplicate network copy in scheduler
-    script_path_str = str(script_dir).upper()
-    if script_path_str.startswith("X:") or "OPERATNS" in script_path_str or "PWRSCHED" in script_path_str:
-        os.environ["DUCK_SUN_SKIP_NETWORK_COPY"] = "1"
-        print("Running from network drive - reports save here only")
-    else:
-        print("Running locally - reports also copy to X:\\ drive")
-
     print()
 
     # Run the forecast
@@ -54,20 +31,17 @@ def main():
     print("-" * 50)
 
     try:
-        import asyncio
         from duck_sun.scheduler import main as run_scheduler
-        result = asyncio.run(run_scheduler())
+        result = run_scheduler()
 
         if result != 0:
             print()
-            print(f"[ERROR] Forecast failed with code {result}")
+            print("[ERROR] Forecast failed!")
             input("Press Enter to exit...")
             return 1
 
     except Exception as e:
         print(f"[ERROR] {e}")
-        import traceback
-        traceback.print_exc()
         input("Press Enter to exit...")
         return 1
 
@@ -76,10 +50,6 @@ def main():
 
     # Find and open the latest xlsx file
     reports_dir = script_dir / "reports"
-    if not reports_dir.exists():
-        # Check current directory for date-based folders (network drive structure)
-        reports_dir = script_dir
-
     xlsx_files = list(reports_dir.rglob("*.xlsx"))
 
     if xlsx_files:
