@@ -54,8 +54,9 @@ def main():
     print("-" * 50)
 
     try:
+        import asyncio
         from duck_sun.scheduler import main as run_scheduler
-        result = run_scheduler()
+        result = asyncio.run(run_scheduler())
 
         if result != 0:
             print()
