@@ -463,7 +463,7 @@ def generate_excel_report(
     pge_input.border = pge_input_border  # Border only on input cell
     pge_input.alignment = center_align
     pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
-    pge_input.number_format = '"$"0.##########'  # Dollar sign without rounding
+    pge_input.number_format = '"$"0.000'  # Dollar sign with exactly 3 decimal places
     # Apply border to merged range
     ws[f'{col(3)}3'].border = pge_input_border
 
