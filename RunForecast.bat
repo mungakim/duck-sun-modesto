@@ -7,7 +7,13 @@ echo   Duck Sun Modesto - Daily Forecast
 echo ============================================
 echo.
 
+:: Make sure we're on main branch for forecast commits
+echo Switching to main branch...
+git checkout main
+git pull origin main
+
 :: Run the forecast and push to GitHub
+echo.
 echo Running forecast...
 call .\venv\Scripts\python.exe -m duck_sun.scheduler
 if %ERRORLEVEL% neq 0 (
@@ -24,7 +30,7 @@ git diff --cached --quiet
 if %ERRORLEVEL% neq 0 (
     for /f "tokens=*" %%i in ('powershell -command "Get-Date -Format 'yyyy-MM-dd'"') do set TODAY=%%i
     git commit -m "Forecast: %TODAY%"
-    git push
+    git push origin main
 ) else (
     echo No new files to commit
 )
