@@ -463,7 +463,7 @@ def generate_excel_report(
     pge_input.border = pge_input_border  # Border only on input cell
     pge_input.alignment = center_align
     pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
-    pge_input.number_format = '"$"0.##########'  # Dollar sign without rounding
+    pge_input.number_format = '"$"0.000'  # Dollar sign with exactly 3 decimal places
     # Apply border to merged range
     ws[f'{col(3)}3'].border = pge_input_border
 
@@ -585,10 +585,18 @@ def generate_excel_report(
         'OPEN-METEO': '1.0',
         'NOAA (GOV)': '3.0',
         'MET.NO (EU)': '3.0',
-        'ACCU (COM)': '4.0',
+        'ACCUWEATHER': '4.0',
         'WEATHER.COM': '4.0',
         'WUNDERGRND': '4.0',
         'GOOGLE (AI)': '6.0',
+    }
+
+    # URLs for clickable source links
+    SOURCE_URLS = {
+        'NOAA (GOV)': 'https://forecast.weather.gov/MapClick.php?lat=37.6684&lon=-120.99',
+        'ACCUWEATHER': 'https://www.accuweather.com/en/us/modesto/95354/daily-weather-forecast/327145?page=0',
+        'WEATHER.COM': 'https://weather.com/weather/tenday/l/USCA0714',
+        'WUNDERGRND': 'https://www.wunderground.com/forecast/us/ca/modesto/95350?cm_ven=localwx_10day',
     }
 
     DAY_COLORS = [
@@ -723,7 +731,7 @@ def generate_excel_report(
         ('OPEN-METEO', lambda d, k: (d.get('high_f'), d.get('low_f')), 0),
         ('NOAA (GOV)', lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')), 1),
         ('MET.NO (EU)', lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2),
-        ('ACCU (COM)', lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3),
+        ('ACCUWEATHER', lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3),
         ('WEATHER.COM', lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 4),
         ('WUNDERGRND', lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 5),
         ('GOOGLE (AI)', lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 6),
@@ -737,10 +745,16 @@ def generate_excel_report(
         source_cell = ws[f'{col(1)}{grid_row}']
         source_cell.value = label  # Just the source name, no weight
         source_cell.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
-        source_cell.font = Font(name='Arial', size=7, bold=True)
         source_cell.alignment = center_align  # Centered
         source_cell.border = thin_border
         ws[f'{col(2)}{grid_row}'].border = thin_border
+
+        # Add clickable hyperlink if URL exists for this source
+        if label in SOURCE_URLS:
+            source_cell.hyperlink = SOURCE_URLS[label]
+            source_cell.font = Font(name='Arial', size=7, bold=True, color='0000FF', underline='single')
+        else:
+            source_cell.font = Font(name='Arial', size=7, bold=True)
 
         for i, day in enumerate(om_daily):
             k = day.get('date', '')

@@ -67,6 +67,7 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path("outputs")
 REPORT_DIR = Path("reports")
+NETWORK_REPORT_DIR = Path(r"X:\Operatns\Pwrsched\Weather")  # Shared network drive for team access
 
 # Conservative retry config: 2 retries, 1-5s delays
 RETRY_CONFIG = RetryConfig(
@@ -757,6 +758,20 @@ async def main():
             report_timestamp=start_time
         )
 
+        # Copy xlsx to network drive (X:\Operatns\Pwrsched\Weather) with same folder structure
+        network_excel_path = None
+        if excel_path and excel_path.exists():
+            try:
+                network_subdir = NETWORK_REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d")
+                network_subdir.mkdir(parents=True, exist_ok=True)
+                network_excel_path = network_subdir / excel_path.name
+                import shutil
+                shutil.copy2(excel_path, network_excel_path)
+                logger.info(f"[main] Copied xlsx to network: {network_excel_path}")
+            except Exception as e:
+                logger.warning(f"[main] Failed to copy xlsx to network drive: {e}")
+                network_excel_path = None
+
         duration = (datetime.now(pacific) - start_time).total_seconds()
 
         # --- STEP 4: Summary ---
@@ -776,6 +791,8 @@ async def main():
         logger.info(f"  JSON:  {json_path}")
         if excel_path:
             logger.info(f"  Excel: {excel_path}")
+            if network_excel_path:
+                logger.info(f"  Network: {network_excel_path}")
         else:
             logger.warning("  Excel: Generation skipped (openpyxl not installed)")
         logger.info(f"  Providers: {len(active_sources)}/11 active")
