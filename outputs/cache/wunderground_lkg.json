@@ -1,64 +1,64 @@
 {
   "provider": "wunderground",
-  "timestamp": "2026-01-16T13:50:35.715385",
+  "timestamp": "2026-01-20T05:50:33.639526",
   "api_success": true,
   "data": [
     {
-      "date": "2026-01-16",
-      "day_name": "Fri",
-      "high_f": 57.0,
-      "low_f": 38.0,
-      "high_c": 13.89,
-      "low_c": 3.33,
-      "condition": "Unknown",
-      "precip_prob": 0
-    },
-    {
-      "date": "2026-01-17",
-      "day_name": "Sat",
-      "high_f": 55.0,
-      "low_f": 40.0,
-      "high_c": 12.78,
-      "low_c": 4.44,
-      "condition": "Unknown",
-      "precip_prob": 0
-    },
-    {
-      "date": "2026-01-18",
-      "day_name": "Sun",
-      "high_f": 57.0,
-      "low_f": 38.0,
-      "high_c": 13.89,
-      "low_c": 3.33,
-      "condition": "Unknown",
-      "precip_prob": 0
-    },
-    {
-      "date": "2026-01-19",
-      "day_name": "Mon",
-      "high_f": 58.0,
-      "low_f": 39.0,
-      "high_c": 14.44,
-      "low_c": 3.89,
-      "condition": "Unknown",
-      "precip_prob": 0
-    },
-    {
       "date": "2026-01-20",
       "day_name": "Tue",
-      "high_f": 59.0,
-      "low_f": 39.0,
-      "high_c": 15.0,
-      "low_c": 3.89,
+      "high_f": 51.0,
+      "low_f": 42.0,
+      "high_c": 10.56,
+      "low_c": 5.56,
       "condition": "Unknown",
       "precip_prob": 0
     },
     {
       "date": "2026-01-21",
       "day_name": "Wed",
+      "high_f": 56.0,
+      "low_f": 45.0,
+      "high_c": 13.33,
+      "low_c": 7.22,
+      "condition": "Unknown",
+      "precip_prob": 0
+    },
+    {
+      "date": "2026-01-22",
+      "day_name": "Thu",
+      "high_f": 61.0,
+      "low_f": 43.0,
+      "high_c": 16.11,
+      "low_c": 6.11,
+      "condition": "Unknown",
+      "precip_prob": 0
+    },
+    {
+      "date": "2026-01-23",
+      "day_name": "Fri",
+      "high_f": 57.0,
+      "low_f": 42.0,
+      "high_c": 13.89,
+      "low_c": 5.56,
+      "condition": "Unknown",
+      "precip_prob": 0
+    },
+    {
+      "date": "2026-01-24",
+      "day_name": "Sat",
       "high_f": 59.0,
       "low_f": 40.0,
       "high_c": 15.0,
+      "low_c": 4.44,
+      "condition": "Unknown",
+      "precip_prob": 0
+    },
+    {
+      "date": "2026-01-25",
+      "day_name": "Sun",
+      "high_f": 58.0,
+      "low_f": 40.0,
+      "high_c": 14.44,
       "low_c": 4.44,
       "condition": "Unknown",
       "precip_prob": 0
