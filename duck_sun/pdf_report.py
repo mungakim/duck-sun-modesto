@@ -714,10 +714,18 @@ def generate_pdf_report(
         'OPEN-METEO': '1.0',
         'NOAA (GOV)': '3.0',
         'MET.NO (EU)': '3.0',
-        'ACCU (COM)': '4.0',
+        'ACCUWEATHER': '4.0',
         'WEATHER.COM': '4.0',
         'WUNDERGRND': '4.0',
         'GOOGLE (AI)': '6.0',
+    }
+
+    # URLs for clickable source links
+    SOURCE_URLS = {
+        'NOAA (GOV)': 'https://forecast.weather.gov/MapClick.php?lat=37.6684&lon=-120.99',
+        'ACCUWEATHER': 'https://www.accuweather.com/en/us/modesto/95354/daily-weather-forecast/327145?page=0',
+        'WEATHER.COM': 'https://weather.com/weather/tenday/l/USCA0714',
+        'WUNDERGRND': 'https://www.wunderground.com/forecast/us/ca/modesto/95350?cm_ven=localwx_10day',
     }
 
     # Define alternating day column colors (pastels for readability)
@@ -869,10 +877,22 @@ def generate_pdf_report(
         weight_val = SOURCE_WEIGHT_DISPLAY.get(label, '')
         pdf.cell(weight_col, row_h, weight_val, 1, 0, 'C', 1)
 
-        # Source label (neutral gray)
+        # Source label (neutral gray) - with clickable link if URL exists
         pdf.set_fill_color(245, 245, 245)
-        pdf.set_font('Helvetica', 'B', 6)
-        pdf.cell(source_col, row_h, label, 1, 0, 'C', 1)
+        source_url = SOURCE_URLS.get(label)
+        if source_url:
+            pdf.set_text_color(0, 0, 255)  # Blue for links
+            pdf.set_font('Helvetica', 'BU', 6)  # Bold + Underline
+            # Store position before drawing cell
+            link_x = pdf.get_x()
+            link_y = pdf.get_y()
+            pdf.cell(source_col, row_h, label, 1, 0, 'C', 1)
+            # Add clickable link over the cell
+            pdf.link(link_x, link_y, source_col, row_h, source_url)
+            pdf.set_text_color(0, 0, 0)  # Reset to black
+        else:
+            pdf.set_font('Helvetica', 'B', 6)
+            pdf.cell(source_col, row_h, label, 1, 0, 'C', 1)
 
         # Temperature cells - COLOR CODED BY DAY
         pdf.set_font('Helvetica', '', 8)  # 15% larger than original 7pt
@@ -905,7 +925,7 @@ def generate_pdf_report(
     draw_row_colored('MET.NO (EU)',
              lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2)
 
-    draw_row_colored('ACCU (COM)',
+    draw_row_colored('ACCUWEATHER',
              lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3)
 
     draw_row_colored('WEATHER.COM',

@@ -58,10 +58,18 @@ SOURCE_WEIGHT_DISPLAY = {
     'OPEN-METEO': '1.0',
     'NOAA (GOV)': '3.0',
     'MET.NO (EU)': '3.0',
-    'ACCU (COM)': '4.0',
+    'ACCUWEATHER': '4.0',
     'WEATHER.COM': '4.0',
     'WUNDERGRND': '4.0',
     'GOOGLE (AI)': '6.0',
+}
+
+# URLs for clickable source links
+SOURCE_URLS = {
+    'NOAA (GOV)': 'https://forecast.weather.gov/MapClick.php?lat=37.6684&lon=-120.99',
+    'ACCUWEATHER': 'https://www.accuweather.com/en/us/modesto/95354/daily-weather-forecast/327145?page=0',
+    'WEATHER.COM': 'https://weather.com/weather/tenday/l/USCA0714',
+    'WUNDERGRND': 'https://www.wunderground.com/forecast/us/ca/modesto/95350?cm_ven=localwx_10day',
 }
 
 
@@ -426,12 +434,16 @@ def generate_xlsx_report(
         weight_cell.alignment = center_align
         weight_cell.border = thin_border
 
-        # Source label
+        # Source label - with clickable hyperlink if URL exists
         source_cell = ws.cell(row=row_num, column=2, value=label)
         source_cell.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
-        source_cell.font = bold_small
         source_cell.alignment = center_align
         source_cell.border = thin_border
+        if label in SOURCE_URLS:
+            source_cell.hyperlink = SOURCE_URLS[label]
+            source_cell.font = Font(size=7, bold=True, color='0000FF', underline='single')
+        else:
+            source_cell.font = bold_small
 
         # Temperature values
         for i, d in enumerate(om_daily):
@@ -470,7 +482,7 @@ def generate_xlsx_report(
                     lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2)
     current_row += 1
 
-    write_source_row(current_row, 'ACCU (COM)',
+    write_source_row(current_row, 'ACCUWEATHER',
                     lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3)
     current_row += 1
 
