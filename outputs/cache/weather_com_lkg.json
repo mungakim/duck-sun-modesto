@@ -1,14 +1,14 @@
 {
   "provider": "weather_com",
-  "timestamp": "2026-01-20T05:50:31.131749",
+  "timestamp": "2026-01-20T06:28:44.808869",
   "api_success": true,
   "data": [
     {
       "date": "2026-01-20",
       "day_name": "Tue",
-      "high_f": 51.0,
+      "high_f": 52.0,
       "low_f": 43.0,
-      "high_c": 10.56,
+      "high_c": 11.11,
       "low_c": 6.11,
       "condition": "Areas of fog early, then cloudy. Highs in the low ",
       "precip_prob": 0
@@ -30,7 +30,7 @@
       "low_f": 43.0,
       "high_c": 16.67,
       "low_c": 6.11,
-      "condition": "Mostly cloudy. Highs in the low 60s and lows in th",
+      "condition": "Cloudy. Highs in the low 60s and lows in the low 4",
       "precip_prob": 0
     },
     {
@@ -40,7 +40,7 @@
       "low_f": 42.0,
       "high_c": 13.89,
       "low_c": 5.56,
-      "condition": "Areas of morning fog, then some sun. Highs in the ",
+      "condition": "Morning fog followed by afternoon sun. Highs in th",
       "precip_prob": 0
     },
     {
@@ -70,7 +70,7 @@
       "low_f": 39.0,
       "high_c": 14.44,
       "low_c": 3.89,
-      "condition": "Morning fog followed by afternoon sun. Highs in th",
+      "condition": "Areas of morning fog, then some sun. Highs in the ",
       "precip_prob": 0
     },
     {
@@ -80,7 +80,7 @@
       "low_f": 42.0,
       "high_c": 15.56,
       "low_c": 5.56,
-      "condition": "Mostly cloudy. Highs in the low 60s and lows in th",
+      "condition": "More clouds than sun. Highs in the low 60s and low",
       "precip_prob": 0
     },
     {
@@ -100,7 +100,7 @@
       "low_f": 43.0,
       "high_c": 16.67,
       "low_c": 6.11,
-      "condition": "Partly cloudy. Highs in the low 60s and lows in th",
+      "condition": "Mix of sun and clouds. Highs in the low 60s and lo",
       "precip_prob": 0
     }
   ]
