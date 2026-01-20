@@ -1,6 +1,6 @@
 {
   "provider": "google_weather",
-  "timestamp": "2026-01-20T07:06:55.640137",
+  "timestamp": "2026-01-20T07:11:44.110739",
   "api_success": true,
   "data": {
     "hourly": [
@@ -1298,6 +1298,6 @@
       }
     ],
     "source": "Google Weather API (MetNet-3)",
-    "fetched_at": "2026-01-20T07:06:55.639701"
+    "fetched_at": "2026-01-20T07:11:44.110286"
   }
 }
