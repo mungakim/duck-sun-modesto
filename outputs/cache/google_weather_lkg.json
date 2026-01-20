@@ -1,6 +1,6 @@
 {
   "provider": "google_weather",
-  "timestamp": "2026-01-20T06:41:48.317208",
+  "timestamp": "2026-01-20T07:01:37.696816",
   "api_success": true,
   "data": {
     "hourly": [
@@ -1227,6 +1227,18 @@
         "wind_speed_kmh": 6.0,
         "condition": "Mostly cloudy",
         "is_daytime": false
+      },
+      {
+        "time": "2026-01-24T14:00:00Z",
+        "temp_c": 6.1,
+        "feels_like_c": 5.0,
+        "precip_prob": 10,
+        "precip_mm": 0.0,
+        "dewpoint_c": 5.2,
+        "cloud_cover": 75,
+        "wind_speed_kmh": 8.0,
+        "condition": "Mostly cloudy",
+        "is_daytime": false
       }
     ],
     "daily": [
@@ -1274,9 +1286,18 @@
         "low_f": 43,
         "precip_prob": 20,
         "condition": "Mostly cloudy"
+      },
+      {
+        "date": "2026-01-24",
+        "high_c": 6.1,
+        "low_c": 6.1,
+        "high_f": 43,
+        "low_f": 43,
+        "precip_prob": 10,
+        "condition": "Unknown"
       }
     ],
     "source": "Google Weather API (MetNet-3)",
-    "fetched_at": "2026-01-20T06:41:48.316702"
+    "fetched_at": "2026-01-20T07:01:37.696339"
   }
 }
