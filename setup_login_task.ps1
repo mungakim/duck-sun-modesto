@@ -1,7 +1,7 @@
 # Setup Windows Task Scheduler task for automatic forecast on login
-# Run this script AS ADMINISTRATOR to create the scheduled task
+# No admin rights required - creates a user-level task
 #
-# Usage: Right-click PowerShell -> "Run as Administrator" -> .\setup_login_task.ps1
+# Usage: .\setup_login_task.ps1
 
 param(
     [string]$TaskName = "DuckSunForecast",
@@ -11,15 +11,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-# Check for admin privileges
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-if (-not $isAdmin) {
-    Write-Host "ERROR: This script must be run as Administrator!" -ForegroundColor Red
-    Write-Host "Right-click PowerShell and select 'Run as Administrator'" -ForegroundColor Yellow
-    exit 1
-}
 
 if ($Remove) {
     # Remove existing task
@@ -107,7 +98,7 @@ Write-Host ""
 Write-Host "=== For Coworkers ===" -ForegroundColor Magenta
 Write-Host "Share these files with coworkers:"
 Write-Host "  1. The entire project folder (or git clone)"
-Write-Host "  2. They run: .\setup_login_task.ps1 (as Administrator)"
+Write-Host "  2. They run: .\setup_login_task.ps1"
 Write-Host ""
 Write-Host "Or import the XML manually:"
 Write-Host "  schtasks /create /xml `"$exportPath`" /tn `"$TaskName`""

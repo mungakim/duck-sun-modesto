@@ -11,9 +11,7 @@ This guide explains how to set up the Duck Sun forecast to run automatically whe
 
 ## Quick Setup (Your Machine)
 
-1. **Open PowerShell as Administrator**
-   - Right-click the Start button
-   - Select "Windows Terminal (Admin)" or "PowerShell (Admin)"
+1. **Open PowerShell** (no admin required)
 
 2. **Navigate to the project folder**
    ```powershell
@@ -43,17 +41,18 @@ Start-ScheduledTask -TaskName "DuckSunForecast"
 
 1. Clone or copy the project folder to coworker's machine
 2. Ensure Python venv and dependencies are set up
-3. Have coworker run as Administrator:
+3. Have coworker run:
    ```powershell
    .\setup_login_task.ps1
    ```
+
+No admin rights required - creates a user-level scheduled task.
 
 ### Option B: Import Task XML
 
 If the setup script doesn't work, import the pre-exported task:
 
 ```powershell
-# As Administrator
 schtasks /create /xml "DuckSunForecast_Task.xml" /tn "DuckSunForecast"
 ```
 
