@@ -272,7 +272,7 @@ class AccuWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 logger.debug(f"[AccuWeatherProvider] GET {url}")
                 resp = await client.get(url, params=params)
                 
@@ -284,7 +284,7 @@ class AccuWeatherProvider:
                     logger.warning("[AccuWeatherProvider] Unauthorized - check API key")
                     return None
                 if resp.status_code != 200:
-                    logger.warning(f"[AccuWeatherProvider] HTTP {resp.status_code}: {resp.text[:100]}")
+                    logger.warning(f"[AccuWeatherProvider] HTTP {resp.status_code} error (response body redacted)")
                     # Return None - let CacheManager handle fallback with proper staleness tier
                     return None
 

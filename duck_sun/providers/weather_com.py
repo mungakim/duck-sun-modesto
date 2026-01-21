@@ -7,9 +7,12 @@ Uses curl_cffi with Chrome impersonation to bypass anti-bot measures.
 Weight: 4.0 (same as AccuWeather - commercial provider)
 """
 
+import json
 import logging
+import os
 import re
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Optional, TypedDict
 from zoneinfo import ZoneInfo
 
@@ -28,6 +31,11 @@ except ImportError:
     BeautifulSoup = None
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting configuration
+CACHE_DIR = Path("outputs")
+CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
+DAILY_CALL_LIMIT = 6  # Hard cap: max 6 web scrapes per day
 
 
 class WeatherComDay(TypedDict):
@@ -64,6 +72,74 @@ class WeatherComProvider:
         if not HAS_BS4:
             logger.warning("[WeatherComProvider] beautifulsoup4 not installed - provider disabled")
 
+        # Ensure cache directory exists
+        CACHE_DIR.mkdir(exist_ok=True)
+
+    def _load_cache(self) -> Optional[dict]:
+        """Load cached data if it exists."""
+        if not CACHE_FILE.exists():
+            return None
+        try:
+            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"[WeatherComProvider] Cache load error: {e}")
+            return None
+
+    def _save_cache(self, data: List['WeatherComDay'], increment_call: bool = True) -> None:
+        """Save forecast data to cache with call counter."""
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            existing = self._load_cache()
+            call_count = 0
+
+            if existing and existing.get('call_date') == today:
+                call_count = existing.get('call_count', 0)
+
+            if increment_call:
+                call_count += 1
+
+            cache = {
+                'timestamp': datetime.now().isoformat(),
+                'call_date': today,
+                'call_count': call_count,
+                'daily_limit': DAILY_CALL_LIMIT,
+                'data': data
+            }
+            with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, indent=2)
+            logger.info(f"[WeatherComProvider] Cache saved: call #{call_count}/{DAILY_CALL_LIMIT} today")
+        except Exception as e:
+            logger.error(f"[WeatherComProvider] Cache save failed: {e}")
+
+    def _is_rate_limited(self) -> bool:
+        """Check if daily rate limit has been reached."""
+        cache = self._load_cache()
+        if not cache:
+            return False
+
+        today = datetime.now().strftime('%Y-%m-%d')
+        if cache.get('call_date') != today:
+            logger.info("[WeatherComProvider] New day - rate limit reset")
+            return False
+
+        call_count = cache.get('call_count', 0)
+        if call_count >= DAILY_CALL_LIMIT:
+            logger.warning(f"[WeatherComProvider] RATE LIMIT REACHED ({call_count}/{DAILY_CALL_LIMIT} calls today)")
+            return True
+
+        logger.info(f"[WeatherComProvider] Daily calls: {call_count}/{DAILY_CALL_LIMIT}")
+        return False
+
+    def _get_cached_data(self) -> Optional[List['WeatherComDay']]:
+        """Return cached data if available."""
+        cache = self._load_cache()
+        if cache and cache.get('data'):
+            age = datetime.now() - datetime.fromisoformat(cache['timestamp'])
+            logger.info(f"[WeatherComProvider] Using cached data ({age.total_seconds()/3600:.1f}h old)")
+            return cache['data']
+        return None
+
     def _parse_temp(self, temp_str: str) -> Optional[int]:
         """Extract integer temperature from string like '60°' or '60'."""
         if not temp_str:
@@ -86,6 +162,8 @@ class WeatherComProvider:
         """
         Synchronously fetch 10-day forecast from Weather.com's API.
 
+        Rate limited to 6 calls/day to avoid anti-bot detection.
+
         Returns:
             List of WeatherComDay dicts, or None on failure
         """
@@ -93,9 +171,17 @@ class WeatherComProvider:
             logger.error("[WeatherComProvider] Missing curl_cffi dependency")
             return None
 
+        # Check rate limit - return cached data if limit reached
+        if self._is_rate_limited():
+            cached = self._get_cached_data()
+            if cached:
+                return cached
+            logger.warning("[WeatherComProvider] Rate limited and no cache available")
+            return None
+
         # Construct API URL with parameters
-        # Weather.com uses this API key for public access
-        api_key = "e1f10a1e78da46f5b10a1e78da96f525"  # Public TWC API key
+        # TWC_API_KEY can be set in .env; defaults to public Weather.com API key
+        api_key = os.getenv("TWC_API_KEY", "e1f10a1e78da46f5b10a1e78da96f525")
         params = {
             "geocode": self.GEOCODE,
             "format": "json",
@@ -116,8 +202,7 @@ class WeatherComProvider:
                     "Referer": "https://weather.com/",
                     "Origin": "https://weather.com",
                 }
-                # verify=False bypasses SSL cert issues on Windows corporate networks
-                response = session.get(url, headers=headers, timeout=30, verify=False)
+                response = session.get(url, headers=headers, timeout=30)
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
@@ -176,6 +261,7 @@ class WeatherComProvider:
                 logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F")
 
             logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} daily records from API")
+            self._save_cache(results)
             return results
 
         except Exception as e:
@@ -195,11 +281,11 @@ class WeatherComProvider:
             with Session(impersonate="chrome110") as session:
                 # First request to get cookies
                 logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
-                home_resp = session.get("https://weather.com/", timeout=15, verify=False)
+                home_resp = session.get("https://weather.com/", timeout=15)
                 logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
 
                 # Now fetch the forecast page with cookies
-                response = session.get(scrape_url, timeout=30, verify=False)
+                response = session.get(scrape_url, timeout=30)
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] Scraping HTTP {response.status_code}")
@@ -248,6 +334,8 @@ class WeatherComProvider:
                 })
 
             logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via scraping")
+            if results:
+                self._save_cache(results)
             return results if results else None
 
         except Exception as e:

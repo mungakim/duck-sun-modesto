@@ -240,7 +240,7 @@ class GoogleWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 all_forecasts = []
                 next_page_token = None
                 page_count = 0
@@ -265,7 +265,7 @@ class GoogleWeatherProvider:
                         return self._get_stale_cache_fallback()
 
                     if resp.status_code != 200:
-                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code}: {resp.text[:200]}")
+                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code} (response body redacted)")
                         return self._get_stale_cache_fallback()
 
                     data = resp.json()
