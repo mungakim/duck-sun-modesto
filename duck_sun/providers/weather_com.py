@@ -180,8 +180,11 @@ class WeatherComProvider:
             return None
 
         # Construct API URL with parameters
-        # TWC_API_KEY can be set in .env; defaults to public Weather.com API key
-        api_key = os.getenv("TWC_API_KEY", "e1f10a1e78da46f5b10a1e78da96f525")
+        # TWC_API_KEY must be set in .env
+        api_key = os.getenv("TWC_API_KEY")
+        if not api_key:
+            logger.error("[WeatherComProvider] TWC_API_KEY not set in environment")
+            return None
         params = {
             "geocode": self.GEOCODE,
             "format": "json",
