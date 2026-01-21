@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Rate limiting configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
-DAILY_CALL_LIMIT = 6  # Hard cap: max 6 web scrapes per day
+DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
 
 
 class WeatherComDay(TypedDict):
