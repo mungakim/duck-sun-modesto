@@ -26,6 +26,10 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+# Load environment variables BEFORE importing providers
+# (providers read env vars at module level during import)
+load_dotenv()
+
 # Core providers
 from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
 from duck_sun.providers.noaa import NOAAProvider
@@ -49,9 +53,6 @@ from duck_sun.cache_manager import CacheManager, FetchResult
 # Verification system (Truth Tracker)
 from duck_sun.verification import TruthTracker, run_daily_verification
 
-# Load environment variables
-load_dotenv()
-
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
 
@@ -67,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path("outputs")
 REPORT_DIR = Path("reports")
-NETWORK_REPORT_DIR = Path(r"X:\Operatns\Pwrsched\Weather")  # Shared network drive for team access
+NETWORK_REPORT_DIR = Path(r"X:\Operatns\Pwrsched\Weather\reports")  # Shared network drive for team access
 
 # Conservative retry config: 2 retries, 1-5s delays
 RETRY_CONFIG = RetryConfig(
@@ -471,6 +472,130 @@ async def retry_single_provider(
         return cache_mgr.get_with_fallback(provider_name, None, "Unknown provider")
 
 
+def _synthesize_baseline_from_alternates(
+    google_data: Optional[Dict],
+    accu_data: Optional[List],
+    noaa_data: Optional[List],
+    met_data: Optional[List]
+) -> Optional[Dict]:
+    """
+    Synthesize baseline data from alternate providers when Open-Meteo fails.
+
+    Creates a minimal data structure compatible with UncannyEngine.normalize_temps().
+
+    Priority: Google > AccuWeather > NOAA > Met.no
+
+    Returns:
+        Dict with 'daily_forecast' and 'hourly' keys, or None if no data available
+    """
+    daily_forecast = []
+    hourly = []
+
+    # Try Google Weather first (highest weight, has daily aggregates)
+    if google_data and isinstance(google_data, dict):
+        google_daily = google_data.get('daily', [])
+        google_hourly = google_data.get('hourly', [])
+
+        if google_daily:
+            for day in google_daily:
+                daily_forecast.append({
+                    'date': day.get('date'),
+                    'high_c': day.get('high_c'),
+                    'low_c': day.get('low_c'),
+                    'precip_prob': day.get('precip_prob', 0),
+                    'condition': day.get('condition', 'Unknown'),
+                    'source': 'Google (fallback)'
+                })
+            logger.info(f"[synthesize] Using Google Weather: {len(daily_forecast)} days")
+
+        if google_hourly:
+            for hour in google_hourly:
+                hourly.append({
+                    'time': hour.get('time'),
+                    'temp_c': hour.get('temp_c'),
+                    'cloud_cover': hour.get('cloud_cover', 0),
+                    'precip_prob': hour.get('precip_prob', 0),
+                    'source': 'Google (fallback)'
+                })
+            logger.info(f"[synthesize] Using Google Weather hourly: {len(hourly)} hours")
+
+    # Fall back to AccuWeather if no Google data
+    if not daily_forecast and accu_data and isinstance(accu_data, list):
+        for day in accu_data:
+            daily_forecast.append({
+                'date': day.get('date'),
+                'high_c': day.get('high_c'),
+                'low_c': day.get('low_c'),
+                'precip_prob': day.get('precip_prob', 0),
+                'condition': day.get('condition', 'Unknown'),
+                'source': 'AccuWeather (fallback)'
+            })
+        logger.info(f"[synthesize] Using AccuWeather: {len(daily_forecast)} days")
+
+    # If still no daily data, try to aggregate from NOAA hourly
+    if not daily_forecast and noaa_data and isinstance(noaa_data, list):
+        from collections import defaultdict
+        daily_temps: Dict[str, List[float]] = defaultdict(list)
+
+        for record in noaa_data:
+            time_str = record.get('valid_time', record.get('time', ''))
+            temp_c = record.get('temp_c')
+            if time_str and temp_c is not None:
+                date_key = time_str[:10]
+                daily_temps[date_key].append(temp_c)
+
+        for date_key in sorted(daily_temps.keys())[:8]:
+            temps = daily_temps[date_key]
+            if temps:
+                daily_forecast.append({
+                    'date': date_key,
+                    'high_c': max(temps),
+                    'low_c': min(temps),
+                    'precip_prob': 0,
+                    'condition': 'Unknown',
+                    'source': 'NOAA (fallback)'
+                })
+        if daily_forecast:
+            logger.info(f"[synthesize] Aggregated from NOAA: {len(daily_forecast)} days")
+
+    # Last resort: Met.no
+    if not daily_forecast and met_data and isinstance(met_data, list):
+        from collections import defaultdict
+        daily_temps: Dict[str, List[float]] = defaultdict(list)
+
+        for record in met_data:
+            time_str = record.get('time', '')
+            temp_c = record.get('temp_c')
+            if time_str and temp_c is not None:
+                date_key = time_str[:10]
+                daily_temps[date_key].append(temp_c)
+
+        for date_key in sorted(daily_temps.keys())[:8]:
+            temps = daily_temps[date_key]
+            if temps:
+                daily_forecast.append({
+                    'date': date_key,
+                    'high_c': max(temps),
+                    'low_c': min(temps),
+                    'precip_prob': 0,
+                    'condition': 'Unknown',
+                    'source': 'Met.no (fallback)'
+                })
+        if daily_forecast:
+            logger.info(f"[synthesize] Aggregated from Met.no: {len(daily_forecast)} days")
+
+    if not daily_forecast:
+        logger.error("[synthesize] No alternate provider data available for baseline synthesis")
+        return None
+
+    return {
+        'daily_forecast': daily_forecast,
+        'hourly': hourly if hourly else [],
+        'generated_at': datetime.now().isoformat(),
+        'source': 'Synthesized fallback (Open-Meteo unavailable)'
+    }
+
+
 async def main():
     """Main scheduler entry point - Full Provider Edition."""
     pacific = ZoneInfo("America/Los_Angeles")
@@ -580,10 +705,19 @@ async def main():
         metar_data = results["metar"].data
         smoke_data = results["smoke"].data
 
-        # Check critical provider
+        # Check critical provider - attempt fallback if Open-Meteo unavailable
         if om_data is None or not om_data:
-            logger.error("CRITICAL: Open-Meteo data unavailable - cannot continue")
-            return 1
+            logger.warning("Open-Meteo data unavailable - attempting fallback synthesis")
+            om_data = _synthesize_baseline_from_alternates(
+                google_data=google_data,
+                accu_data=accu_data,
+                noaa_data=noaa_data,
+                met_data=met_data
+            )
+            if om_data is None:
+                logger.error("CRITICAL: No baseline data available from any provider - cannot continue")
+                return 1
+            logger.info("Successfully synthesized baseline data from alternate providers")
 
         # --- SPECIAL HANDLING FOR NOAA PERIOD DATA ---
         # Fetch the Period-based forecast for website alignment

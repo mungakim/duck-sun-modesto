@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("outputs/cache")
 CACHE_FILE = CACHE_DIR / "google_weather_lkg.json"
 
+# SSL verification toggle for corporate proxy environments
+SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
+
 
 class GoogleHourlyData(TypedDict):
     """Hourly forecast data from Google Weather API."""
@@ -240,7 +243,7 @@ class GoogleWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=not SKIP_SSL_VERIFY) as client:
                 all_forecasts = []
                 next_page_token = None
                 page_count = 0
@@ -265,7 +268,7 @@ class GoogleWeatherProvider:
                         return self._get_stale_cache_fallback()
 
                     if resp.status_code != 200:
-                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code}: {resp.text[:200]}")
+                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code} (response body redacted)")
                         return self._get_stale_cache_fallback()
 
                     data = resp.json()

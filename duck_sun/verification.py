@@ -29,6 +29,7 @@ Usage:
 
 import sqlite3
 import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any, TypedDict
@@ -38,6 +39,9 @@ logger = logging.getLogger(__name__)
 
 # Default database path (at project root)
 DB_PATH = Path("verification.db")
+
+# SSL verification toggle for corporate proxy environments
+SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
 
 
 class DailyHighLow(TypedDict):
@@ -510,7 +514,7 @@ async def fetch_yesterday_actuals() -> Optional[Dict[str, Any]]:
     logger.debug(f"[fetch_yesterday_actuals] Request params: {params}")
     
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=not SKIP_SSL_VERIFY) as client:
             resp = await client.get(URL, params=params)
             logger.info(f"[fetch_yesterday_actuals] Response status: {resp.status_code}")
             
