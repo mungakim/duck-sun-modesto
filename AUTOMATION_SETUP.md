@@ -213,8 +213,7 @@ mkdir "c:\Professional Projects\duck-sun-modesto\logs"
 ## Security Notes
 
 ### Credentials
-- No API keys stored in code (all free APIs)
-- Anthropic API key in environment variable (safe)
+- All API keys loaded from environment variables (never hardcoded)
 - Memory file contains no sensitive data
 
 ### Network Access
@@ -223,9 +222,17 @@ The system calls these endpoints:
 - `api.weather.gov` (NWS forecast)
 - `api.met.no` (European model)
 - `tgftp.nws.noaa.gov` (METAR observations)
-- `api.anthropic.com` (Claude AI briefing)
+- `dataservice.accuweather.com` (AccuWeather forecast)
+- `weather.googleapis.com` (Google Weather / MetNet-3)
+- `weather.com` (The Weather Company)
+- `wunderground.com` (Weather Underground)
 
-All use HTTPS. No data is sent outbound except API requests.
+### Security Controls
+- HTTPS connections configured to trust MID corporate SSL proxy inspection certificates
+- Web scraping rate-limited to 3 calls/day per source to minimize external footprint
+- API error responses truncated in logs to limit data exposure
+
+All traffic flows through MID's corporate proxy. No data is sent outbound except API requests.
 
 ---
 
