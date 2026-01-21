@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path("outputs")
 REPORT_DIR = Path("reports")
-NETWORK_REPORT_DIR = Path(r"X:\Operatns\Pwrsched\Weather")  # Shared network drive for team access
+NETWORK_REPORT_DIR = Path(r"X:\Operatns\Pwrsched\Weather\reports")  # Shared network drive for team access
 
 # Conservative retry config: 2 retries, 1-5s delays
 RETRY_CONFIG = RetryConfig(
