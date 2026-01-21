@@ -101,7 +101,8 @@ TWC_API_KEY=your_key_here
 
 Optional:
 ```
-LOG_LEVEL=INFO  # DEBUG for verbose output
+LOG_LEVEL=INFO                # DEBUG for verbose output
+DUCK_SUN_SKIP_SSL_VERIFY=1    # Required for MID corporate proxy
 ```
 
 ---
@@ -158,6 +159,6 @@ Run standalone: `./venv/Scripts/python.exe -m duck_sun.verification`
 ## Security Notes
 
 - All API keys loaded from environment variables (never hardcoded)
-- SSL certificate verification enabled on all HTTPS connections
-- Web scraping rate-limited to 3 calls/day to avoid detection
-- API response bodies redacted from error logs
+- HTTPS connections configured to trust MID corporate SSL proxy inspection certificates
+- Web scraping rate-limited to 3 calls/day per source to minimize external footprint
+- API error responses truncated in logs to limit data exposure
