@@ -26,6 +26,10 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+# Load environment variables BEFORE importing providers
+# (providers read env vars at module level during import)
+load_dotenv()
+
 # Core providers
 from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
 from duck_sun.providers.noaa import NOAAProvider
@@ -48,9 +52,6 @@ from duck_sun.cache_manager import CacheManager, FetchResult
 
 # Verification system (Truth Tracker)
 from duck_sun.verification import TruthTracker, run_daily_verification
-
-# Load environment variables
-load_dotenv()
 
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
