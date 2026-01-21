@@ -16,9 +16,13 @@ The "Smoke Shade" Effect:
 
 import httpx
 import logging
+import os
 from typing import Dict, Any, Optional, List, TypedDict
 
 logger = logging.getLogger(__name__)
+
+# SSL verification toggle for corporate proxy environments
+SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
 
 
 class SmokeMetrics(TypedDict):
@@ -75,7 +79,7 @@ class SmokeProvider:
         logger.debug(f"[SmokeProvider] Request params: {params}")
 
         try:
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=not SKIP_SSL_VERIFY) as client:
                 logger.debug(f"[SmokeProvider] Sending GET request to {self.URL}")
                 resp = await client.get(self.URL, params=params)
                 

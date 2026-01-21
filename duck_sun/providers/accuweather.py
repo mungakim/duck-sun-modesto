@@ -26,6 +26,9 @@ CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "accuweather_cache.json"
 DAILY_CALL_LIMIT = 42  # Stop making API calls after 42/day (safety margin under 50)
 
+# SSL verification toggle for corporate proxy environments
+SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
+
 
 class AccuWeatherDay(TypedDict):
     date: str
@@ -272,7 +275,7 @@ class AccuWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=not SKIP_SSL_VERIFY) as client:
                 logger.debug(f"[AccuWeatherProvider] GET {url}")
                 resp = await client.get(url, params=params)
                 

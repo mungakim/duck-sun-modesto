@@ -9,6 +9,7 @@ Weight: 4.0 (same as AccuWeather - commercial provider)
 
 import json
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -35,6 +36,9 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "wunderground_cache.json"
 DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
+
+# SSL verification toggle for corporate proxy environments
+SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
 
 
 class WUndergroundDay(TypedDict):
@@ -194,7 +198,7 @@ class WUndergroundProvider:
             from curl_cffi.requests import Session
 
             with Session(impersonate="firefox135") as session:
-                response = session.get(self.URL, timeout=30)
+                response = session.get(self.URL, timeout=30, verify=not SKIP_SSL_VERIFY)
 
             if response.status_code != 200:
                 logger.error(f"[WUndergroundProvider] HTTP {response.status_code}")
