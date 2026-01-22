@@ -1,7 +1,8 @@
 {
-  "provider": "wunderground",
-  "timestamp": "2026-01-22T05:26:44.963905",
-  "api_success": true,
+  "timestamp": "2026-01-22T05:26:44.962273",
+  "call_date": "2026-01-22",
+  "call_count": 1,
+  "daily_limit": 3,
   "data": [
     {
       "date": "2026-01-22",
