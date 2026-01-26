@@ -223,6 +223,24 @@ class WeatherComProvider:
             temp_min = data.get('temperatureMin', [])
             narrative = data.get('narrative', [])
 
+            # Extract precipitation probability from daypart array
+            # TWC API returns daypart[0] with arrays for day/night parts
+            # precipChance has 2x entries (day, night) per calendar day
+            precip_by_day = []
+            daypart = data.get('daypart', [{}])
+            if daypart and len(daypart) > 0:
+                precip_chance = daypart[0].get('precipChance', [])
+                # precipChance has alternating day/night values
+                # Take max of each day/night pair for daily precip
+                for i in range(0, len(precip_chance), 2):
+                    day_precip = precip_chance[i] if i < len(precip_chance) else None
+                    night_precip = precip_chance[i + 1] if i + 1 < len(precip_chance) else None
+                    # Handle None values (API returns null for past periods)
+                    day_val = day_precip if day_precip is not None else 0
+                    night_val = night_precip if night_precip is not None else 0
+                    precip_by_day.append(max(day_val, night_val))
+                logger.info(f"[WeatherComProvider] Extracted precip for {len(precip_by_day)} days: {precip_by_day[:5]}...")
+
             if not temp_max or not temp_min:
                 logger.error("[WeatherComProvider] No temperature data in API response")
                 return self._fetch_via_scraping()
@@ -253,6 +271,9 @@ class WeatherComProvider:
                 # Get condition from narrative
                 condition = narrative[i][:50] if i < len(narrative) else "Unknown"
 
+                # Get precip probability (from daypart extraction above)
+                precip_prob = precip_by_day[i] if i < len(precip_by_day) else 0
+
                 results.append({
                     "date": date_str,
                     "day_name": day_name,
@@ -261,10 +282,10 @@ class WeatherComProvider:
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
                     "condition": condition,
-                    "precip_prob": 0
+                    "precip_prob": precip_prob
                 })
 
-                logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F")
+                logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F, Precip={precip_prob}%")
 
             logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} daily records from API")
             self._save_cache(results)
