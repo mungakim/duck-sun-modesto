@@ -216,28 +216,43 @@ class WeatherComProvider:
     def _build_results_from_forecast(self, forecast: dict) -> Optional[List[WeatherComDay]]:
         """Build WeatherComDay results from parsed forecast JSON structure."""
         try:
-            # Extract daily data arrays
-            days_of_week = forecast.get('dayOfWeek', [])
-            max_temps = forecast.get('temperatureMax', [])
-            min_temps = forecast.get('temperatureMin', [])
+            # Extract daily data arrays - try multiple possible key names
+            days_of_week = forecast.get('dayOfWeek', forecast.get('dayofWeek', []))
+            max_temps = forecast.get('temperatureMax', forecast.get('calendarDayTemperatureMax', []))
+            min_temps = forecast.get('temperatureMin', forecast.get('calendarDayTemperatureMin', []))
+
+            # Log what we found
+            logger.info(f"[WeatherComProvider] days_of_week: {len(days_of_week)} items, first 3: {days_of_week[:3]}")
+            logger.info(f"[WeatherComProvider] max_temps: {len(max_temps)} items, first 3: {max_temps[:3]}")
+            logger.info(f"[WeatherComProvider] min_temps: {len(min_temps)} items, first 3: {min_temps[:3]}")
 
             # Precipitation is in daypart structure (alternating day/night)
-            daypart = forecast.get('daypart', {})
+            daypart = forecast.get('daypart', None)
+
+            # Handle daypart as list (common format)
             if isinstance(daypart, list) and daypart:
                 daypart = daypart[0]  # First element contains the data
 
-            precip_chances = daypart.get('precipChance', []) if isinstance(daypart, dict) else []
-
-            logger.info(f"[WeatherComProvider] __NEXT_DATA__: {len(days_of_week)} days, {len(precip_chances)} precip values")
+            # Try to get precip from daypart
+            precip_chances = []
+            if isinstance(daypart, dict):
+                precip_chances = daypart.get('precipChance', [])
+                logger.info(f"[WeatherComProvider] precip from daypart: {len(precip_chances)} items, first 6: {precip_chances[:6]}")
+            else:
+                # Try direct precipChance in forecast (some structures)
+                precip_chances = forecast.get('precipChance', [])
+                if precip_chances:
+                    logger.info(f"[WeatherComProvider] precip from forecast: {len(precip_chances)} items")
 
             if not days_of_week or not max_temps or not min_temps:
-                logger.warning("[WeatherComProvider] Missing required arrays in forecast data")
+                logger.warning(f"[WeatherComProvider] Missing required arrays - days:{len(days_of_week)}, max:{len(max_temps)}, min:{len(min_temps)}")
+                logger.warning(f"[WeatherComProvider] Available keys: {list(forecast.keys())[:20]}")
                 return None
 
             return self._build_results_from_arrays(days_of_week, max_temps, min_temps, precip_chances)
 
         except Exception as e:
-            logger.error(f"[WeatherComProvider] Error building results from forecast: {e}")
+            logger.error(f"[WeatherComProvider] Error building results from forecast: {e}", exc_info=True)
             return None
 
     def _build_results_from_arrays(
@@ -303,74 +318,114 @@ class WeatherComProvider:
         # Find the __NEXT_DATA__ script tag
         next_data_script = soup.find('script', id='__NEXT_DATA__')
         if not next_data_script or not next_data_script.string:
+            logger.warning("[WeatherComProvider] No __NEXT_DATA__ script tag found")
             return None
 
         try:
             data = json.loads(next_data_script.string)
-            logger.debug("[WeatherComProvider] Parsed __NEXT_DATA__ JSON successfully")
+            logger.info(f"[WeatherComProvider] Parsed __NEXT_DATA__ - top keys: {list(data.keys())}")
 
             # Navigate to forecast data - structure varies but typically:
             # props.pageProps.*** contains the forecast
             props = data.get('props', {})
             page_props = props.get('pageProps', {})
 
+            logger.info(f"[WeatherComProvider] pageProps keys: {list(page_props.keys())[:15]}")
+
             # Try different possible locations for forecast data
             forecast = None
 
-            # Location 1: pageProps.forecast
+            # Location 1: pageProps.forecast (direct)
             if 'forecast' in page_props:
                 forecast = page_props['forecast']
+                logger.info("[WeatherComProvider] Found at pageProps.forecast")
 
             # Location 2: pageProps.data.forecast
             if not forecast and 'data' in page_props:
-                forecast = page_props['data'].get('forecast', {})
+                pdata = page_props['data']
+                if isinstance(pdata, dict):
+                    logger.debug(f"[WeatherComProvider] pageProps.data keys: {list(pdata.keys())[:10]}")
+                    forecast = pdata.get('forecast', {})
+                    if forecast:
+                        logger.info("[WeatherComProvider] Found at pageProps.data.forecast")
 
             # Location 3: pageProps.pageData.forecast
             if not forecast and 'pageData' in page_props:
-                forecast = page_props['pageData'].get('forecast', {})
+                page_data = page_props['pageData']
+                if isinstance(page_data, dict):
+                    logger.debug(f"[WeatherComProvider] pageData keys: {list(page_data.keys())[:10]}")
+                    forecast = page_data.get('forecast', {})
+                    if forecast:
+                        logger.info("[WeatherComProvider] Found at pageProps.pageData.forecast")
 
-            # Location 4: Look for dalSummary in daypart structure
+            # Location 4: Look in initialState or similar
+            if not forecast and 'initialState' in page_props:
+                init_state = page_props['initialState']
+                if isinstance(init_state, dict):
+                    logger.debug(f"[WeatherComProvider] initialState keys: {list(init_state.keys())[:10]}")
+                    # Try dal.getSunV3DailyForecastWithHeadersUrlConfig
+                    dal = init_state.get('dal', {})
+                    if dal:
+                        logger.debug(f"[WeatherComProvider] dal keys: {list(dal.keys())[:5]}")
+                        # Search for any key containing 'DailyForecast'
+                        for key in dal.keys():
+                            if 'DailyForecast' in key or 'dailyForecast' in key:
+                                forecast_data = dal[key]
+                                if isinstance(forecast_data, dict) and 'data' in forecast_data:
+                                    forecast = forecast_data['data']
+                                    logger.info(f"[WeatherComProvider] Found at initialState.dal.{key}.data")
+                                    break
+
+            # Location 5: Recursive search as fallback
             if not forecast:
-                # Search recursively for the forecast structure
+                logger.info("[WeatherComProvider] Trying recursive search...")
                 forecast = self._find_forecast_in_json(data)
+                if forecast:
+                    logger.info("[WeatherComProvider] Found via recursive search")
 
             if forecast:
-                logger.info("[WeatherComProvider] Found forecast data in __NEXT_DATA__")
+                if isinstance(forecast, dict):
+                    logger.info(f"[WeatherComProvider] Forecast keys: {list(forecast.keys())[:15]}")
                 return forecast
+            else:
+                logger.warning("[WeatherComProvider] No forecast data found in __NEXT_DATA__")
 
         except json.JSONDecodeError as e:
             logger.warning(f"[WeatherComProvider] Failed to parse __NEXT_DATA__: {e}")
         except Exception as e:
-            logger.warning(f"[WeatherComProvider] Error extracting __NEXT_DATA__: {e}")
+            logger.warning(f"[WeatherComProvider] Error extracting __NEXT_DATA__: {e}", exc_info=True)
 
         return None
 
-    def _find_forecast_in_json(self, data: dict, depth: int = 0) -> Optional[dict]:
+    def _find_forecast_in_json(self, data, depth: int = 0, path: str = "root") -> Optional[dict]:
         """Recursively search for forecast data containing temperatureMax."""
-        if depth > 10:  # Prevent infinite recursion
+        if depth > 15:  # Prevent infinite recursion (increased depth for Weather.com)
             return None
 
         if isinstance(data, dict):
             # Check if this dict has the forecast arrays we need
             if 'temperatureMax' in data and 'temperatureMin' in data:
+                logger.info(f"[WeatherComProvider] Found temperatureMax at path: {path}")
                 return data
 
             # Also check for daypart structure with precipChance
             if 'daypart' in data and isinstance(data['daypart'], list):
                 daypart = data['daypart'][0] if data['daypart'] else {}
-                if 'precipChance' in daypart:
+                if isinstance(daypart, dict) and 'precipChance' in daypart:
+                    logger.info(f"[WeatherComProvider] Found daypart with precipChance at path: {path}")
                     # Merge daypart data with daily data
                     return {**data, 'daypart': daypart}
 
             # Recurse into child dicts
-            for value in data.values():
-                result = self._find_forecast_in_json(value, depth + 1)
+            for key, value in data.items():
+                result = self._find_forecast_in_json(value, depth + 1, f"{path}.{key}")
                 if result:
                     return result
 
-        elif isinstance(data, list):
-            for item in data:
-                result = self._find_forecast_in_json(item, depth + 1)
+        elif isinstance(data, list) and len(data) > 0:
+            # Only check first few items to avoid excessive searching
+            for i, item in enumerate(data[:3]):
+                result = self._find_forecast_in_json(item, depth + 1, f"{path}[{i}]")
                 if result:
                     return result
 
