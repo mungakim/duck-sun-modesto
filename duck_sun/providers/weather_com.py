@@ -510,7 +510,6 @@ class WeatherComProvider:
 
                 # Try to parse embedded JSON objects - Weather.com may embed data as JSON blob
                 # Look for patterns like {"temperatureMax":[...], ...}
-                import re
                 json_match = re.search(r'\{[^{}]*"temperatureMax"\s*:\s*\[[^\]]+\][^{}]*\}', forecast_json)
                 if json_match:
                     try:
