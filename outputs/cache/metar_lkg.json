@@ -1,16 +1,16 @@
 {
   "provider": "metar",
-  "timestamp": "2026-01-26T05:35:54.210448",
+  "timestamp": "2026-01-26T13:19:25.795964",
   "api_success": true,
   "data": {
-    "raw": "KMOD 261303Z AUTO 26003KT 2 1/2SM BR CLR 05/04 A3028 RMK AO2 T00500039 $",
+    "raw": "KMOD 262053Z 00000KT 5SM HZ CLR 13/07 A3028 RMK AO2 SLP254 T01330067 58020",
     "station": "KMOD",
-    "observation_time": "2026/01/26 13:03",
-    "temp_c": 5,
-    "dewpoint_c": 4,
-    "wind_speed_kt": 3,
-    "wind_dir": 260,
-    "visibility_sm": 2.0,
-    "sky_condition": "MIST - Clear"
+    "observation_time": "2026/01/26 20:53",
+    "temp_c": 13,
+    "dewpoint_c": 7,
+    "wind_speed_kt": 0,
+    "wind_dir": 0,
+    "visibility_sm": 5.0,
+    "sky_condition": "HAZE - Clear"
   }
 }
