@@ -435,79 +435,129 @@ class WeatherComProvider:
         """
         Extract precipitation percentages from Weather.com HTML structure.
 
-        Tries multiple strategies:
-        1. data-testid="PercentageValue" (common for precip display)
-        2. data-testid="precipValue" (alternative attribute)
-        3. Elements with class containing "precip"
-        4. Spans with percentage patterns near day cards
+        Weather.com shows precip % in the day SUMMARY rows (collapsed view).
+        The expanded details contain humidity, UV, etc. - we need to avoid those.
 
-        Returns list of precipitation percentages aligned with forecast days.
+        Strategy: Find each day's summary element and extract the ONE precip value from it.
         """
         precip_values = []
 
-        # Strategy 1: Try data-testid="PercentageValue"
-        percent_elems = soup.find_all(attrs={"data-testid": "PercentageValue"})
-        if percent_elems:
-            logger.debug(f"[WeatherComProvider] Found {len(percent_elems)} PercentageValue elements")
-            for elem in percent_elems:
-                text = elem.text.strip().replace('%', '')
-                try:
-                    precip_values.append(int(text))
-                except ValueError:
-                    precip_values.append(0)
+        # Strategy 1: Find <details> elements for each day, extract precip from <summary> only
+        # Weather.com uses <details> with <summary> for the collapsible day cards
+        day_details_elements = soup.find_all('details', attrs={"data-testid": True})
+        if day_details_elements:
+            logger.debug(f"[WeatherComProvider] Found {len(day_details_elements)} details elements")
+            for details in day_details_elements:
+                # Get ONLY the summary child - this is the collapsed view with precip
+                summary = details.find('summary')
+                if summary:
+                    # Find PercentageValue ONLY within the summary (not expanded content)
+                    precip_elem = summary.find(attrs={"data-testid": "PercentageValue"})
+                    if precip_elem:
+                        text = precip_elem.text.strip().replace('%', '')
+                        try:
+                            precip_values.append(int(text))
+                        except ValueError:
+                            precip_values.append(0)
+                    else:
+                        # Fallback: look for any X% pattern in summary
+                        summary_text = summary.get_text()
+                        match = re.search(r'(\d{1,2})%', summary_text)
+                        if match:
+                            precip_values.append(int(match.group(1)))
+                        else:
+                            precip_values.append(0)
+
             if precip_values:
+                logger.debug(f"[WeatherComProvider] Extracted {len(precip_values)} precip from summaries: {precip_values[:10]}")
                 return precip_values
 
-        # Strategy 2: Try data-testid="precipValue"
-        precip_elems = soup.find_all(attrs={"data-testid": "precipValue"})
-        if precip_elems:
-            logger.debug(f"[WeatherComProvider] Found {len(precip_elems)} precipValue elements")
-            for elem in precip_elems:
-                text = elem.text.strip().replace('%', '')
-                try:
-                    precip_values.append(int(text))
-                except ValueError:
-                    precip_values.append(0)
-            if precip_values:
-                return precip_values
-
-        # Strategy 3: Find day cards and look for precip inside each
-        day_details = soup.find_all(attrs={"data-testid": "DailyContent"})
-        if not day_details:
-            day_details = soup.find_all(attrs={"data-testid": "ExpandedDetailsCard"})
-        if not day_details:
-            # Try finding all details sections
-            day_details = soup.find_all(attrs={"data-testid": "DaypartDetails"})
-
-        if day_details:
-            logger.debug(f"[WeatherComProvider] Found {len(day_details)} day detail cards")
-            for card in day_details:
-                # Look for precip within each card
-                precip_elem = card.find(attrs={"data-testid": "PercentageValue"})
-                if not precip_elem:
-                    precip_elem = card.find(attrs={"data-testid": "precipValue"})
-                if not precip_elem:
-                    # Look for any span with % that looks like precipitation
-                    spans = card.find_all('span')
-                    for span in spans:
-                        text = span.text.strip()
-                        if '%' in text and len(text) < 5:
-                            precip_elem = span
+        # Strategy 2: Find day cards by looking for daypartName, then get sibling precip
+        day_names = soup.find_all(attrs={"data-testid": "daypartName"})
+        if day_names:
+            logger.debug(f"[WeatherComProvider] Found {len(day_names)} daypartName elements, searching for precip siblings")
+            for day_name_elem in day_names:
+                # Walk up to find the day card container, then find precip within it
+                parent = day_name_elem.parent
+                # Walk up a few levels to find the day row/card
+                for _ in range(5):
+                    if parent is None:
+                        break
+                    # Check if this parent is a summary or day row
+                    if parent.name == 'summary':
+                        precip_elem = parent.find(attrs={"data-testid": "PercentageValue"})
+                        if precip_elem:
+                            text = precip_elem.text.strip().replace('%', '')
+                            try:
+                                precip_values.append(int(text))
+                            except ValueError:
+                                precip_values.append(0)
                             break
+                    # Also check for a section/div that contains the day summary
+                    if parent.name in ('div', 'section', 'li'):
+                        # Look for precip elem at this level
+                        precip_elem = parent.find(attrs={"data-testid": "PercentageValue"})
+                        if precip_elem:
+                            # Make sure we're not in expanded details
+                            in_details_content = False
+                            for ancestor in precip_elem.parents:
+                                if ancestor.name == 'details' and ancestor.find('summary'):
+                                    # Check if precip_elem is OUTSIDE summary (in expanded content)
+                                    summary = ancestor.find('summary')
+                                    if precip_elem not in summary.descendants:
+                                        in_details_content = True
+                                    break
+                            if not in_details_content:
+                                text = precip_elem.text.strip().replace('%', '')
+                                try:
+                                    precip_values.append(int(text))
+                                except ValueError:
+                                    precip_values.append(0)
+                                break
+                    parent = parent.parent
 
-                if precip_elem:
-                    text = precip_elem.text.strip().replace('%', '')
-                    try:
-                        precip_values.append(int(text))
-                    except ValueError:
-                        precip_values.append(0)
-                else:
-                    precip_values.append(0)
-
+            # Remove duplicates while preserving order
             if precip_values:
+                seen = []
+                for v in precip_values:
+                    if len(seen) < 15:  # Max 15 days
+                        seen.append(v)
+                precip_values = seen
+                logger.debug(f"[WeatherComProvider] Extracted {len(precip_values)} precip via parent walk: {precip_values[:10]}")
                 return precip_values
 
-        # Strategy 4: Find elements with class containing "precip" or "Precip"
+        # Strategy 3: Find precip by looking for the raindrop/precip icon and nearby percentage
+        # Weather.com typically shows: [droplet icon] 11%
+        precip_icons = soup.find_all(attrs={"data-testid": "PrecipIcon"})
+        if not precip_icons:
+            precip_icons = soup.find_all('svg', attrs={"name": lambda x: x and 'drop' in str(x).lower() if x else False})
+
+        if precip_icons:
+            logger.debug(f"[WeatherComProvider] Found {len(precip_icons)} precip icons")
+            for icon in precip_icons:
+                # Look for percentage in next sibling or parent's next element
+                next_elem = icon.find_next_sibling()
+                if next_elem:
+                    text = next_elem.get_text().strip()
+                    match = re.match(r'^(\d{1,2})%?$', text)
+                    if match:
+                        precip_values.append(int(match.group(1)))
+                        continue
+                # Try parent's siblings
+                parent = icon.parent
+                if parent:
+                    next_elem = parent.find_next_sibling()
+                    if next_elem:
+                        text = next_elem.get_text().strip()
+                        match = re.match(r'^(\d{1,2})%?$', text)
+                        if match:
+                            precip_values.append(int(match.group(1)))
+
+            if precip_values:
+                logger.debug(f"[WeatherComProvider] Extracted {len(precip_values)} precip via icons: {precip_values[:10]}")
+                return precip_values
+
+        # Strategy 4: Last resort - find elements with class containing "precip"
         precip_class_elems = soup.find_all(
             class_=lambda x: x and ('precip' in str(x).lower()) if x else False
         )
@@ -515,33 +565,14 @@ class WeatherComProvider:
             logger.debug(f"[WeatherComProvider] Found {len(precip_class_elems)} elements with precip class")
             for elem in precip_class_elems:
                 text = elem.text.strip()
-                # Extract percentage from text like "10%" or "Precip: 10%"
-                match = re.search(r'(\d+)\s*%', text)
+                match = re.search(r'(\d{1,2})\s*%', text)
                 if match:
                     precip_values.append(int(match.group(1)))
 
             if precip_values:
                 return precip_values
 
-        # Strategy 5: Broader search for percentage spans
-        all_spans = soup.find_all('span')
-        for span in all_spans:
-            text = span.text.strip()
-            # Look for standalone percentage values (1-3 digits + %)
-            if re.match(r'^\d{1,3}%$', text):
-                try:
-                    precip_values.append(int(text.replace('%', '')))
-                except ValueError:
-                    pass
-
-        # Filter to reasonable count (should be ~10-15 for 10-day forecast)
-        if len(precip_values) > 20:
-            # Likely picking up too many unrelated percentages
-            logger.debug(f"[WeatherComProvider] Too many percentage values ({len(precip_values)}), trying to filter")
-            # Take every other one if we have roughly double (day/night pairs)
-            if 18 <= len(precip_values) <= 25:
-                precip_values = precip_values[::2]
-
+        logger.warning("[WeatherComProvider] Could not extract precipitation from HTML")
         return precip_values
 
     def _fetch_via_scraping(self) -> Optional[List[WeatherComDay]]:
