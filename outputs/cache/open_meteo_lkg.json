@@ -1,9 +1,9 @@
 {
   "provider": "open_meteo",
-  "timestamp": "2026-01-26T13:19:17.491256",
+  "timestamp": "2026-01-26T13:27:58.186001",
   "api_success": true,
   "data": {
-    "generated_at": "2026-01-26T13:19:17.490461",
+    "generated_at": "2026-01-26T13:27:58.185305",
     "location": "Modesto, CA",
     "daily_summary": [
       {
@@ -128,63 +128,63 @@
       },
       {
         "time": "2026-01-26T12:00",
-        "solar_factor": 0.358,
+        "solar_factor": 0.362,
         "is_duck_hour": true,
         "cloud_cover": 41,
-        "radiation": 451.5,
-        "temperature_c": 10.5,
-        "dewpoint_c": 7.7,
-        "wind_speed_kmh": 2.9
+        "radiation": 456.5,
+        "temperature_c": 11.5,
+        "dewpoint_c": 8.7,
+        "wind_speed_kmh": 3.5
       },
       {
         "time": "2026-01-26T13:00",
-        "solar_factor": 0.543,
+        "solar_factor": 0.556,
         "is_duck_hour": true,
         "cloud_cover": 13,
-        "radiation": 537.5,
-        "temperature_c": 12.0,
-        "dewpoint_c": 8.1,
-        "wind_speed_kmh": 2.7
+        "radiation": 550.5,
+        "temperature_c": 12.5,
+        "dewpoint_c": 8.5,
+        "wind_speed_kmh": 2.5
       },
       {
         "time": "2026-01-26T14:00",
-        "solar_factor": 0.51,
+        "solar_factor": 0.53,
         "is_duck_hour": true,
         "cloud_cover": 14,
-        "radiation": 508.8,
-        "temperature_c": 13.3,
-        "dewpoint_c": 7.1,
-        "wind_speed_kmh": 3.3
+        "radiation": 529.0,
+        "temperature_c": 13.6,
+        "dewpoint_c": 7.3,
+        "wind_speed_kmh": 3.6
       },
       {
         "time": "2026-01-26T15:00",
-        "solar_factor": 0.141,
+        "solar_factor": 0.136,
         "is_duck_hour": true,
         "cloud_cover": 100,
-        "radiation": 422.5,
+        "radiation": 407.8,
         "temperature_c": 13.9,
-        "dewpoint_c": 7.0,
-        "wind_speed_kmh": 5.9
+        "dewpoint_c": 6.9,
+        "wind_speed_kmh": 6.8
       },
       {
         "time": "2026-01-26T16:00",
-        "solar_factor": 0.089,
+        "solar_factor": 0.087,
         "is_duck_hour": true,
         "cloud_cover": 100,
-        "radiation": 265.5,
-        "temperature_c": 13.7,
-        "dewpoint_c": 7.0,
-        "wind_speed_kmh": 5.1
+        "radiation": 261.8,
+        "temperature_c": 13.5,
+        "dewpoint_c": 6.8,
+        "wind_speed_kmh": 4.8
       },
       {
         "time": "2026-01-26T17:00",
         "solar_factor": 0.035,
         "is_duck_hour": false,
         "cloud_cover": 100,
-        "radiation": 104.0,
+        "radiation": 106.0,
         "temperature_c": 12.1,
-        "dewpoint_c": 6.5,
-        "wind_speed_kmh": 4.7
+        "dewpoint_c": 6.6,
+        "wind_speed_kmh": 4.0
       },
       {
         "time": "2026-01-26T18:00",
@@ -194,7 +194,7 @@
         "radiation": 3.2,
         "temperature_c": 9.9,
         "dewpoint_c": 5.1,
-        "wind_speed_kmh": 6.6
+        "wind_speed_kmh": 5.4
       },
       {
         "time": "2026-01-26T19:00",
@@ -202,9 +202,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 8.7,
-        "dewpoint_c": 4.7,
-        "wind_speed_kmh": 5.0
+        "temperature_c": 8.8,
+        "dewpoint_c": 4.8,
+        "wind_speed_kmh": 0.4
       },
       {
         "time": "2026-01-26T20:00",
@@ -212,9 +212,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 7.2,
-        "dewpoint_c": 4.7,
-        "wind_speed_kmh": 5.2
+        "temperature_c": 7.6,
+        "dewpoint_c": 5.1,
+        "wind_speed_kmh": 2.7
       },
       {
         "time": "2026-01-26T21:00",
@@ -224,7 +224,7 @@
         "radiation": 0.0,
         "temperature_c": 6.2,
         "dewpoint_c": 4.5,
-        "wind_speed_kmh": 5.7
+        "wind_speed_kmh": 5.1
       },
       {
         "time": "2026-01-26T22:00",
@@ -232,9 +232,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 5.7,
-        "dewpoint_c": 4.2,
-        "wind_speed_kmh": 3.6
+        "temperature_c": 5.6,
+        "dewpoint_c": 4.1,
+        "wind_speed_kmh": 6.6
       },
       {
         "time": "2026-01-26T23:00",
@@ -242,9 +242,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 5.0,
-        "dewpoint_c": 3.8,
-        "wind_speed_kmh": 6.4
+        "temperature_c": 4.9,
+        "dewpoint_c": 3.7,
+        "wind_speed_kmh": 4.7
       },
       {
         "time": "2026-01-27T00:00",
@@ -252,9 +252,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 4.4,
-        "dewpoint_c": 4.4,
-        "wind_speed_kmh": 3.2
+        "temperature_c": 4.0,
+        "dewpoint_c": 4.0,
+        "wind_speed_kmh": 2.0
       },
       {
         "time": "2026-01-27T01:00",
@@ -262,9 +262,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 3.3,
-        "dewpoint_c": 3.3,
-        "wind_speed_kmh": 1.9
+        "temperature_c": 3.2,
+        "dewpoint_c": 3.2,
+        "wind_speed_kmh": 3.3
       },
       {
         "time": "2026-01-27T02:00",
@@ -272,9 +272,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 3.8,
-        "dewpoint_c": 3.8,
-        "wind_speed_kmh": 3.3
+        "temperature_c": 3.9,
+        "dewpoint_c": 3.9,
+        "wind_speed_kmh": 6.6
       },
       {
         "time": "2026-01-27T03:00",
@@ -282,9 +282,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 4.3,
-        "dewpoint_c": 4.3,
-        "wind_speed_kmh": 3.7
+        "temperature_c": 4.4,
+        "dewpoint_c": 4.4,
+        "wind_speed_kmh": 6.2
       },
       {
         "time": "2026-01-27T04:00",
@@ -292,9 +292,9 @@
         "is_duck_hour": false,
         "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 4.8,
-        "dewpoint_c": 4.8,
-        "wind_speed_kmh": 5.2
+        "temperature_c": 4.9,
+        "dewpoint_c": 4.9,
+        "wind_speed_kmh": 4.7
       },
       {
         "time": "2026-01-27T05:00",
@@ -314,7 +314,7 @@
         "radiation": 0.0,
         "temperature_c": 4.0,
         "dewpoint_c": 4.0,
-        "wind_speed_kmh": 6.5
+        "wind_speed_kmh": 6.1
       },
       {
         "time": "2026-01-27T07:00",
@@ -1936,17 +1936,17 @@
         "high_f": 57,
         "low_f": 38,
         "precip_prob": 0,
-        "weather_code": 45,
-        "condition": "Fog"
+        "weather_code": 3,
+        "condition": "Overcast"
       },
       {
         "date": "2026-01-27",
         "day_name": "Tue",
         "high_c": 15.8,
-        "low_c": 3.3,
+        "low_c": 3.2,
         "high_f": 60,
         "low_f": 38,
-        "precip_prob": 13,
+        "precip_prob": 7,
         "weather_code": 45,
         "condition": "Fog"
       },
@@ -1957,7 +1957,7 @@
         "low_c": 7.8,
         "high_f": 62,
         "low_f": 46,
-        "precip_prob": 13,
+        "precip_prob": 14,
         "weather_code": 45,
         "condition": "Fog"
       },
@@ -1968,7 +1968,7 @@
         "low_c": 7.0,
         "high_f": 63,
         "low_f": 45,
-        "precip_prob": 3,
+        "precip_prob": 1,
         "weather_code": 3,
         "condition": "Overcast"
       },
@@ -1979,7 +1979,7 @@
         "low_c": 8.2,
         "high_f": 65,
         "low_f": 47,
-        "precip_prob": 4,
+        "precip_prob": 1,
         "weather_code": 3,
         "condition": "Overcast"
       },
@@ -1990,7 +1990,7 @@
         "low_c": 8.9,
         "high_f": 67,
         "low_f": 48,
-        "precip_prob": 7,
+        "precip_prob": 2,
         "weather_code": 3,
         "condition": "Overcast"
       },
@@ -2001,7 +2001,7 @@
         "low_c": 10.2,
         "high_f": 66,
         "low_f": 50,
-        "precip_prob": 9,
+        "precip_prob": 6,
         "weather_code": 3,
         "condition": "Overcast"
       },
@@ -2012,7 +2012,7 @@
         "low_c": 9.3,
         "high_f": 67,
         "low_f": 49,
-        "precip_prob": 5,
+        "precip_prob": 6,
         "weather_code": 3,
         "condition": "Overcast"
       }
