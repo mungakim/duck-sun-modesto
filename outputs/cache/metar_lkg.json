@@ -1,16 +1,16 @@
 {
   "provider": "metar",
-  "timestamp": "2026-01-22T05:26:45.961894",
+  "timestamp": "2026-01-26T05:35:54.210448",
   "api_success": true,
   "data": {
-    "raw": "KMOD 221304Z 00000KT 4SM BR FEW003 BKN120 07/06 A3001 RMK AO2 T00670061",
+    "raw": "KMOD 261303Z AUTO 26003KT 2 1/2SM BR CLR 05/04 A3028 RMK AO2 T00500039 $",
     "station": "KMOD",
-    "observation_time": "2026/01/22 13:04",
-    "temp_c": 7,
-    "dewpoint_c": 6,
-    "wind_speed_kt": 0,
-    "wind_dir": 0,
-    "visibility_sm": 4.0,
-    "sky_condition": "MIST - Few Clouds"
+    "observation_time": "2026/01/26 13:03",
+    "temp_c": 5,
+    "dewpoint_c": 4,
+    "wind_speed_kt": 3,
+    "wind_dir": 260,
+    "visibility_sm": 2.0,
+    "sky_condition": "MIST - Clear"
   }
 }
