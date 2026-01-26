@@ -599,7 +599,7 @@ def generate_xlsx_report(
     # Precip sources note
     ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=18)
     note = ws.cell(row=current_row, column=1,
-                  value='PRECIP = Google (0-72hr) > AccuWeather (72hr+) > Open-Meteo')
+                  value='PRECIP = Weather.com (PRIMARY) > Google > AccuWeather > Open-Meteo')
     note.font = Font(italic=True, size=8, color="505050")
     note.alignment = Alignment(horizontal='right')
     current_row += 2

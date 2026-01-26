@@ -813,13 +813,12 @@ async def main():
         if degraded:
             logger.warning(f"[main] Degraded providers: {', '.join(degraded)}")
 
-        # Build PRECIP consensus data with range-aware source selection
-        # Google MetNet-3 is best for 0-72 hours (days 0-2)
-        # AccuWeather is better for 72+ hours (days 3+) - physics models beat neural at longer ranges
+        # Build PRECIP data with Weather.com as PRIMARY source (1:1 match with website)
+        # Fallback chain: Weather.com > Google (calendar-day) > AccuWeather > Open-Meteo
         precip_data = {}
         today = start_time.strftime('%Y-%m-%d')
 
-        # Step 1: Open-Meteo as fallback base (always has 8 days)
+        # Step 1: Open-Meteo as base fallback (always has 8 days)
         if om_data and 'daily_forecast' in om_data:
             for d in om_data['daily_forecast']:
                 date_key = d.get('date', '')
@@ -839,42 +838,42 @@ async def main():
                         'source': 'AccuWeather'
                     }
 
-        # Step 3: Google Weather overwrites BUT ONLY for days 0-2 (0-72 hours)
-        # MetNet-3 neural model is optimized for short-term "nowcasting"
-        # At 72+ hours, physics models (AccuWeather) are more reliable for precip
+        # Step 3: Google Weather as secondary fallback (calendar-day aggregation)
+        # Only used if Weather.com fails - uses fixed calendar-day logic
         if google_data and 'daily' in google_data:
-            from datetime import datetime as dt_class
-            today_dt = dt_class.strptime(today, '%Y-%m-%d')
-
             for d in google_data['daily']:
                 date_key = d.get('date', '')
                 if date_key and d.get('precip_prob') is not None:
-                    try:
-                        forecast_dt = dt_class.strptime(date_key, '%Y-%m-%d')
-                        days_ahead = (forecast_dt - today_dt).days
+                    precip_data[date_key] = {
+                        'consensus': d.get('precip_prob', 0),
+                        'source': 'Google'
+                    }
 
-                        # Only use Google for days 0-2 (0-72 hours)
-                        if days_ahead <= 2:
-                            precip_data[date_key] = {
-                                'consensus': d.get('precip_prob', 0),
-                                'source': 'Google'
-                            }
-                        else:
-                            # For days 3+, keep AccuWeather (already set in step 2)
-                            # Log when Google would disagree significantly
-                            accu_val = precip_data.get(date_key, {}).get('consensus', 0)
-                            google_val = d.get('precip_prob', 0)
-                            if abs(google_val - accu_val) > 30:
-                                logger.warning(f"[main] PRECIP RANGE CHECK: {date_key} (day {days_ahead}) - "
-                                             f"Google={google_val}% vs AccuWeather={accu_val}% - Using AccuWeather")
-                    except ValueError:
-                        pass
+        # Step 4: Weather.com as PRIMARY source (1:1 match with weather.com website)
+        # This overwrites all previous sources for days where we have Weather.com data
+        weather_com_precip_count = 0
+        if weather_com_data:
+            for d in weather_com_data:
+                date_key = d.get('date', '')
+                precip_prob = d.get('precip_prob')
+                # Only use if we have actual precip data (not None or missing)
+                if date_key and precip_prob is not None:
+                    precip_data[date_key] = {
+                        'consensus': precip_prob,
+                        'source': 'Weather.com'
+                    }
+                    weather_com_precip_count += 1
 
         # Log precip source summary
+        wcom_days = sum(1 for v in precip_data.values() if v.get('source') == 'Weather.com')
         google_days = sum(1 for v in precip_data.values() if v.get('source') == 'Google')
         accu_days = sum(1 for v in precip_data.values() if v.get('source') == 'AccuWeather')
         om_days = sum(1 for v in precip_data.values() if v.get('source') == 'Open-Meteo')
-        logger.info(f"[main] PRECIP sources: Google={google_days} (days 0-2), AccuWeather={accu_days} (days 3+), Open-Meteo={om_days}")
+
+        if wcom_days > 0:
+            logger.info(f"[main] PRECIP sources: Weather.com={wcom_days} (PRIMARY), Google={google_days}, AccuWeather={accu_days}, Open-Meteo={om_days}")
+        else:
+            logger.warning(f"[main] PRECIP sources: Weather.com UNAVAILABLE - using fallbacks: Google={google_days}, AccuWeather={accu_days}, Open-Meteo={om_days}")
 
         excel_path = generate_excel_report(
             om_data=om_data,

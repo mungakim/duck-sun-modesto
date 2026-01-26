@@ -880,7 +880,7 @@ def generate_excel_report(
     grid_row = 22
     ws.merge_cells(f'{col(12)}{grid_row}:{col(18)}{grid_row}')
     note_cell = ws[f'{col(12)}{grid_row}']
-    note_cell.value = "PRECIP = Google (0-72hr) > AccuWeather (72hr+) > Open-Meteo"
+    note_cell.value = "PRECIP = Weather.com (PRIMARY) > Google > AccuWeather > Open-Meteo"
     note_cell.font = Font(name='Arial', size=6, italic=True, color='505050')
     note_cell.alignment = Alignment(horizontal='right', vertical='center')
 

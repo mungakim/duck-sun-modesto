@@ -1026,7 +1026,7 @@ def generate_pdf_report(
     # Precip sources note - right-aligned below temperature matrix
     pdf.set_font('Helvetica', 'I', 5)
     pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 3, 'PRECIP = Google (0-72hr) > AccuWeather (72hr+) > Open-Meteo  ', 0, 1, 'R')
+    pdf.cell(0, 3, 'PRECIP = Weather.com (PRIMARY) > Google > AccuWeather > Open-Meteo  ', 0, 1, 'R')
 
     # ===================
     # SOLAR FORECAST GRID (4-Day: Today + 3 Days)
