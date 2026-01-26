@@ -431,6 +431,119 @@ class WeatherComProvider:
 
         return None
 
+    def _extract_precip_from_html(self, soup: 'BeautifulSoup') -> List[int]:
+        """
+        Extract precipitation percentages from Weather.com HTML structure.
+
+        Tries multiple strategies:
+        1. data-testid="PercentageValue" (common for precip display)
+        2. data-testid="precipValue" (alternative attribute)
+        3. Elements with class containing "precip"
+        4. Spans with percentage patterns near day cards
+
+        Returns list of precipitation percentages aligned with forecast days.
+        """
+        precip_values = []
+
+        # Strategy 1: Try data-testid="PercentageValue"
+        percent_elems = soup.find_all(attrs={"data-testid": "PercentageValue"})
+        if percent_elems:
+            logger.debug(f"[WeatherComProvider] Found {len(percent_elems)} PercentageValue elements")
+            for elem in percent_elems:
+                text = elem.text.strip().replace('%', '')
+                try:
+                    precip_values.append(int(text))
+                except ValueError:
+                    precip_values.append(0)
+            if precip_values:
+                return precip_values
+
+        # Strategy 2: Try data-testid="precipValue"
+        precip_elems = soup.find_all(attrs={"data-testid": "precipValue"})
+        if precip_elems:
+            logger.debug(f"[WeatherComProvider] Found {len(precip_elems)} precipValue elements")
+            for elem in precip_elems:
+                text = elem.text.strip().replace('%', '')
+                try:
+                    precip_values.append(int(text))
+                except ValueError:
+                    precip_values.append(0)
+            if precip_values:
+                return precip_values
+
+        # Strategy 3: Find day cards and look for precip inside each
+        day_details = soup.find_all(attrs={"data-testid": "DailyContent"})
+        if not day_details:
+            day_details = soup.find_all(attrs={"data-testid": "ExpandedDetailsCard"})
+        if not day_details:
+            # Try finding all details sections
+            day_details = soup.find_all(attrs={"data-testid": "DaypartDetails"})
+
+        if day_details:
+            logger.debug(f"[WeatherComProvider] Found {len(day_details)} day detail cards")
+            for card in day_details:
+                # Look for precip within each card
+                precip_elem = card.find(attrs={"data-testid": "PercentageValue"})
+                if not precip_elem:
+                    precip_elem = card.find(attrs={"data-testid": "precipValue"})
+                if not precip_elem:
+                    # Look for any span with % that looks like precipitation
+                    spans = card.find_all('span')
+                    for span in spans:
+                        text = span.text.strip()
+                        if '%' in text and len(text) < 5:
+                            precip_elem = span
+                            break
+
+                if precip_elem:
+                    text = precip_elem.text.strip().replace('%', '')
+                    try:
+                        precip_values.append(int(text))
+                    except ValueError:
+                        precip_values.append(0)
+                else:
+                    precip_values.append(0)
+
+            if precip_values:
+                return precip_values
+
+        # Strategy 4: Find elements with class containing "precip" or "Precip"
+        precip_class_elems = soup.find_all(
+            class_=lambda x: x and ('precip' in str(x).lower()) if x else False
+        )
+        if precip_class_elems:
+            logger.debug(f"[WeatherComProvider] Found {len(precip_class_elems)} elements with precip class")
+            for elem in precip_class_elems:
+                text = elem.text.strip()
+                # Extract percentage from text like "10%" or "Precip: 10%"
+                match = re.search(r'(\d+)\s*%', text)
+                if match:
+                    precip_values.append(int(match.group(1)))
+
+            if precip_values:
+                return precip_values
+
+        # Strategy 5: Broader search for percentage spans
+        all_spans = soup.find_all('span')
+        for span in all_spans:
+            text = span.text.strip()
+            # Look for standalone percentage values (1-3 digits + %)
+            if re.match(r'^\d{1,3}%$', text):
+                try:
+                    precip_values.append(int(text.replace('%', '')))
+                except ValueError:
+                    pass
+
+        # Filter to reasonable count (should be ~10-15 for 10-day forecast)
+        if len(precip_values) > 20:
+            # Likely picking up too many unrelated percentages
+            logger.debug(f"[WeatherComProvider] Too many percentage values ({len(precip_values)}), trying to filter")
+            # Take every other one if we have roughly double (day/night pairs)
+            if 18 <= len(precip_values) <= 25:
+                precip_values = precip_values[::2]
+
+        return precip_values
+
     def _fetch_via_scraping(self) -> Optional[List[WeatherComDay]]:
         """
         Fetch forecast via web scraping with embedded JSON extraction.
@@ -543,14 +656,21 @@ class WeatherComProvider:
                 if days_of_week and max_temps and min_temps:
                     return self._build_results_from_arrays(days_of_week, max_temps, min_temps, precip_chances)
 
-            # METHOD 3: Fall back to HTML element parsing (no precip available)
-            logger.warning("[WeatherComProvider] No embedded JSON found, falling back to HTML parsing (no precip)")
+            # METHOD 3: Fall back to HTML element parsing with precipitation extraction
+            logger.warning("[WeatherComProvider] No embedded JSON found, falling back to HTML parsing")
 
             day_names = soup.find_all(attrs={"data-testid": "daypartName"})
             high_temps = soup.find_all(
                 class_=lambda x: x and 'highTempValue' in str(x) if x else False
             )
             low_temps = soup.find_all(attrs={"data-testid": "lowTempValue"})
+
+            # Extract precipitation percentages from HTML
+            precip_values = self._extract_precip_from_html(soup)
+            if precip_values:
+                logger.info(f"[WeatherComProvider] HTML precip extraction: {precip_values[:10]}")
+            else:
+                logger.warning("[WeatherComProvider] No precipitation data found in HTML")
 
             if not high_temps or not low_temps:
                 logger.error("[WeatherComProvider] No forecast data found in page")
@@ -571,6 +691,9 @@ class WeatherComProvider:
                 day_name = day_names[i].text.strip()[:3] if i < len(day_names) else f"D{i}"
                 date_str = self._get_date_for_day(i)
 
+                # Get precip from extracted values
+                precip = precip_values[i] if i < len(precip_values) else 0
+
                 results.append({
                     "date": date_str,
                     "day_name": day_name,
@@ -579,10 +702,10 @@ class WeatherComProvider:
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
                     "condition": "Unknown",
-                    "precip_prob": 0  # No precip available via HTML parsing
+                    "precip_prob": precip
                 })
 
-            logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via HTML parsing (no precip)")
+            logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via HTML parsing")
             if results:
                 self._save_cache(results)
             return results if results else None
