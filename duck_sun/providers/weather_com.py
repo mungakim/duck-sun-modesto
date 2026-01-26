@@ -481,6 +481,45 @@ class WeatherComProvider:
                     break
 
             if forecast_json:
+                # Log a sample of the script content for debugging
+                sample_start = forecast_json.find('temperatureMax')
+                if sample_start > 0:
+                    logger.info(f"[WeatherComProvider] Script sample near temperatureMax: {forecast_json[sample_start:sample_start+300]}")
+
+                # Try to find window.__data or similar embedded JSON
+                window_data_patterns = [
+                    r'window\.__data\s*=\s*(\{.+\});',
+                    r'window\.weatherData\s*=\s*(\{.+\});',
+                    r'self\.__next_f\.push\(\[.*?,\s*"([^"]*temperatureMax[^"]*)"\]',
+                ]
+                for pattern in window_data_patterns:
+                    match = re.search(pattern, forecast_json, re.DOTALL)
+                    if match:
+                        try:
+                            data_str = match.group(1)
+                            # Handle escaped JSON in Next.js streaming format
+                            if '\\' in data_str:
+                                data_str = data_str.encode().decode('unicode_escape')
+                            data_obj = json.loads(data_str)
+                            logger.info(f"[WeatherComProvider] Found window data with pattern: {pattern[:30]}")
+                            forecast = self._find_forecast_in_json(data_obj)
+                            if forecast:
+                                return self._build_results_from_forecast(forecast)
+                        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                            logger.debug(f"[WeatherComProvider] Failed to parse window data: {e}")
+
+                # Try to parse embedded JSON objects - Weather.com may embed data as JSON blob
+                # Look for patterns like {"temperatureMax":[...], ...}
+                import re
+                json_match = re.search(r'\{[^{}]*"temperatureMax"\s*:\s*\[[^\]]+\][^{}]*\}', forecast_json)
+                if json_match:
+                    try:
+                        forecast_obj = json.loads(json_match.group(0))
+                        logger.info(f"[WeatherComProvider] Parsed JSON object with keys: {list(forecast_obj.keys())}")
+                        return self._build_results_from_forecast(forecast_obj)
+                    except json.JSONDecodeError:
+                        logger.debug("[WeatherComProvider] Failed to parse JSON object")
+
                 # Try multiple regex patterns - Weather.com JSON might have different formats
                 # Pattern A: Standard JSON arrays (no spaces)
                 days_of_week = self._extract_json_array(r'"dayOfWeek":\[([^\]]+)\]', forecast_json, is_numeric=False)
@@ -500,7 +539,7 @@ class WeatherComProvider:
                 if not precip_chances:
                     precip_chances = self._extract_json_array(r'"precipChance":\s*\[([^\]]+)\]', forecast_json)
 
-                logger.debug(f"[WeatherComProvider] Regex extracted: days={len(days_of_week)}, max={len(max_temps)}, min={len(min_temps)}, precip={len(precip_chances)}")
+                logger.info(f"[WeatherComProvider] Regex extracted: days={len(days_of_week)}, max={len(max_temps)}, min={len(min_temps)}, precip={len(precip_chances)}")
 
                 if days_of_week and max_temps and min_temps:
                     return self._build_results_from_arrays(days_of_week, max_temps, min_temps, precip_chances)
