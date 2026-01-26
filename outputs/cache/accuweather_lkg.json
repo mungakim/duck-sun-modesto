@@ -1,23 +1,23 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-01-26T13:27:59.185241",
+  "timestamp": "2026-01-26T13:50:33.971108",
   "api_success": true,
   "data": [
     {
       "date": "2026-01-26",
       "high_c": 13.89,
-      "low_c": 2.78,
+      "low_c": 2.22,
       "high_f": 57.0,
-      "low_f": 37.0,
+      "low_f": 36.0,
       "precip_prob": 25,
       "condition": "Partly sunny"
     },
     {
       "date": "2026-01-27",
-      "high_c": 15.56,
-      "low_c": 6.67,
-      "high_f": 60.0,
-      "low_f": 44.0,
+      "high_c": 16.11,
+      "low_c": 6.11,
+      "high_f": 61.0,
+      "low_f": 43.0,
       "precip_prob": 3,
       "condition": "Mostly cloudy"
     },
