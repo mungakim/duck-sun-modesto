@@ -58,15 +58,16 @@ class WeatherComProvider:
     Provider for Weather.com data via web scraping.
 
     Uses curl_cffi with Chrome impersonation to bypass anti-bot protection.
+    Extracts forecast data INCLUDING PRECIPITATION from embedded JSON in page.
     Returns 10-day forecast data compatible with ensemble weighting.
 
     Weight: 4.0 (commercial provider tier)
+
+    NOTE: This uses FREE web scraping, not the paid TWC API ($500/month).
     """
 
-    # Use Weather.com's internal API endpoint (JSON) - more reliable
-    # This is the same API that powers their website
-    API_URL = "https://api.weather.com/v3/wx/forecast/daily/10day"
-    GEOCODE = "37.64,-120.99"  # Modesto, CA
+    # Scrape URL for Modesto, CA 10-day forecast
+    SCRAPE_URL = "https://weather.com/weather/tenday/l/37.6393,-120.9969"
 
     def __init__(self):
         logger.info("[WeatherComProvider] Initializing provider...")
@@ -163,9 +164,12 @@ class WeatherComProvider:
 
     def fetch_sync(self) -> Optional[List[WeatherComDay]]:
         """
-        Synchronously fetch 10-day forecast from Weather.com's API.
+        Synchronously fetch 10-day forecast from Weather.com via web scraping.
 
-        Rate limited to 6 calls/day to avoid anti-bot detection.
+        Uses curl_cffi with Chrome impersonation to bypass anti-bot protection.
+        Extracts forecast data from embedded JSON in the page's script tags.
+
+        Rate limited to 3 calls/day to avoid anti-bot detection.
 
         Returns:
             List of WeatherComDay dicts, or None on failure
@@ -182,129 +186,48 @@ class WeatherComProvider:
             logger.warning("[WeatherComProvider] Rate limited and no cache available")
             return None
 
-        # Construct API URL with parameters
-        # TWC_API_KEY must be set in .env
-        api_key = os.getenv("TWC_API_KEY")
-        if not api_key:
-            logger.error("[WeatherComProvider] TWC_API_KEY not set in environment")
-            return None
-        params = {
-            "geocode": self.GEOCODE,
-            "format": "json",
-            "units": "e",  # Imperial (Fahrenheit)
-            "language": "en-US",
-            "apiKey": api_key
-        }
-        url = f"{self.API_URL}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+        # Use web scraping (FREE) - no API key needed
+        return self._fetch_via_scraping()
 
-        logger.info(f"[WeatherComProvider] Fetching from Weather.com API for {self.GEOCODE}")
-
-        try:
-            from curl_cffi.requests import Session
-
-            with Session(impersonate="chrome136") as session:
-                headers = {
-                    "Accept": "application/json",
-                    "Referer": "https://weather.com/",
-                    "Origin": "https://weather.com",
-                }
-                response = session.get(url, headers=headers, timeout=30, verify=not SKIP_SSL_VERIFY)
-
-            if response.status_code != 200:
-                logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
-                # Fall back to scraping if API fails
-                return self._fetch_via_scraping()
-
-            data = response.json()
-
-            # Extract daily forecast data
-            day_of_week = data.get('dayOfWeek', [])
-            temp_max = data.get('temperatureMax', [])
-            temp_min = data.get('temperatureMin', [])
-            narrative = data.get('narrative', [])
-
-            # Extract precipitation probability from daypart array
-            # TWC API returns daypart[0] with arrays for day/night parts
-            # precipChance has 2x entries (day, night) per calendar day
-            precip_by_day = []
-            daypart = data.get('daypart', [{}])
-            if daypart and len(daypart) > 0:
-                precip_chance = daypart[0].get('precipChance', [])
-                # precipChance has alternating day/night values
-                # Take max of each day/night pair for daily precip
-                for i in range(0, len(precip_chance), 2):
-                    day_precip = precip_chance[i] if i < len(precip_chance) else None
-                    night_precip = precip_chance[i + 1] if i + 1 < len(precip_chance) else None
-                    # Handle None values (API returns null for past periods)
-                    day_val = day_precip if day_precip is not None else 0
-                    night_val = night_precip if night_precip is not None else 0
-                    precip_by_day.append(max(day_val, night_val))
-                logger.info(f"[WeatherComProvider] Extracted precip for {len(precip_by_day)} days: {precip_by_day[:5]}...")
-
-            if not temp_max or not temp_min:
-                logger.error("[WeatherComProvider] No temperature data in API response")
-                return self._fetch_via_scraping()
-
-            results: List[WeatherComDay] = []
-            num_days = min(10, len(temp_max), len(temp_min))
-
-            logger.info(f"[WeatherComProvider] Found {num_days} forecast days from API")
-
-            for i in range(num_days):
-                high_f = temp_max[i]
-                low_f = temp_min[i]
-
-                if high_f is None or low_f is None:
-                    logger.warning(f"[WeatherComProvider] Null temps for day {i}")
-                    continue
-
-                # Convert to Celsius
-                high_c = (high_f - 32) * 5 / 9
-                low_c = (low_f - 32) * 5 / 9
-
-                # Get day name
-                day_name = day_of_week[i][:3] if i < len(day_of_week) else f"D{i}"
-
-                # Get date
-                date_str = self._get_date_for_day(i)
-
-                # Get condition from narrative
-                condition = narrative[i][:50] if i < len(narrative) else "Unknown"
-
-                # Get precip probability (from daypart extraction above)
-                precip_prob = precip_by_day[i] if i < len(precip_by_day) else 0
-
-                results.append({
-                    "date": date_str,
-                    "day_name": day_name,
-                    "high_f": float(high_f),
-                    "low_f": float(low_f),
-                    "high_c": round(high_c, 2),
-                    "low_c": round(low_c, 2),
-                    "condition": condition,
-                    "precip_prob": precip_prob
-                })
-
-                logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F, Precip={precip_prob}%")
-
-            logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} daily records from API")
-            self._save_cache(results)
-            return results
-
-        except Exception as e:
-            logger.error(f"[WeatherComProvider] API fetch failed: {e}", exc_info=True)
-            return self._fetch_via_scraping()
+    def _extract_json_array(self, pattern: str, data: str, is_numeric: bool = True) -> List:
+        """Extract array values from JavaScript/JSON data using regex."""
+        match = re.search(pattern, data)
+        if match:
+            arr_str = match.group(1)
+            if is_numeric:
+                values = []
+                for x in arr_str.split(','):
+                    x = x.strip()
+                    if x == 'null' or not x:
+                        values.append(None)
+                    else:
+                        try:
+                            values.append(int(x))
+                        except ValueError:
+                            try:
+                                values.append(int(float(x)))
+                            except ValueError:
+                                values.append(None)
+                return values
+            else:
+                return [x.strip().strip('"').strip("'") for x in arr_str.split(',')]
+        return []
 
     def _fetch_via_scraping(self) -> Optional[List[WeatherComDay]]:
-        """Fallback to web scraping if API fails."""
-        logger.info("[WeatherComProvider] Falling back to web scraping...")
+        """
+        Fetch forecast via web scraping with embedded JSON extraction.
+
+        Weather.com embeds forecast JSON in script tags, similar to Weather Underground.
+        This extracts temps AND precipitation from that embedded data.
+        """
+        logger.info("[WeatherComProvider] Fetching via web scraping (curl_cffi)...")
 
         scrape_url = "https://weather.com/weather/tenday/l/37.6393,-120.9969"
 
         try:
             from curl_cffi.requests import Session
 
-            # Use a session to handle cookies - first visit homepage to get session cookies
+            # Use a session to handle cookies
             with Session(impersonate="chrome110") as session:
                 # First request to get cookies
                 logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
@@ -323,6 +246,84 @@ class WeatherComProvider:
                 return None
 
             soup = BeautifulSoup(response.content, 'html.parser')
+
+            # METHOD 1: Try to extract from embedded JSON in script tags (most reliable)
+            scripts = soup.find_all('script')
+            forecast_json = None
+
+            for script in scripts:
+                if script.string and 'temperatureMax' in script.string and 'precipChance' in script.string:
+                    forecast_json = script.string
+                    logger.info("[WeatherComProvider] Found embedded forecast JSON with precip data")
+                    break
+
+            if forecast_json:
+                # Extract arrays from embedded JSON
+                days_of_week = self._extract_json_array(
+                    r'"dayOfWeek":\s*\[([^\]]+)\]',
+                    forecast_json,
+                    is_numeric=False
+                )
+                max_temps = self._extract_json_array(
+                    r'"temperatureMax":\s*\[([^\]]+)\]',
+                    forecast_json
+                )
+                min_temps = self._extract_json_array(
+                    r'"temperatureMin":\s*\[([^\]]+)\]',
+                    forecast_json
+                )
+                # Extract precipitation - daypart has alternating day/night values
+                precip_chances = self._extract_json_array(
+                    r'"precipChance":\s*\[([^\]]+)\]',
+                    forecast_json
+                )
+
+                if days_of_week and max_temps and min_temps:
+                    logger.info(f"[WeatherComProvider] Extracted from JSON: {len(days_of_week)} days, precip: {precip_chances[:6]}")
+
+                    # Build daily precip from day/night pairs (take max of each pair)
+                    daily_precip = []
+                    for i in range(0, len(precip_chances), 2):
+                        day_p = precip_chances[i] if i < len(precip_chances) and precip_chances[i] is not None else 0
+                        night_p = precip_chances[i + 1] if i + 1 < len(precip_chances) and precip_chances[i + 1] is not None else 0
+                        daily_precip.append(max(day_p, night_p))
+
+                    results: List[WeatherComDay] = []
+                    num_days = min(10, len(days_of_week), len(max_temps), len(min_temps))
+
+                    for i in range(num_days):
+                        high_f = max_temps[i]
+                        low_f = min_temps[i]
+
+                        if high_f is None or low_f is None:
+                            continue
+
+                        high_c = (high_f - 32) * 5 / 9
+                        low_c = (low_f - 32) * 5 / 9
+                        day_name = days_of_week[i][:3] if days_of_week[i] else f"D{i}"
+                        date_str = self._get_date_for_day(i)
+                        precip = daily_precip[i] if i < len(daily_precip) else 0
+
+                        results.append({
+                            "date": date_str,
+                            "day_name": day_name,
+                            "high_f": float(high_f),
+                            "low_f": float(low_f),
+                            "high_c": round(high_c, 2),
+                            "low_c": round(low_c, 2),
+                            "condition": "Unknown",
+                            "precip_prob": precip
+                        })
+
+                        logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F, Precip={precip}%")
+
+                    logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via JSON extraction")
+                    if results:
+                        self._save_cache(results)
+                    return results if results else None
+
+            # METHOD 2: Fall back to HTML element parsing (no precip available)
+            logger.warning("[WeatherComProvider] No embedded JSON found, falling back to HTML parsing (no precip)")
 
             day_names = soup.find_all(attrs={"data-testid": "daypartName"})
             high_temps = soup.find_all(
@@ -357,16 +358,16 @@ class WeatherComProvider:
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
                     "condition": "Unknown",
-                    "precip_prob": 0
+                    "precip_prob": 0  # No precip available via HTML parsing
                 })
 
-            logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via scraping")
+            logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via HTML parsing (no precip)")
             if results:
                 self._save_cache(results)
             return results if results else None
 
         except Exception as e:
-            logger.error(f"[WeatherComProvider] Scraping failed: {e}")
+            logger.error(f"[WeatherComProvider] Scraping failed: {e}", exc_info=True)
             return None
 
     async def fetch_async(self) -> Optional[List[WeatherComDay]]:

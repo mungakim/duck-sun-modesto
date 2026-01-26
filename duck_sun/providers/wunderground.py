@@ -234,6 +234,21 @@ class WUndergroundProvider:
                 r'"temperatureMin":\[([^\]]+)\]',
                 forecast_data
             )
+            # Extract precipitation - daypart has alternating day/night values
+            precip_chances = self._extract_array(
+                r'"precipChance":\[([^\]]+)\]',
+                forecast_data
+            )
+
+            # Build daily precip from day/night pairs (take max of each pair)
+            daily_precip = []
+            for i in range(0, len(precip_chances), 2):
+                day_p = precip_chances[i] if i < len(precip_chances) and precip_chances[i] is not None else 0
+                night_p = precip_chances[i + 1] if i + 1 < len(precip_chances) and precip_chances[i + 1] is not None else 0
+                daily_precip.append(max(day_p, night_p))
+
+            if daily_precip:
+                logger.info(f"[WUndergroundProvider] Extracted precip for {len(daily_precip)} days: {daily_precip[:5]}")
 
             if not days_of_week or not max_temps or not min_temps:
                 logger.error("[WUndergroundProvider] Could not parse forecast arrays")
@@ -265,6 +280,9 @@ class WUndergroundProvider:
                 # Get date
                 date_str = self._get_date_for_day(i)
 
+                # Get precip from extracted daily_precip array
+                precip = daily_precip[i] if i < len(daily_precip) else 0
+
                 results.append({
                     "date": date_str,
                     "day_name": day_abbrev,
@@ -273,10 +291,10 @@ class WUndergroundProvider:
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
                     "condition": "Unknown",  # Could parse from narratives if needed
-                    "precip_prob": 0  # Could parse from precipChance array
+                    "precip_prob": precip
                 })
 
-                logger.debug(f"[WUndergroundProvider] {date_str}: Hi={high_f}F, Lo={low_f}F")
+                logger.debug(f"[WUndergroundProvider] {date_str}: Hi={high_f}F, Lo={low_f}F, Precip={precip}%")
 
             logger.info(f"[WUndergroundProvider] [OK] Retrieved {len(results)} daily records")
             self._save_cache(results)
