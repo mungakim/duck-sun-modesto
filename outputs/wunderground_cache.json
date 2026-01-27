@@ -1,48 +1,38 @@
 {
-  "timestamp": "2026-01-26T13:28:04.629932",
-  "call_date": "2026-01-26",
-  "call_count": 3,
+  "timestamp": "2026-01-27T05:34:26.537834",
+  "call_date": "2026-01-27",
+  "call_count": 1,
   "daily_limit": 3,
   "data": [
     {
-      "date": "2026-01-26",
-      "day_name": "Mon",
-      "high_f": 61.0,
-      "low_f": 38.0,
-      "high_c": 16.11,
-      "low_c": 3.33,
-      "condition": "Unknown",
-      "precip_prob": 13
-    },
-    {
       "date": "2026-01-27",
       "day_name": "Tue",
-      "high_f": 61.0,
+      "high_f": 62.0,
       "low_f": 45.0,
-      "high_c": 16.11,
+      "high_c": 16.67,
       "low_c": 7.22,
       "condition": "Unknown",
-      "precip_prob": 13
+      "precip_prob": 19
     },
     {
       "date": "2026-01-28",
       "day_name": "Wed",
       "high_f": 62.0,
-      "low_f": 42.0,
+      "low_f": 41.0,
       "high_c": 16.67,
-      "low_c": 5.56,
+      "low_c": 5.0,
       "condition": "Unknown",
-      "precip_prob": 9
+      "precip_prob": 12
     },
     {
       "date": "2026-01-29",
       "day_name": "Thu",
-      "high_f": 58.0,
+      "high_f": 60.0,
       "low_f": 42.0,
-      "high_c": 14.44,
+      "high_c": 15.56,
       "low_c": 5.56,
       "condition": "Unknown",
-      "precip_prob": 8
+      "precip_prob": 10
     },
     {
       "date": "2026-01-30",
@@ -62,7 +52,17 @@
       "high_c": 15.0,
       "low_c": 6.67,
       "condition": "Unknown",
-      "precip_prob": 9
+      "precip_prob": 8
+    },
+    {
+      "date": "2026-02-01",
+      "day_name": "Sun",
+      "high_f": 61.0,
+      "low_f": 45.0,
+      "high_c": 16.11,
+      "low_c": 7.22,
+      "condition": "Unknown",
+      "precip_prob": 18
     }
   ]
 }
