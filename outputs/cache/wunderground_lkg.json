@@ -1,67 +1,67 @@
 {
   "provider": "wunderground",
-  "timestamp": "2026-01-27T05:34:26.539767",
+  "timestamp": "2026-01-28T05:26:45.699167",
   "api_success": true,
   "data": [
     {
-      "date": "2026-01-27",
-      "day_name": "Tue",
-      "high_f": 62.0,
-      "low_f": 45.0,
-      "high_c": 16.67,
-      "low_c": 7.22,
-      "condition": "Unknown",
-      "precip_prob": 19
-    },
-    {
       "date": "2026-01-28",
       "day_name": "Wed",
-      "high_f": 62.0,
-      "low_f": 41.0,
-      "high_c": 16.67,
-      "low_c": 5.0,
+      "high_f": 63.0,
+      "low_f": 42.0,
+      "high_c": 17.22,
+      "low_c": 5.56,
       "condition": "Unknown",
-      "precip_prob": 12
+      "precip_prob": 15
     },
     {
       "date": "2026-01-29",
       "day_name": "Thu",
-      "high_f": 60.0,
+      "high_f": 59.0,
       "low_f": 42.0,
-      "high_c": 15.56,
+      "high_c": 15.0,
       "low_c": 5.56,
       "condition": "Unknown",
-      "precip_prob": 10
+      "precip_prob": 15
     },
     {
       "date": "2026-01-30",
       "day_name": "Fri",
-      "high_f": 60.0,
-      "low_f": 42.0,
-      "high_c": 15.56,
-      "low_c": 5.56,
+      "high_f": 59.0,
+      "low_f": 43.0,
+      "high_c": 15.0,
+      "low_c": 6.11,
       "condition": "Unknown",
-      "precip_prob": 9
+      "precip_prob": 8
     },
     {
       "date": "2026-01-31",
       "day_name": "Sat",
-      "high_f": 59.0,
-      "low_f": 44.0,
-      "high_c": 15.0,
-      "low_c": 6.67,
+      "high_f": 60.0,
+      "low_f": 42.0,
+      "high_c": 15.56,
+      "low_c": 5.56,
       "condition": "Unknown",
       "precip_prob": 8
     },
     {
       "date": "2026-02-01",
       "day_name": "Sun",
-      "high_f": 61.0,
+      "high_f": 63.0,
       "low_f": 45.0,
-      "high_c": 16.11,
+      "high_c": 17.22,
       "low_c": 7.22,
       "condition": "Unknown",
-      "precip_prob": 18
+      "precip_prob": 16
+    },
+    {
+      "date": "2026-02-02",
+      "day_name": "Mon",
+      "high_f": 62.0,
+      "low_f": 42.0,
+      "high_c": 16.67,
+      "low_c": 5.56,
+      "condition": "Unknown",
+      "precip_prob": 8
     }
   ]
 }

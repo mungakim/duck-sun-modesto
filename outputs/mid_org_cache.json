@@ -1,24 +1,24 @@
 {
-  "timestamp": "2026-01-27T05:34:27.165179",
+  "timestamp": "2026-01-28T05:26:46.548176",
   "source": "midapi.websupport.expert",
   "data": {
     "today": {
       "rain": "0.00",
-      "high": "45",
-      "low": "39",
-      "datestring": "Tuesday January  27,  2026"
+      "high": "52",
+      "low": "48",
+      "datestring": "Wednesday January  28,  2026"
     },
     "yesterday": {
       "rain": "0.00",
       "high": "60",
-      "low": "42",
-      "datestring": "Monday January  26,  2026"
+      "low": "39",
+      "datestring": "Tuesday January  27,  2026"
     },
-    "record_high_temp": 67,
+    "record_high_temp": 69,
     "record_high_year": 2003,
-    "record_low_temp": 26,
+    "record_low_temp": 25,
     "record_low_year": 1949,
-    "avg_high_temp": 56,
+    "avg_high_temp": 57,
     "avg_low_temp": 39
   }
 }
