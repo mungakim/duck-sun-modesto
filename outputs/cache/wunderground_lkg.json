@@ -1,55 +1,45 @@
 {
   "provider": "wunderground",
-  "timestamp": "2026-01-29T05:32:12.907456",
+  "timestamp": "2026-01-30T05:34:11.052025",
   "api_success": true,
   "data": [
-    {
-      "date": "2026-01-29",
-      "day_name": "Thu",
-      "high_f": 58.0,
-      "low_f": 41.0,
-      "high_c": 14.44,
-      "low_c": 5.0,
-      "condition": "Unknown",
-      "precip_prob": 16
-    },
     {
       "date": "2026-01-30",
       "day_name": "Fri",
       "high_f": 61.0,
-      "low_f": 43.0,
+      "low_f": 41.0,
       "high_c": 16.11,
-      "low_c": 6.11,
+      "low_c": 5.0,
       "condition": "Unknown",
       "precip_prob": 16
     },
     {
       "date": "2026-01-31",
       "day_name": "Sat",
-      "high_f": 61.0,
-      "low_f": 43.0,
-      "high_c": 16.11,
-      "low_c": 6.11,
+      "high_f": 62.0,
+      "low_f": 42.0,
+      "high_c": 16.67,
+      "low_c": 5.56,
       "condition": "Unknown",
-      "precip_prob": 14
+      "precip_prob": 12
     },
     {
       "date": "2026-02-01",
       "day_name": "Sun",
-      "high_f": 62.0,
+      "high_f": 63.0,
       "low_f": 43.0,
-      "high_c": 16.67,
+      "high_c": 17.22,
       "low_c": 6.11,
       "condition": "Unknown",
-      "precip_prob": 9
+      "precip_prob": 10
     },
     {
       "date": "2026-02-02",
       "day_name": "Mon",
-      "high_f": 62.0,
-      "low_f": 41.0,
-      "high_c": 16.67,
-      "low_c": 5.0,
+      "high_f": 64.0,
+      "low_f": 42.0,
+      "high_c": 17.78,
+      "low_c": 5.56,
       "condition": "Unknown",
       "precip_prob": 9
     },
@@ -57,9 +47,19 @@
       "date": "2026-02-03",
       "day_name": "Tue",
       "high_f": 63.0,
-      "low_f": 41.0,
+      "low_f": 42.0,
       "high_c": 17.22,
-      "low_c": 5.0,
+      "low_c": 5.56,
+      "condition": "Unknown",
+      "precip_prob": 9
+    },
+    {
+      "date": "2026-02-04",
+      "day_name": "Wed",
+      "high_f": 62.0,
+      "low_f": 43.0,
+      "high_c": 16.67,
+      "low_c": 6.11,
       "condition": "Unknown",
       "precip_prob": 8
     }
