@@ -1,107 +1,107 @@
 {
   "provider": "weather_com",
-  "timestamp": "2026-01-30T05:34:09.661105",
+  "timestamp": "2026-02-02T05:34:10.856464",
   "api_success": true,
   "data": [
     {
-      "date": "2026-01-30",
-      "day_name": "Tod",
-      "high_f": 61.0,
-      "low_f": 41.0,
-      "high_c": 16.11,
-      "low_c": 5.0,
-      "condition": "Unknown",
-      "precip_prob": 6
-    },
-    {
-      "date": "2026-01-31",
-      "day_name": "Sat",
-      "high_f": 61.0,
-      "low_f": 42.0,
-      "high_c": 16.11,
-      "low_c": 5.56,
-      "condition": "Unknown",
-      "precip_prob": 11
-    },
-    {
-      "date": "2026-02-01",
-      "day_name": "Sun",
-      "high_f": 63.0,
-      "low_f": 43.0,
-      "high_c": 17.22,
-      "low_c": 6.11,
-      "condition": "Unknown",
-      "precip_prob": 9
-    },
-    {
       "date": "2026-02-02",
-      "day_name": "Mon",
+      "day_name": "Tod",
       "high_f": 64.0,
-      "low_f": 42.0,
+      "low_f": 40.0,
       "high_c": 17.78,
-      "low_c": 5.56,
+      "low_c": 4.44,
       "condition": "Unknown",
-      "precip_prob": 9
+      "precip_prob": 24
     },
     {
       "date": "2026-02-03",
       "day_name": "Tue",
-      "high_f": 63.0,
-      "low_f": 42.0,
-      "high_c": 17.22,
-      "low_c": 5.56,
+      "high_f": 66.0,
+      "low_f": 41.0,
+      "high_c": 18.89,
+      "low_c": 5.0,
       "condition": "Unknown",
-      "precip_prob": 8
+      "precip_prob": 13
     },
     {
       "date": "2026-02-04",
       "day_name": "Wed",
-      "high_f": 62.0,
-      "low_f": 43.0,
-      "high_c": 16.67,
-      "low_c": 6.11,
+      "high_f": 66.0,
+      "low_f": 42.0,
+      "high_c": 18.89,
+      "low_c": 5.56,
       "condition": "Unknown",
-      "precip_prob": 8
+      "precip_prob": 14
     },
     {
       "date": "2026-02-05",
       "day_name": "Thu",
-      "high_f": 65.0,
-      "low_f": 44.0,
-      "high_c": 18.33,
-      "low_c": 6.67,
+      "high_f": 66.0,
+      "low_f": 46.0,
+      "high_c": 18.89,
+      "low_c": 7.78,
       "condition": "Unknown",
       "precip_prob": 8
     },
     {
       "date": "2026-02-06",
       "day_name": "Fri",
-      "high_f": 66.0,
-      "low_f": 44.0,
-      "high_c": 18.89,
-      "low_c": 6.67,
+      "high_f": 67.0,
+      "low_f": 45.0,
+      "high_c": 19.44,
+      "low_c": 7.22,
       "condition": "Unknown",
-      "precip_prob": 7
+      "precip_prob": 16
     },
     {
       "date": "2026-02-07",
       "day_name": "Sat",
       "high_f": 66.0,
-      "low_f": 44.0,
+      "low_f": 46.0,
       "high_c": 18.89,
-      "low_c": 6.67,
+      "low_c": 7.78,
       "condition": "Unknown",
-      "precip_prob": 7
+      "precip_prob": 8
     },
     {
       "date": "2026-02-08",
       "day_name": "Sun",
-      "high_f": 63.0,
-      "low_f": 46.0,
-      "high_c": 17.22,
-      "low_c": 7.78,
+      "high_f": 65.0,
+      "low_f": 47.0,
+      "high_c": 18.33,
+      "low_c": 8.33,
       "condition": "Unknown",
-      "precip_prob": 11
+      "precip_prob": 35
+    },
+    {
+      "date": "2026-02-09",
+      "day_name": "Mon",
+      "high_f": 59.0,
+      "low_f": 42.0,
+      "high_c": 15.0,
+      "low_c": 5.56,
+      "condition": "Unknown",
+      "precip_prob": 24
+    },
+    {
+      "date": "2026-02-10",
+      "day_name": "Tue",
+      "high_f": 58.0,
+      "low_f": 42.0,
+      "high_c": 14.44,
+      "low_c": 5.56,
+      "condition": "Unknown",
+      "precip_prob": 24
+    },
+    {
+      "date": "2026-02-11",
+      "day_name": "Wed",
+      "high_f": 57.0,
+      "low_f": 40.0,
+      "high_c": 13.89,
+      "low_c": 4.44,
+      "condition": "Unknown",
+      "precip_prob": 31
     }
   ]
 }

@@ -1,52 +1,52 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-01-30T05:34:07.277770",
+  "timestamp": "2026-02-02T05:34:07.571932",
   "api_success": true,
   "data": [
     {
-      "date": "2026-01-30",
-      "high_c": 16.11,
-      "low_c": 5.56,
-      "high_f": 61.0,
-      "low_f": 42.0,
+      "date": "2026-02-02",
+      "high_c": 17.78,
+      "low_c": 3.33,
+      "high_f": 64.0,
+      "low_f": 38.0,
       "precip_prob": 0,
       "condition": "Intermittent clouds"
     },
     {
-      "date": "2026-01-31",
-      "high_c": 16.11,
-      "low_c": 5.56,
-      "high_f": 61.0,
-      "low_f": 42.0,
+      "date": "2026-02-03",
+      "high_c": 17.78,
+      "low_c": 4.44,
+      "high_f": 64.0,
+      "low_f": 40.0,
+      "precip_prob": 0,
+      "condition": "Intermittent clouds"
+    },
+    {
+      "date": "2026-02-04",
+      "high_c": 16.67,
+      "low_c": 6.67,
+      "high_f": 62.0,
+      "low_f": 44.0,
       "precip_prob": 0,
       "condition": "Partly sunny"
     },
     {
-      "date": "2026-02-01",
+      "date": "2026-02-05",
       "high_c": 17.78,
-      "low_c": 6.11,
+      "low_c": 7.22,
       "high_f": 64.0,
-      "low_f": 43.0,
-      "precip_prob": 1,
+      "low_f": 45.0,
+      "precip_prob": 2,
       "condition": "Intermittent clouds"
     },
     {
-      "date": "2026-02-02",
-      "high_c": 16.67,
-      "low_c": 3.89,
-      "high_f": 62.0,
-      "low_f": 39.0,
-      "precip_prob": 2,
-      "condition": "Mostly sunny"
-    },
-    {
-      "date": "2026-02-03",
-      "high_c": 17.22,
-      "low_c": 6.11,
-      "high_f": 63.0,
-      "low_f": 43.0,
-      "precip_prob": 1,
-      "condition": "Mostly sunny"
+      "date": "2026-02-06",
+      "high_c": 20.0,
+      "low_c": 7.78,
+      "high_f": 68.0,
+      "low_f": 46.0,
+      "precip_prob": 25,
+      "condition": "Cloudy"
     }
   ]
 }
