@@ -1,55 +1,45 @@
 {
-  "timestamp": "2026-02-03T05:30:34.175833",
-  "call_date": "2026-02-03",
+  "timestamp": "2026-02-04T05:30:18.012017",
+  "call_date": "2026-02-04",
   "call_count": 1,
   "daily_limit": 3,
   "data": [
     {
-      "date": "2026-02-03",
-      "day_name": "Tue",
-      "high_f": 65.0,
-      "low_f": 40.0,
-      "high_c": 18.33,
-      "low_c": 4.44,
-      "condition": "Unknown",
-      "precip_prob": 15
-    },
-    {
       "date": "2026-02-04",
       "day_name": "Wed",
-      "high_f": 65.0,
-      "low_f": 42.0,
-      "high_c": 18.33,
-      "low_c": 5.56,
+      "high_f": 64.0,
+      "low_f": 41.0,
+      "high_c": 17.78,
+      "low_c": 5.0,
       "condition": "Unknown",
-      "precip_prob": 14
+      "precip_prob": 13
     },
     {
       "date": "2026-02-05",
       "day_name": "Thu",
-      "high_f": 66.0,
+      "high_f": 68.0,
       "low_f": 47.0,
-      "high_c": 18.89,
+      "high_c": 20.0,
       "low_c": 8.33,
       "condition": "Unknown",
-      "precip_prob": 9
+      "precip_prob": 16
     },
     {
       "date": "2026-02-06",
       "day_name": "Fri",
-      "high_f": 68.0,
-      "low_f": 45.0,
-      "high_c": 20.0,
-      "low_c": 7.22,
+      "high_f": 70.0,
+      "low_f": 44.0,
+      "high_c": 21.11,
+      "low_c": 6.67,
       "condition": "Unknown",
       "precip_prob": 8
     },
     {
       "date": "2026-02-07",
       "day_name": "Sat",
-      "high_f": 67.0,
+      "high_f": 66.0,
       "low_f": 44.0,
-      "high_c": 19.44,
+      "high_c": 18.89,
       "low_c": 6.67,
       "condition": "Unknown",
       "precip_prob": 8
@@ -58,11 +48,21 @@
       "date": "2026-02-08",
       "day_name": "Sun",
       "high_f": 67.0,
-      "low_f": 47.0,
+      "low_f": 48.0,
       "high_c": 19.44,
-      "low_c": 8.33,
+      "low_c": 8.89,
       "condition": "Unknown",
-      "precip_prob": 20
+      "precip_prob": 24
+    },
+    {
+      "date": "2026-02-09",
+      "day_name": "Mon",
+      "high_f": 62.0,
+      "low_f": 45.0,
+      "high_c": 16.67,
+      "low_c": 7.22,
+      "condition": "Unknown",
+      "precip_prob": 22
     }
   ]
 }

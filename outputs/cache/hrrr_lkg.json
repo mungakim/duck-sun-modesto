@@ -1,309 +1,69 @@
 {
   "provider": "hrrr",
-  "timestamp": "2026-02-03T05:30:29.043790",
+  "timestamp": "2026-02-04T05:30:12.292924",
   "api_success": true,
   "data": {
-    "generated_at": "2026-02-03T05:30:29.041451",
+    "generated_at": "2026-02-04T05:30:12.290327",
     "model": "HRRR",
     "location": "Modesto, CA",
     "hourly": [
       {
-        "time": "2026-02-03T00:00",
-        "temperature_c": 8.4,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T01:00",
-        "temperature_c": 8.1,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T02:00",
-        "temperature_c": 6.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 300.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T03:00",
-        "temperature_c": 5.3,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 300.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T04:00",
-        "temperature_c": 5.2,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 88,
-        "visibility_m": 100.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T05:00",
-        "temperature_c": 6.6,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 100.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T06:00",
-        "temperature_c": 7.2,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 100.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T07:00",
-        "temperature_c": 6.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T08:00",
-        "temperature_c": 6.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 100.0,
-        "shortwave_radiation": 26.5,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T09:00",
-        "temperature_c": 8.0,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 300.0,
-        "shortwave_radiation": 86.8,
-        "is_fog": true
-      },
-      {
-        "time": "2026-02-03T10:00",
-        "temperature_c": 9.3,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12300.0,
-        "shortwave_radiation": 211.8,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T11:00",
-        "temperature_c": 10.1,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12500.0,
-        "shortwave_radiation": 276.2,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T12:00",
-        "temperature_c": 10.9,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 12500.0,
-        "shortwave_radiation": 322.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T13:00",
-        "temperature_c": 12.4,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 96,
-        "visibility_m": 14600.0,
-        "shortwave_radiation": 406.2,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T14:00",
-        "temperature_c": 13.6,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 79,
-        "visibility_m": 16900.0,
-        "shortwave_radiation": 393.2,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T15:00",
-        "temperature_c": 14.7,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 37,
-        "visibility_m": 18900.0,
-        "shortwave_radiation": 419.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T16:00",
-        "temperature_c": 15.1,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 28,
-        "visibility_m": 19500.0,
-        "shortwave_radiation": 307.5,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T17:00",
-        "temperature_c": 14.3,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 14,
-        "visibility_m": 18600.0,
-        "shortwave_radiation": 134.8,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T18:00",
-        "temperature_c": 11.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 7,
-        "visibility_m": 14800.0,
-        "shortwave_radiation": 9.2,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T19:00",
-        "temperature_c": 10.4,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 6,
-        "visibility_m": 12800.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T20:00",
-        "temperature_c": 9.0,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 17,
-        "visibility_m": 12200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T21:00",
-        "temperature_c": 7.9,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 47,
-        "visibility_m": 12200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T22:00",
-        "temperature_c": 7.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 3050.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-03T23:00",
-        "temperature_c": 6.6,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 100.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
-      },
-      {
         "time": "2026-02-04T00:00",
-        "temperature_c": 6.5,
+        "temperature_c": 6.9,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "cloud_cover": 16,
+        "visibility_m": 300.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2026-02-04T01:00",
-        "temperature_c": 7.1,
+        "temperature_c": 6.3,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "cloud_cover": 38,
+        "visibility_m": 300.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2026-02-04T02:00",
-        "temperature_c": 7.8,
+        "temperature_c": 5.9,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 300.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2026-02-04T03:00",
-        "temperature_c": 8.1,
+        "temperature_c": 5.6,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 100.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2026-02-04T04:00",
-        "temperature_c": 7.8,
+        "temperature_c": 6.0,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 100.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2026-02-04T05:00",
-        "temperature_c": 7.3,
+        "temperature_c": 6.9,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 100.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
@@ -313,12 +73,172 @@
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 0.0,
+        "visibility_m": 100.0,
         "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
         "time": "2026-02-04T07:00",
+        "temperature_c": 7.3,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 100.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-04T08:00",
+        "temperature_c": 7.6,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 18.2,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-04T09:00",
+        "temperature_c": 7.8,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 60.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-04T10:00",
+        "temperature_c": 7.8,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 128.2,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-04T11:00",
+        "temperature_c": 8.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 100.0,
+        "shortwave_radiation": 182.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-04T12:00",
+        "temperature_c": 10.0,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 200.0,
+        "shortwave_radiation": 238.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-04T13:00",
+        "temperature_c": 11.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 98,
+        "visibility_m": 13400.0,
+        "shortwave_radiation": 380.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T14:00",
+        "temperature_c": 12.7,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 65,
+        "visibility_m": 14500.0,
+        "shortwave_radiation": 352.2,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T15:00",
+        "temperature_c": 13.5,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 22,
+        "visibility_m": 16500.0,
+        "shortwave_radiation": 330.2,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T16:00",
+        "temperature_c": 13.6,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 15,
+        "visibility_m": 16500.0,
+        "shortwave_radiation": 237.2,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T17:00",
+        "temperature_c": 12.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 9,
+        "visibility_m": 16400.0,
+        "shortwave_radiation": 132.5,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T18:00",
+        "temperature_c": 10.8,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 7,
+        "visibility_m": 15000.0,
+        "shortwave_radiation": 10.2,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T19:00",
+        "temperature_c": 9.5,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 4,
+        "visibility_m": 13900.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T20:00",
+        "temperature_c": 8.6,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 4,
+        "visibility_m": 13400.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T21:00",
+        "temperature_c": 7.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 25,
+        "visibility_m": 12250.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T22:00",
+        "temperature_c": 7.3,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 66,
+        "visibility_m": 9150.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-04T23:00",
         "temperature_c": 6.5,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
@@ -328,157 +248,237 @@
         "is_fog": true
       },
       {
-        "time": "2026-02-04T08:00",
-        "temperature_c": 7.0,
+        "time": "2026-02-05T00:00",
+        "temperature_c": 6.4,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
         "visibility_m": 0.0,
-        "shortwave_radiation": 26.0,
+        "shortwave_radiation": 0.0,
         "is_fog": true
       },
       {
-        "time": "2026-02-04T09:00",
+        "time": "2026-02-05T01:00",
+        "temperature_c": 7.1,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T02:00",
+        "temperature_c": 7.7,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T03:00",
+        "temperature_c": 7.6,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T04:00",
+        "temperature_c": 7.2,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T05:00",
+        "temperature_c": 7.5,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 100.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T06:00",
+        "temperature_c": 7.4,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T07:00",
+        "temperature_c": 6.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T08:00",
+        "temperature_c": 7.1,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 0.0,
+        "shortwave_radiation": 25.0,
+        "is_fog": true
+      },
+      {
+        "time": "2026-02-05T09:00",
         "temperature_c": 7.8,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
         "visibility_m": 100.0,
-        "shortwave_radiation": 107.0,
+        "shortwave_radiation": 82.0,
         "is_fog": true
       },
       {
-        "time": "2026-02-04T10:00",
-        "temperature_c": 9.5,
+        "time": "2026-02-05T10:00",
+        "temperature_c": 9.3,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 300.0,
-        "shortwave_radiation": 262.0,
+        "visibility_m": 400.0,
+        "shortwave_radiation": 257.0,
         "is_fog": true
       },
       {
-        "time": "2026-02-04T11:00",
-        "temperature_c": 11.5,
+        "time": "2026-02-05T11:00",
+        "temperature_c": 11.3,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 71,
-        "visibility_m": 13500.0,
-        "shortwave_radiation": 311.0,
+        "cloud_cover": 51,
+        "visibility_m": 14900.0,
+        "shortwave_radiation": 354.0,
         "is_fog": false
       },
       {
-        "time": "2026-02-04T12:00",
-        "temperature_c": 13.7,
+        "time": "2026-02-05T12:00",
+        "temperature_c": 13.8,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 27,
-        "visibility_m": 16200.0,
-        "shortwave_radiation": 530.0,
+        "cloud_cover": 17,
+        "visibility_m": 18800.0,
+        "shortwave_radiation": 600.0,
         "is_fog": false
       },
       {
-        "time": "2026-02-04T13:00",
-        "temperature_c": 16.5,
+        "time": "2026-02-05T13:00",
+        "temperature_c": 16.3,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 5,
-        "visibility_m": 21100.0,
-        "shortwave_radiation": 633.0,
+        "cloud_cover": 7,
+        "visibility_m": 23900.0,
+        "shortwave_radiation": 616.0,
         "is_fog": false
       },
       {
-        "time": "2026-02-04T14:00",
-        "temperature_c": 18.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 5,
-        "visibility_m": 31200.0,
-        "shortwave_radiation": 573.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-04T15:00",
-        "temperature_c": 19.8,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 5,
-        "visibility_m": 34600.0,
-        "shortwave_radiation": 478.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-04T16:00",
-        "temperature_c": 19.9,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 18,
-        "visibility_m": 35400.0,
-        "shortwave_radiation": 313.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-04T17:00",
+        "time": "2026-02-05T14:00",
         "temperature_c": 18.4,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 1,
-        "visibility_m": 33900.0,
-        "shortwave_radiation": 115.0,
+        "cloud_cover": 6,
+        "visibility_m": 29900.0,
+        "shortwave_radiation": 591.0,
         "is_fog": false
       },
       {
-        "time": "2026-02-04T18:00",
-        "temperature_c": 14.6,
+        "time": "2026-02-05T15:00",
+        "temperature_c": 19.8,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
-        "cloud_cover": 3,
-        "visibility_m": 21800.0,
-        "shortwave_radiation": 0.0,
+        "cloud_cover": 96,
+        "visibility_m": 37300.0,
+        "shortwave_radiation": 463.0,
         "is_fog": false
       },
       {
-        "time": "2026-02-04T19:00",
-        "temperature_c": 12.7,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 1,
-        "visibility_m": 15600.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-04T20:00",
-        "temperature_c": 11.5,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 8,
-        "visibility_m": 13600.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-04T21:00",
-        "temperature_c": 10.6,
-        "precipitation_prob": 0,
-        "precipitation_mm": 0.0,
-        "cloud_cover": 21,
-        "visibility_m": 12500.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": false
-      },
-      {
-        "time": "2026-02-04T22:00",
-        "temperature_c": 9.5,
+        "time": "2026-02-05T16:00",
+        "temperature_c": 19.5,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
         "cloud_cover": 100,
-        "visibility_m": 200.0,
-        "shortwave_radiation": 0.0,
-        "is_fog": true
+        "visibility_m": 38300.0,
+        "shortwave_radiation": 208.0,
+        "is_fog": false
       },
       {
-        "time": "2026-02-04T23:00",
+        "time": "2026-02-05T17:00",
+        "temperature_c": 17.5,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 32900.0,
+        "shortwave_radiation": 84.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-05T18:00",
+        "temperature_c": 15.2,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 27100.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-05T19:00",
+        "temperature_c": 13.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 25100.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-05T20:00",
+        "temperature_c": 13.4,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 25000.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-05T21:00",
+        "temperature_c": 11.9,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 100,
+        "visibility_m": 18600.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-05T22:00",
+        "temperature_c": 10.8,
+        "precipitation_prob": 0,
+        "precipitation_mm": 0.0,
+        "cloud_cover": 88,
+        "visibility_m": 13400.0,
+        "shortwave_radiation": 0.0,
+        "is_fog": false
+      },
+      {
+        "time": "2026-02-05T23:00",
         "temperature_c": 0.0,
         "precipitation_prob": 0,
         "precipitation_mm": 0.0,
@@ -489,8 +489,8 @@
       }
     ],
     "daily_precip_prob": {
-      "2026-02-03": 0,
-      "2026-02-04": 0
+      "2026-02-04": 0,
+      "2026-02-05": 0
     }
   }
 }
