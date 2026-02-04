@@ -37,8 +37,9 @@ CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
 DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
 
-# SSL verification toggle for corporate proxy environments
-SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
+# CA certificate bundle for corporate proxy environments
+# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
+CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
 
 
 class WeatherComDay(TypedDict):
@@ -208,7 +209,7 @@ class WeatherComProvider:
                     "Referer": "https://weather.com/",
                     "Origin": "https://weather.com",
                 }
-                response = session.get(url, headers=headers, timeout=30, verify=not SKIP_SSL_VERIFY)
+                response = session.get(url, headers=headers, timeout=30, verify=CA_BUNDLE)
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
@@ -287,11 +288,11 @@ class WeatherComProvider:
             with Session(impersonate="chrome110") as session:
                 # First request to get cookies
                 logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
-                home_resp = session.get("https://weather.com/", timeout=15, verify=not SKIP_SSL_VERIFY)
+                home_resp = session.get("https://weather.com/", timeout=15, verify=CA_BUNDLE)
                 logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
 
                 # Now fetch the forecast page with cookies
-                response = session.get(scrape_url, timeout=30, verify=not SKIP_SSL_VERIFY)
+                response = session.get(scrape_url, timeout=30, verify=CA_BUNDLE)
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] Scraping HTTP {response.status_code}")

@@ -228,11 +228,13 @@ The system calls these endpoints:
 - `wunderground.com` (Weather Underground)
 
 ### Security Controls
-- HTTPS connections configured to trust MID corporate SSL proxy inspection certificates
+- Full SSL certificate verification on all HTTPS connections (never disabled)
+- Optional `DUCK_SUN_CA_BUNDLE` env var to provide MID corporate CA certificate for proxy environments
 - Web scraping rate-limited to 3 calls/day per source to minimize external footprint
 - API error responses truncated in logs to limit data exposure
+- Removed `air-quality-api.open-meteo.com` (unsigned certificate endpoint)
 
-All traffic flows through MID's corporate proxy. No data is sent outbound except API requests.
+All endpoints use verified HTTPS. No data is sent outbound except API requests.
 
 ---
 

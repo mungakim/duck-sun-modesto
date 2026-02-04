@@ -37,8 +37,9 @@ CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "wunderground_cache.json"
 DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
 
-# SSL verification toggle for corporate proxy environments
-SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
+# CA certificate bundle for corporate proxy environments
+# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
+CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
 
 
 class WUndergroundDay(TypedDict):
@@ -198,7 +199,7 @@ class WUndergroundProvider:
             from curl_cffi.requests import Session
 
             with Session(impersonate="firefox135") as session:
-                response = session.get(self.URL, timeout=30, verify=not SKIP_SSL_VERIFY)
+                response = session.get(self.URL, timeout=30, verify=CA_BUNDLE)
 
             if response.status_code != 200:
                 logger.error(f"[WUndergroundProvider] HTTP {response.status_code}")

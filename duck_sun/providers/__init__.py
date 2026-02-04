@@ -13,8 +13,6 @@ from multiple sources for the Weighted Ensemble Consensus Model:
 7. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 6x
 8. MID.org - Modesto Irrigation District local data - Weight: 2x
 9. METAR - Real-time airport ground truth observations
-10. Smoke - Open-Meteo Air Quality API (PM2.5/AQI for wildfire smoke)
-
 RELIABILITY IS KING - Google MetNet-3 neural model leads the weighted ensemble.
 """
 
@@ -57,11 +55,6 @@ from duck_sun.providers.metar import (
     MetarObservation,
 )
 
-from duck_sun.providers.smoke import (
-    SmokeProvider,
-    SmokeMetrics,
-)
-
 from duck_sun.providers.weather_com import (
     WeatherComProvider,
     WeatherComDay,
@@ -98,9 +91,6 @@ __all__ = [
     # METAR (ground truth)
     "MetarProvider",
     "MetarObservation",
-    # Smoke (air quality/wildfire)
-    "SmokeProvider",
-    "SmokeMetrics",
     # Weather.com (commercial, weight: 4x) - Web scraping
     "WeatherComProvider",
     "WeatherComDay",

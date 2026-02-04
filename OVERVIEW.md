@@ -10,7 +10,7 @@ Duck Sun Modesto is an automated solar forecasting system for Modesto, CA power 
 
 ## How It Works
 
-### Data Collection (11 Weather Sources)
+### Data Collection (10 Weather Sources)
 
 The system fetches weather data from multiple providers and combines them using weighted ensemble averaging:
 
@@ -26,13 +26,12 @@ The system fetches weather data from multiple providers and combines them using 
 | **MID.org** | API | 2x | Local Modesto microclimate |
 | **HRRR** | API | - | High-resolution precipitation |
 | **METAR** | API | - | Airport ground truth |
-| **Smoke/AQI** | API | - | Wildfire smoke detection |
 
 ### Processing Pipeline
 
 ```
 1. FETCH DATA        2. VALIDATE           3. PHYSICS ENGINE      4. GENERATE REPORT
-   (11 providers)       (retry failures)      (solar calculations)   (Excel to network)
+   (10 providers)       (retry failures)      (solar calculations)   (Excel to network)
         |                    |                      |                      |
         v                    v                      v                      v
    [API calls]  -->  [Check completeness]  -->  [Weighted        -->  [Save to X: drive]
@@ -66,7 +65,7 @@ The system fetches weather data from multiple providers and combines them using 
 ```
 duck_sun/
 ├── scheduler.py          # Main orchestrator - runs the daily workflow
-├── providers/            # Data fetching (11 provider modules)
+├── providers/            # Data fetching (10 provider modules)
 │   ├── google_weather.py
 │   ├── accuweather.py
 │   ├── weather_com.py    # Web scraping, 3/day limit
@@ -75,8 +74,7 @@ duck_sun/
 │   ├── met_no.py
 │   ├── open_meteo.py
 │   ├── mid_org.py
-│   ├── metar.py
-│   └── smoke.py
+│   └── metar.py
 ├── uncanniness.py        # Physics engine (solar math, fog detection)
 ├── ensemble.py           # Weighted consensus calculations
 ├── solar_physics.py      # Solar factor & irradiance math
@@ -102,7 +100,7 @@ TWC_API_KEY=your_key_here
 Optional:
 ```
 LOG_LEVEL=INFO                # DEBUG for verbose output
-DUCK_SUN_SKIP_SSL_VERIFY=1    # Required for MID corporate proxy
+DUCK_SUN_CA_BUNDLE=C:\path\to\mid-ca-bundle.pem  # MID corporate CA certificate
 ```
 
 ---
@@ -139,7 +137,7 @@ The Excel report includes:
 2. **MID Weather Summary** - Local 48-hour with historical records
 3. **Precipitation Forecast** - % chance from ensemble
 4. **3-Day Solar Forecast** - Hourly W/m² for duck curve hours (HE09-HE16)
-5. **Fog/Smoke Alerts** - Tule fog detection, wildfire smoke warnings
+5. **Fog Alerts** - Tule fog detection for Central Valley
 
 ---
 
@@ -159,6 +157,8 @@ Run standalone: `./venv/Scripts/python.exe -m duck_sun.verification`
 ## Security Notes
 
 - All API keys loaded from environment variables (never hardcoded)
-- HTTPS connections configured to trust MID corporate SSL proxy inspection certificates
+- Full SSL certificate verification on all HTTPS connections (never disabled)
+- Optional `DUCK_SUN_CA_BUNDLE` env var to provide MID corporate CA certificate for proxy environments
 - Web scraping rate-limited to 3 calls/day per source to minimize external footprint
 - API error responses truncated in logs to limit data exposure
+- Removed `air-quality-api.open-meteo.com` (unsigned certificate endpoint)

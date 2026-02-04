@@ -38,7 +38,6 @@ from duck_sun.providers.accuweather import AccuWeatherProvider
 from duck_sun.providers.google_weather import GoogleWeatherProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
-from duck_sun.providers.smoke import SmokeProvider
 from duck_sun.providers.weather_com import WeatherComProvider
 from duck_sun.providers.wunderground import WUndergroundProvider
 
@@ -393,15 +392,6 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["metar"] = await fetch_with_retry("metar", _fetch_metar, cache_mgr)
 
-    # 9. Smoke (air quality)
-    logger.info("[fetch_all_providers] Fetching Smoke/AQI...")
-
-    async def _fetch_smoke():
-        smoke = SmokeProvider()
-        return await smoke.fetch_async(days=3)
-
-    results["smoke"] = await fetch_with_retry("smoke", _fetch_smoke, cache_mgr)
-
     # Summary
     fresh_count = sum(1 for r in results.values() if r.source == "API")
     cache_count = sum(1 for r in results.values() if r.source == "CACHE")
@@ -703,7 +693,6 @@ async def main():
         wunderground_data = results["wunderground"].data
         mid_data = results["mid_org"].data
         metar_data = results["metar"].data
-        smoke_data = results["smoke"].data
 
         # Check critical provider - attempt fallback if Open-Meteo unavailable
         if om_data is None or not om_data:
