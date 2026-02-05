@@ -136,7 +136,9 @@ class UncannyEngine:
         # AccuWeather daily temps (interpolate to hourly by day)
         df['temp_accu'] = np.nan
         if accu_data:
-            accu_by_date = {d['date']: d for d in accu_data}
+            # Filter to only days with valid temperature data
+            accu_by_date = {d['date']: d for d in accu_data
+                           if d.get('low_c') is not None and d.get('high_c') is not None}
             accu_merged = 0
             for idx, row in df.iterrows():
                 date_str = row['time'].strftime('%Y-%m-%d')
