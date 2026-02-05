@@ -40,9 +40,13 @@ logger = logging.getLogger(__name__)
 # Default database path (at project root)
 DB_PATH = Path("verification.db")
 
-# CA certificate bundle for corporate proxy environments
-# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
-CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
+# Import SSL helper for Windows certificate store support
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+except ImportError:
+    # Fallback if ssl_helper not available
+    def get_ca_bundle():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
 
 
 class DailyHighLow(TypedDict):
@@ -515,7 +519,7 @@ async def fetch_yesterday_actuals() -> Optional[Dict[str, Any]]:
     logger.debug(f"[fetch_yesterday_actuals] Request params: {params}")
     
     try:
-        async with httpx.AsyncClient(timeout=15.0, verify=CA_BUNDLE) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
             resp = await client.get(URL, params=params)
             logger.info(f"[fetch_yesterday_actuals] Response status: {resp.status_code}")
             
