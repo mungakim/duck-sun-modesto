@@ -3,6 +3,7 @@ Standalone forecast runner for PyInstaller exe.
 This script runs the forecast and opens the Excel report.
 Git operations are skipped (not needed for coworkers).
 """
+import asyncio
 import os
 import sys
 import traceback
@@ -32,7 +33,8 @@ def main():
 
     try:
         from duck_sun.scheduler import main as run_scheduler
-        result = run_scheduler()
+        # scheduler.main() is async, so we need asyncio.run()
+        result = asyncio.run(run_scheduler())
 
         if result != 0:
             print()
