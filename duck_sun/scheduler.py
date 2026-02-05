@@ -810,23 +810,32 @@ async def main():
 
         # Step 1: Open-Meteo as fallback base (always has 8 days)
         if om_data and 'daily_forecast' in om_data:
+            om_precip_debug = []
             for d in om_data['daily_forecast']:
                 date_key = d.get('date', '')
+                precip_val = d.get('precip_prob', 0)
                 if date_key:
                     precip_data[date_key] = {
-                        'consensus': d.get('precip_prob', 0),
+                        'consensus': precip_val,
                         'source': 'Open-Meteo'
                     }
+                    om_precip_debug.append(f"{date_key[-5:]}:{precip_val}%")
+            logger.info(f"[main] PRECIP Step 1 (Open-Meteo): {', '.join(om_precip_debug)}")
 
         # Step 2: AccuWeather overwrites Open-Meteo (better quality, 5 days)
         if accu_data:
+            accu_precip_debug = []
             for d in accu_data:
                 date_key = d.get('date', '')
-                if date_key and d.get('precip_prob') is not None:
+                precip_val = d.get('precip_prob')
+                if date_key and precip_val is not None:
                     precip_data[date_key] = {
-                        'consensus': d.get('precip_prob', 0),
+                        'consensus': precip_val,
                         'source': 'AccuWeather'
                     }
+                    accu_precip_debug.append(f"{date_key[-5:]}:{precip_val}%")
+            if accu_precip_debug:
+                logger.info(f"[main] PRECIP Step 2 (AccuWeather): {', '.join(accu_precip_debug)}")
 
         # Step 3: Google Weather overwrites BUT ONLY for days 0-2 (0-72 hours)
         # MetNet-3 neural model is optimized for short-term "nowcasting"
@@ -834,10 +843,13 @@ async def main():
         if google_data and 'daily' in google_data:
             from datetime import datetime as dt_class
             today_dt = dt_class.strptime(today, '%Y-%m-%d')
+            google_precip_debug = []
 
             for d in google_data['daily']:
                 date_key = d.get('date', '')
-                if date_key and d.get('precip_prob') is not None:
+                precip_val = d.get('precip_prob')
+                google_precip_debug.append(f"{date_key[-5:]}:{precip_val}%")
+                if date_key and precip_val is not None:
                     try:
                         forecast_dt = dt_class.strptime(date_key, '%Y-%m-%d')
                         days_ahead = (forecast_dt - today_dt).days
@@ -845,19 +857,19 @@ async def main():
                         # Only use Google for days 0-2 (0-72 hours)
                         if days_ahead <= 2:
                             precip_data[date_key] = {
-                                'consensus': d.get('precip_prob', 0),
+                                'consensus': precip_val,
                                 'source': 'Google'
                             }
                         else:
                             # For days 3+, keep AccuWeather (already set in step 2)
                             # Log when Google would disagree significantly
                             accu_val = precip_data.get(date_key, {}).get('consensus', 0)
-                            google_val = d.get('precip_prob', 0)
-                            if abs(google_val - accu_val) > 30:
+                            if abs(precip_val - accu_val) > 30:
                                 logger.warning(f"[main] PRECIP RANGE CHECK: {date_key} (day {days_ahead}) - "
-                                             f"Google={google_val}% vs AccuWeather={accu_val}% - Using AccuWeather")
+                                             f"Google={precip_val}% vs AccuWeather={accu_val}% - Using AccuWeather")
                     except ValueError:
                         pass
+            logger.info(f"[main] PRECIP Step 3 (Google raw): {', '.join(google_precip_debug)}")
 
         # Log precip source summary
         google_days = sum(1 for v in precip_data.values() if v.get('source') == 'Google')
