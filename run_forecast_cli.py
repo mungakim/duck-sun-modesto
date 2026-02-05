@@ -5,7 +5,7 @@ Git operations are skipped (not needed for coworkers).
 """
 import os
 import sys
-import subprocess
+import traceback
 from pathlib import Path
 
 def main():
@@ -36,12 +36,19 @@ def main():
 
         if result != 0:
             print()
-            print("[ERROR] Forecast failed!")
+            print("[ERROR] Forecast returned non-zero exit code:", result)
             input("Press Enter to exit...")
             return 1
 
     except Exception as e:
-        print(f"[ERROR] {e}")
+        print()
+        print("=" * 50)
+        print("[ERROR] Forecast failed with exception:")
+        print("=" * 50)
+        traceback.print_exc()
+        print()
+        print(f"Error: {e}")
+        print()
         input("Press Enter to exit...")
         return 1
 
