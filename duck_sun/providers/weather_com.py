@@ -30,16 +30,20 @@ except ImportError:
     HAS_BS4 = False
     BeautifulSoup = None
 
+# Import SSL helper for Windows certificate store support
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl
+except ImportError:
+    # Fallback if ssl_helper not available
+    def get_ca_bundle_for_curl():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
+
 logger = logging.getLogger(__name__)
 
 # Rate limiting configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
 DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
-
-# CA certificate bundle for corporate proxy environments
-# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
-CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
 
 
 class WeatherComDay(TypedDict):
@@ -209,7 +213,7 @@ class WeatherComProvider:
                     "Referer": "https://weather.com/",
                     "Origin": "https://weather.com",
                 }
-                response = session.get(url, headers=headers, timeout=30, verify=CA_BUNDLE)
+                response = session.get(url, headers=headers, timeout=30, verify=get_ca_bundle_for_curl())
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
@@ -288,11 +292,11 @@ class WeatherComProvider:
             with Session(impersonate="chrome110") as session:
                 # First request to get cookies
                 logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
-                home_resp = session.get("https://weather.com/", timeout=15, verify=CA_BUNDLE)
+                home_resp = session.get("https://weather.com/", timeout=15, verify=get_ca_bundle_for_curl())
                 logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
 
                 # Now fetch the forecast page with cookies
-                response = session.get(scrape_url, timeout=30, verify=CA_BUNDLE)
+                response = session.get(scrape_url, timeout=30, verify=get_ca_bundle_for_curl())
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] Scraping HTTP {response.status_code}")
