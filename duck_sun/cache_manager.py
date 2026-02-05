@@ -150,7 +150,6 @@ class CacheManager:
             "fetched_at": "DEFAULT"
         },
         "metar": None,  # Ground truth - None is acceptable
-        "smoke": None,  # Optional - None is acceptable
     }
 
     MAX_HISTORY_DAYS = 30

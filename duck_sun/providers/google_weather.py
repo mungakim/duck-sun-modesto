@@ -31,8 +31,9 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("outputs/cache")
 CACHE_FILE = CACHE_DIR / "google_weather_lkg.json"
 
-# SSL verification toggle for corporate proxy environments
-SKIP_SSL_VERIFY = os.getenv("DUCK_SUN_SKIP_SSL_VERIFY", "").lower() in ("1", "true", "yes")
+# CA certificate bundle for corporate proxy environments
+# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
+CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
 
 
 class GoogleHourlyData(TypedDict):
@@ -243,7 +244,7 @@ class GoogleWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=not SKIP_SSL_VERIFY) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=CA_BUNDLE) as client:
                 all_forecasts = []
                 next_page_token = None
                 page_count = 0
