@@ -31,9 +31,13 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("outputs/cache")
 CACHE_FILE = CACHE_DIR / "google_weather_lkg.json"
 
-# CA certificate bundle for corporate proxy environments
-# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
-CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
+# Import SSL helper for Windows certificate store support
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+except ImportError:
+    # Fallback if ssl_helper not available
+    def get_ca_bundle():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
 
 
 class GoogleHourlyData(TypedDict):
@@ -244,7 +248,7 @@ class GoogleWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=CA_BUNDLE) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=get_ca_bundle()) as client:
                 all_forecasts = []
                 next_page_token = None
                 page_count = 0
