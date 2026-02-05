@@ -30,16 +30,20 @@ except ImportError:
     HAS_BS4 = False
     BeautifulSoup = None
 
+# Import SSL helper for Windows certificate store support
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl
+except ImportError:
+    # Fallback if ssl_helper not available
+    def get_ca_bundle_for_curl():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
+
 logger = logging.getLogger(__name__)
 
 # Rate limiting configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "wunderground_cache.json"
 DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
-
-# CA certificate bundle for corporate proxy environments
-# Set DUCK_SUN_CA_BUNDLE to the path of a .pem file containing MID's root CA certificate
-CA_BUNDLE = os.getenv("DUCK_SUN_CA_BUNDLE", True)  # True = system default certs
 
 
 class WUndergroundDay(TypedDict):
@@ -199,7 +203,7 @@ class WUndergroundProvider:
             from curl_cffi.requests import Session
 
             with Session(impersonate="firefox135") as session:
-                response = session.get(self.URL, timeout=30, verify=CA_BUNDLE)
+                response = session.get(self.URL, timeout=30, verify=get_ca_bundle_for_curl())
 
             if response.status_code != 200:
                 logger.error(f"[WUndergroundProvider] HTTP {response.status_code}")
