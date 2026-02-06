@@ -1,6 +1,6 @@
 {
   "provider": "wunderground",
-  "timestamp": "2026-02-06T08:38:36.526560",
+  "timestamp": "2026-02-06T09:43:28.837614",
   "api_success": true,
   "data": [
     {
@@ -21,7 +21,7 @@
       "high_c": 21.67,
       "low_c": 6.67,
       "condition": "Unknown",
-      "precip_prob": 10
+      "precip_prob": 9
     },
     {
       "date": "2026-02-08",
@@ -31,7 +31,7 @@
       "high_c": 20.56,
       "low_c": 9.44,
       "condition": "Unknown",
-      "precip_prob": 12
+      "precip_prob": 11
     },
     {
       "date": "2026-02-09",
@@ -41,7 +41,7 @@
       "high_c": 16.11,
       "low_c": 7.78,
       "condition": "Unknown",
-      "precip_prob": 54
+      "precip_prob": 53
     },
     {
       "date": "2026-02-10",
@@ -51,14 +51,14 @@
       "high_c": 13.33,
       "low_c": 5.56,
       "condition": "Unknown",
-      "precip_prob": 56
+      "precip_prob": 57
     },
     {
       "date": "2026-02-11",
       "day_name": "Wed",
-      "high_f": 60.0,
+      "high_f": 61.0,
       "low_f": 41.0,
-      "high_c": 15.56,
+      "high_c": 16.11,
       "low_c": 5.0,
       "condition": "Unknown",
       "precip_prob": 22
