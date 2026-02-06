@@ -539,7 +539,6 @@ if __name__ == "__main__":
     from duck_sun.providers.open_meteo import fetch_open_meteo
     from duck_sun.providers.noaa import NOAAProvider
     from duck_sun.providers.met_no import MetNoProvider
-    from duck_sun.providers.smoke import SmokeProvider
     from duck_sun.providers.accuweather import AccuWeatherProvider
     from duck_sun.providers.mid_org import MIDOrgProvider
 
@@ -568,18 +567,13 @@ if __name__ == "__main__":
         mid = MIDOrgProvider()
         mid_data = await mid.fetch_48hr_summary()
 
-        print("Fetching Smoke data...")
-        smoke = SmokeProvider()
-        smoke_data = await smoke.fetch_async(days=3)
-
         engine = UncannyEngine()
 
         print("\nBuilding WEIGHTED ENSEMBLE consensus model...")
         df = engine.normalize_temps(
             om_data, noaa_data, met_data,
             accu_data=accu_data,
-            mid_data=mid_data,
-            smoke_data=smoke_data
+            mid_data=mid_data
         )
 
         print("\n=== Variance Report ===")
@@ -590,7 +584,7 @@ if __name__ == "__main__":
         if var_report.get('has_critical'):
             print(f"  WARNING: Critical variance detected!")
 
-        print("\nRunning Fog Guard + Smoke Guard with Narrative Override...")
+        print("\nRunning Fog Guard + Narrative Override...")
         df_analyzed = engine.analyze_duck_curve(df, noaa_text_data=noaa_text)
 
         print("\n=== Daily Summary ===")

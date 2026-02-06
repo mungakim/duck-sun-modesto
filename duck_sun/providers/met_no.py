@@ -121,7 +121,7 @@ class MetNoProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(self.BASE_URL, params=params, headers=self.HEADERS)
 
                 if resp.status_code != 200:

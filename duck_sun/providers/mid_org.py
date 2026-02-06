@@ -122,7 +122,7 @@ class MIDOrgProvider:
         logger.info("[MIDOrgProvider] Fetching from MID API...")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 # Fetch 48-hour summary
                 summary_url = f"{MID_API_BASE}/weather/twoday/summary"
                 summary_resp = await client.get(summary_url, headers=self.HEADERS)
@@ -167,7 +167,7 @@ class MIDOrgProvider:
         Returns list of hourly records with temperature, wind, barometer, rain.
         """
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 detail_url = f"{MID_API_BASE}/weather/twoday/detail"
                 resp = await client.get(detail_url, headers=self.HEADERS)
 

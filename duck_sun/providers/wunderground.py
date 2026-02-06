@@ -203,15 +203,7 @@ class WUndergroundProvider:
             from curl_cffi.requests import Session
 
             with Session(impersonate="firefox135") as session:
-                verify = get_ca_bundle_for_curl()
-                try:
-                    response = session.get(self.URL, timeout=30, verify=verify)
-                except Exception as ssl_err:
-                    if 'SSL' in str(ssl_err) or 'certificate' in str(ssl_err).lower():
-                        logger.warning(f"[WUndergroundProvider] SSL failed with verify={verify}, retrying with verify=False")
-                        response = session.get(self.URL, timeout=30, verify=False)
-                    else:
-                        raise
+                response = session.get(self.URL, timeout=30, verify=get_ca_bundle_for_curl())
 
             if response.status_code != 200:
                 logger.error(f"[WUndergroundProvider] HTTP {response.status_code}")
