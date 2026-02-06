@@ -392,6 +392,7 @@ class GoogleWeatherProvider:
         daily_temps: Dict[str, List[float]] = {}      # Uses meteorological day
         daily_precip: Dict[str, List[int]] = {}       # Uses CALENDAR day
         daily_conditions: Dict[str, List[str]] = {}   # Uses meteorological day
+        daily_max_hour: Dict[str, int] = {}           # Track max local hour per met-day
         processed_count = 0
         error_count = 0
 
@@ -420,11 +421,13 @@ class GoogleWeatherProvider:
                 if met_date not in daily_temps:
                     daily_temps[met_date] = []
                     daily_conditions[met_date] = []
+                    daily_max_hour[met_date] = 0
                 if calendar_date not in daily_precip:
                     daily_precip[calendar_date] = []
 
                 # Temps and conditions use meteorological day
                 daily_temps[met_date].append(hour['temp_c'])
+                daily_max_hour[met_date] = max(daily_max_hour[met_date], dt.hour)
                 if hour.get('is_daytime', True):
                     daily_conditions[met_date].append(hour['condition'])
 
@@ -445,6 +448,14 @@ class GoogleWeatherProvider:
         for met_date in sorted(daily_temps.keys()):
             temps = daily_temps[met_date]
             if not temps:
+                continue
+
+            # Skip partial days that lack afternoon data — the "high" would just
+            # be a morning temp, not the actual daytime peak. This happens at the
+            # edges of the 96-hour API window (first/last day).
+            max_hour = daily_max_hour.get(met_date, 0)
+            if max_hour < 14:
+                logger.info(f"[GoogleWeatherProvider] Skipping partial day {met_date} (max local hour={max_hour}, need >=14 for reliable high)")
                 continue
 
             high_c = max(temps)
