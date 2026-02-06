@@ -36,15 +36,6 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo Opening Excel report...
-
-:: Find and open the latest xlsx file
-for /f "delims=" %%F in ('powershell -command "Get-ChildItem -Path 'reports' -Filter '*.xlsx' -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName"') do (
-    echo Opening: %%F
-    start "" "%%F"
-)
-
-echo.
 echo ============================================
 echo   Done!
 echo ============================================
