@@ -48,4 +48,6 @@ echo.
 echo ============================================
 echo   Done!
 echo ============================================
-timeout /t 3
+echo.
+echo Review output above for any errors.
+pause

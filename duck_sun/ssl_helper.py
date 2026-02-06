@@ -88,10 +88,10 @@ def get_ca_bundle_for_curl() -> str | bool:
     Priority:
     1. DUCK_SUN_CA_BUNDLE environment variable (explicit override)
     2. Windows certificate store (if on Windows)
-    3. True (use curl's default behavior)
+    3. False (skip verification - matches httpx providers, avoids proxy failures)
 
     Returns:
-        Path to CA bundle file, or True for default behavior
+        Path to CA bundle file, or False to skip verification
     """
     # Check for explicit override
     env_bundle = os.getenv("DUCK_SUN_CA_BUNDLE")
@@ -107,9 +107,14 @@ def get_ca_bundle_for_curl() -> str | bool:
     if windows_bundle:
         return windows_bundle
 
-    # Fall back to default
-    logger.debug("[ssl_helper] Using default CA bundle")
-    return True
+    # Fall back to skipping verification
+    # This matches what httpx-based providers (NOAA, Met.no, MID.org, Open-Meteo,
+    # METAR) already do with verify=False. Behind corporate proxies with SSL
+    # inspection, curl_cffi's bundled Mozilla CA bundle won't have the proxy's
+    # CA cert, so using True (default bundle) would fail. Better to skip
+    # verification than to fail entirely and serve stale cached data.
+    logger.warning("[ssl_helper] No CA bundle available - falling back to verify=False")
+    return False
 
 
 # Pre-extract on module load for Windows
