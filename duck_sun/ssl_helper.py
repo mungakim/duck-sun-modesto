@@ -7,11 +7,13 @@ Two functions for two SSL stacks:
 2. get_httpx_ssl_context() → ssl.SSLContext for httpx (Python ssl module)
 
 curl_cffi uses libcurl which needs a PEM file on disk.
-httpx can accept an ssl.SSLContext directly — this avoids the "Missing
-Authority Key Identifier" error that occurs when Python's ssl module
-loads certain Windows certs from a PEM file. Loading certs natively
-into an SSLContext handles chain-building without needing the AKI
-extension on every certificate.
+
+httpx needs an ssl.SSLContext. On Windows behind a corporate firewall,
+the firewall's intermediate cert may lack the Authority Key Identifier
+(AKI) X.509 extension. OpenSSL 3.x (bundled with Python 3.14) rejects
+these chains, but Windows SChannel handles them fine. The `truststore`
+package delegates SSL verification to the OS native stack (SChannel on
+Windows), bypassing OpenSSL's strict AKI requirement.
 """
 
 import base64
@@ -28,6 +30,12 @@ try:
 except ImportError:
     HAS_CERTIFI = False
     certifi = None
+
+try:
+    import truststore
+    HAS_TRUSTSTORE = True
+except ImportError:
+    HAS_TRUSTSTORE = False
 
 logger = logging.getLogger(__name__)
 
@@ -142,17 +150,13 @@ def get_ca_bundle_for_curl() -> str | bool:
 
 def get_httpx_ssl_context() -> ssl.SSLContext:
     """
-    Get an ssl.SSLContext for httpx with Windows cert store loaded.
+    Get an ssl.SSLContext for httpx with OS-native cert verification.
 
-    Unlike get_ca_bundle_for_curl() which returns a PEM file path,
-    this returns an SSLContext that httpx can use directly. Loading
-    certs natively into an SSLContext avoids the "Missing Authority
-    Key Identifier" error that Python's ssl module raises when it
-    reads certain Windows certs from a PEM file — chain-building
-    works correctly when certs are loaded via the SSLContext API.
-
-    On non-Windows platforms, returns ssl.create_default_context()
-    which uses the OS default cert store.
+    Priority:
+    1. truststore (delegates to Windows SChannel / macOS SecureTransport)
+       - Bypasses OpenSSL 3.x strict AKI checks that reject firewall certs
+       - Used by pip itself for corporate proxy/firewall environments
+    2. Fallback: ssl.create_default_context() + manual Windows cert loading
 
     Returns:
         ssl.SSLContext configured for HTTPS with proper CA certs.
@@ -162,6 +166,20 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
     if _cached_ssl_context is not None:
         return _cached_ssl_context
 
+    # Option 1: truststore — uses OS native SSL (SChannel on Windows)
+    # This is the only reliable way to handle firewall certs that lack
+    # the Authority Key Identifier extension (OpenSSL 3.x rejects them,
+    # but Windows SChannel handles them via subject/issuer name matching)
+    if HAS_TRUSTSTORE:
+        try:
+            ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            logger.info("[ssl_helper] httpx SSLContext: using truststore (OS-native SSL)")
+            _cached_ssl_context = ctx
+            return ctx
+        except Exception as e:
+            logger.warning(f"[ssl_helper] truststore init failed: {e}, falling back")
+
+    # Option 2: Manual Windows cert loading (works if no AKI issues)
     ctx = ssl.create_default_context()
 
     if sys.platform == 'win32':
@@ -184,7 +202,7 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
 
         if loaded:
             logger.info(
-                f"[ssl_helper] httpx SSLContext: loaded {loaded} Windows certs"
+                f"[ssl_helper] httpx SSLContext: loaded {loaded} Windows certs (no truststore)"
                 + (f" (skipped {skipped} problematic)" if skipped else "")
             )
 
