@@ -1,14 +1,17 @@
 """
 SSL Helper for Certificate Store Integration
 
-Provides CA bundle resolution for curl_cffi, which uses libcurl's SSL
-stack and doesn't automatically use the OS certificate store.
+Two functions for two SSL stacks:
 
-httpx uses Python's ssl module, which pip-system-certs patches to use
-the OS cert store automatically. But curl_cffi uses libcurl and needs
-a PEM file. This module exports the Windows cert store to a PEM file
-so curl_cffi trusts the same certificates as the OS (including any
-firewall/inspection CA certs that Windows trusts).
+1. get_ca_bundle_for_curl() → PEM file path for curl_cffi (libcurl)
+2. get_httpx_ssl_context() → ssl.SSLContext for httpx (Python ssl module)
+
+curl_cffi uses libcurl which needs a PEM file on disk.
+httpx can accept an ssl.SSLContext directly — this avoids the "Missing
+Authority Key Identifier" error that occurs when Python's ssl module
+loads certain Windows certs from a PEM file. Loading certs natively
+into an SSLContext handles chain-building without needing the AKI
+extension on every certificate.
 """
 
 import base64
@@ -30,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Cache the exported PEM path for process lifetime
 _cached_windows_pem: str | None = None
+# Cache the SSLContext for process lifetime
+_cached_ssl_context: ssl.SSLContext | None = None
 
 
 def _export_windows_cert_store() -> str | None:
@@ -133,3 +138,55 @@ def get_ca_bundle_for_curl() -> str | bool:
     # Use curl's default CA store (SSL verification stays ON)
     logger.warning("[ssl_helper] No CA bundle available - using curl default CA store")
     return True
+
+
+def get_httpx_ssl_context() -> ssl.SSLContext:
+    """
+    Get an ssl.SSLContext for httpx with Windows cert store loaded.
+
+    Unlike get_ca_bundle_for_curl() which returns a PEM file path,
+    this returns an SSLContext that httpx can use directly. Loading
+    certs natively into an SSLContext avoids the "Missing Authority
+    Key Identifier" error that Python's ssl module raises when it
+    reads certain Windows certs from a PEM file — chain-building
+    works correctly when certs are loaded via the SSLContext API.
+
+    On non-Windows platforms, returns ssl.create_default_context()
+    which uses the OS default cert store.
+
+    Returns:
+        ssl.SSLContext configured for HTTPS with proper CA certs.
+    """
+    global _cached_ssl_context
+
+    if _cached_ssl_context is not None:
+        return _cached_ssl_context
+
+    ctx = ssl.create_default_context()
+
+    if sys.platform == 'win32':
+        loaded = 0
+        skipped = 0
+        for store_name in ('ROOT', 'CA'):
+            try:
+                for cert_data, encoding, trust in ssl.enum_certificates(store_name):
+                    if encoding == 'x509_asn':
+                        try:
+                            pem = ssl.DER_cert_to_PEM_cert(cert_data)
+                            ctx.load_verify_locations(cadata=pem)
+                            loaded += 1
+                        except Exception:
+                            skipped += 1
+            except AttributeError:
+                break
+            except Exception as e:
+                logger.debug(f"[ssl_helper] Error reading {store_name} store: {e}")
+
+        if loaded:
+            logger.info(
+                f"[ssl_helper] httpx SSLContext: loaded {loaded} Windows certs"
+                + (f" (skipped {skipped} problematic)" if skipped else "")
+            )
+
+    _cached_ssl_context = ctx
+    return ctx

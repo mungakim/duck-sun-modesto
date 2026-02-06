@@ -26,13 +26,13 @@ CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "accuweather_cache.json"
 DAILY_CALL_LIMIT = 42  # Stop making API calls after 42/day (safety margin under 50)
 
-# Import SSL helper for Windows certificate store support
+# SSL: Use OS certificate store for PyInstaller exe compatibility
 try:
-    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+    from duck_sun.ssl_helper import get_httpx_ssl_context
 except ImportError:
-    # Fallback if ssl_helper not available
-    def get_ca_bundle():
-        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
+    import ssl as _ssl
+    def get_httpx_ssl_context():
+        return _ssl.create_default_context()
 
 
 class AccuWeatherDay(TypedDict):
@@ -280,7 +280,7 @@ class AccuWeatherProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=10.0, verify=get_ca_bundle()) as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=get_httpx_ssl_context()) as client:
                 logger.debug(f"[AccuWeatherProvider] GET {url}")
                 resp = await client.get(url, params=params)
                 
