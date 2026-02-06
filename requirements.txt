@@ -8,6 +8,9 @@ anthropic>=0.75.0
 # Async HTTP client
 httpx>=0.28.0
 
+# SSL certificates (explicit for PyInstaller bundling)
+certifi>=2024.0.0
+
 # Environment variable management
 python-dotenv>=1.0.0
 

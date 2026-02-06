@@ -77,18 +77,21 @@ def get_windows_ca_bundle() -> str | None:
         return _cached_cert_file
 
     except Exception as e:
-        logger.error(f"[ssl_helper] Failed to extract Windows certs: {e}")
+        import traceback
+        logger.error(f"[ssl_helper] Failed to extract Windows certs: {type(e).__name__}: {e}")
+        logger.debug(f"[ssl_helper] Traceback: {traceback.format_exc()}")
         return None
 
 
 def get_ca_bundle_for_curl() -> str | bool:
     """
-    Get the appropriate CA bundle for curl_cffi.
+    Get the appropriate CA bundle for curl_cffi and httpx.
 
     Priority:
     1. DUCK_SUN_CA_BUNDLE environment variable (explicit override)
     2. Windows certificate store (if on Windows)
-    3. True (use curl's default behavior)
+    3. Certifi bundle (if available - works with PyInstaller)
+    4. True (use library's default behavior)
 
     Returns:
         Path to CA bundle file, or True for default behavior
@@ -106,6 +109,18 @@ def get_ca_bundle_for_curl() -> str | bool:
     windows_bundle = get_windows_ca_bundle()
     if windows_bundle:
         return windows_bundle
+
+    # Try certifi (works with PyInstaller frozen apps)
+    try:
+        import certifi
+        certifi_bundle = certifi.where()
+        if certifi_bundle and os.path.exists(certifi_bundle):
+            logger.info(f"[ssl_helper] Using certifi CA bundle: {certifi_bundle}")
+            return certifi_bundle
+    except ImportError:
+        logger.debug("[ssl_helper] certifi not available")
+    except Exception as e:
+        logger.debug(f"[ssl_helper] certifi error: {e}")
 
     # Fall back to default
     logger.debug("[ssl_helper] Using default CA bundle")
