@@ -228,6 +228,13 @@ class WeatherComProvider:
             temp_min = data.get('temperatureMin', [])
             narrative = data.get('narrative', [])
 
+            # Extract daypart data for precipitation and conditions
+            # daypart[0] contains alternating day/night arrays (2 entries per day)
+            daypart = data.get('daypart', [{}])
+            dp = daypart[0] if daypart else {}
+            precip_chances = dp.get('precipChance', [])
+            wx_phrases = dp.get('wxPhraseLong', [])
+
             if not temp_max or not temp_min:
                 logger.error("[WeatherComProvider] No temperature data in API response")
                 return self._fetch_via_scraping()
@@ -255,8 +262,21 @@ class WeatherComProvider:
                 # Get date
                 date_str = self._get_date_for_day(i)
 
-                # Get condition from narrative
-                condition = narrative[i][:50] if i < len(narrative) else "Unknown"
+                # Get condition from daypart wxPhraseLong (daytime preferred)
+                day_dp_idx = i * 2
+                night_dp_idx = i * 2 + 1
+                if day_dp_idx < len(wx_phrases) and wx_phrases[day_dp_idx]:
+                    condition = wx_phrases[day_dp_idx]
+                elif night_dp_idx < len(wx_phrases) and wx_phrases[night_dp_idx]:
+                    condition = wx_phrases[night_dp_idx]
+                else:
+                    condition = narrative[i][:50] if i < len(narrative) else "Unknown"
+
+                # Get precipitation probability (max of day/night)
+                day_precip = precip_chances[day_dp_idx] if day_dp_idx < len(precip_chances) else None
+                night_precip = precip_chances[night_dp_idx] if night_dp_idx < len(precip_chances) else None
+                precip_values = [p for p in [day_precip, night_precip] if p is not None]
+                precip_prob = max(precip_values) if precip_values else 0
 
                 results.append({
                     "date": date_str,
@@ -266,7 +286,7 @@ class WeatherComProvider:
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
                     "condition": condition,
-                    "precip_prob": 0
+                    "precip_prob": precip_prob
                 })
 
                 logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F")
@@ -313,6 +333,8 @@ class WeatherComProvider:
                 class_=lambda x: x and 'highTempValue' in str(x) if x else False
             )
             low_temps = soup.find_all(attrs={"data-testid": "lowTempValue"})
+            precip_elems = soup.find_all(attrs={"data-testid": "PercentageValue"})
+            condition_elems = soup.find_all(attrs={"data-testid": "wxPhrase"})
 
             if not high_temps or not low_temps:
                 logger.error("[WeatherComProvider] No forecast data found in page")
@@ -333,6 +355,20 @@ class WeatherComProvider:
                 day_name = day_names[i].text.strip()[:3] if i < len(day_names) else f"D{i}"
                 date_str = self._get_date_for_day(i)
 
+                # Extract precipitation percentage from scraped page
+                precip_prob = 0
+                if i < len(precip_elems):
+                    precip_text = precip_elems[i].text.strip().replace('%', '')
+                    try:
+                        precip_prob = int(precip_text)
+                    except ValueError:
+                        pass
+
+                # Extract condition text from scraped page
+                condition = "Unknown"
+                if i < len(condition_elems):
+                    condition = condition_elems[i].text.strip()
+
                 results.append({
                     "date": date_str,
                     "day_name": day_name,
@@ -340,8 +376,8 @@ class WeatherComProvider:
                     "low_f": float(low_f),
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
-                    "condition": "Unknown",
-                    "precip_prob": 0
+                    "condition": condition,
+                    "precip_prob": precip_prob
                 })
 
             logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via scraping")
@@ -377,11 +413,11 @@ if __name__ == "__main__":
 
     if data:
         print(f"\n[RESULTS] Weather.com 10-Day Forecast ({len(data)} days):")
-        print("-" * 50)
-        print(f"{'Day':<15} | {'High':<6} | {'Low':<6}")
-        print("-" * 35)
+        print("-" * 70)
+        print(f"{'Date':<12} {'Day':<5} | {'High':<6} | {'Low':<6} | {'Precip':<7} | {'Condition'}")
+        print("-" * 70)
         for day in data:
-            print(f"{day['day_name']:<15} | {day['high_f']:.0f}F    | {day['low_f']:.0f}F")
+            print(f"{day['date']:<12} {day['day_name']:<5} | {day['high_f']:.0f}F    | {day['low_f']:.0f}F    | {day['precip_prob']:>3}%    | {day['condition']}")
     else:
         print("[FAILED] Could not fetch Weather.com data")
 
