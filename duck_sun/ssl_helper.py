@@ -36,9 +36,9 @@ def _export_windows_cert_store() -> str | None:
     """
     Export Windows certificate store to a PEM file.
 
-    Uses Python's ssl module to read the OS trust store (which includes
-    any certs Windows trusts, such as firewall inspection CAs), then
-    writes them to a PEM file that curl_cffi/libcurl can use.
+    Uses ssl.enum_certificates() to read directly from the Windows
+    ROOT and CA stores, avoiding any monkey-patching by pip-system-certs.
+    This captures all certs Windows trusts, including firewall inspection CAs.
 
     The file is cached in a temp directory for the process lifetime.
 
@@ -54,11 +54,22 @@ def _export_windows_cert_store() -> str | None:
         return None
 
     try:
-        context = ssl.create_default_context()
-        der_certs = context.get_ca_certs(binary_form=True)
+        der_certs = []
+
+        # Read directly from Windows cert stores (ROOT = trusted root CAs, CA = intermediate CAs)
+        for store_name in ('ROOT', 'CA'):
+            try:
+                for cert_data, encoding, trust in ssl.enum_certificates(store_name):
+                    if encoding == 'x509_asn':
+                        der_certs.append(cert_data)
+            except AttributeError:
+                # ssl.enum_certificates not available (non-Windows or old Python)
+                break
+            except Exception as e:
+                logger.debug(f"[ssl_helper] Error reading {store_name} store: {e}")
 
         if not der_certs:
-            logger.warning("[ssl_helper] No certificates found in Windows store")
+            logger.warning("[ssl_helper] No certificates found in Windows stores")
             return None
 
         # Write to a persistent temp file
@@ -78,7 +89,7 @@ def _export_windows_cert_store() -> str | None:
         return _cached_windows_pem
 
     except Exception as e:
-        logger.warning(f"[ssl_helper] Windows cert export failed: {e}")
+        logger.warning(f"[ssl_helper] Windows cert export failed: {type(e).__name__}: {e}")
         return None
 
 
