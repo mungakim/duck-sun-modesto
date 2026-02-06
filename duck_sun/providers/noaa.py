@@ -8,8 +8,16 @@ to match the NOAA weather.gov website's human-curated numbers.
 
 import httpx
 import logging
+import os
 from datetime import datetime
 from typing import List, Optional, TypedDict, Dict, Any
+
+# SSL: Use OS certificate store for PyInstaller exe compatibility
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+except ImportError:
+    def get_ca_bundle():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +116,7 @@ class NOAAProvider:
         logger.info(f"[NOAAProvider] Verifying gridpoint for KMOD ({self.KMOD_LAT}, {self.KMOD_LON})...")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
                 resp = await client.get(self.POINTS_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
@@ -162,7 +170,7 @@ class NOAAProvider:
         logger.info("[NOAAProvider] Fetching data from api.weather.gov...")
 
         try:
-            with httpx.Client(timeout=15.0) as client:
+            with httpx.Client(timeout=15.0, verify=get_ca_bundle()) as client:
                 resp = client.get(self.GRIDPOINT_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
@@ -215,7 +223,7 @@ class NOAAProvider:
         logger.info("[NOAAProvider] Async fetch from api.weather.gov (Gridpoints)...")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
                 resp = await client.get(self.GRIDPOINT_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
@@ -279,7 +287,7 @@ class NOAAProvider:
         """
         logger.info("[NOAAProvider] Fetching text forecast periods (Website Match)...")
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
                 resp = await client.get(self.FORECAST_URL, headers=self.HEADERS)
                 if resp.status_code != 200:
                     logger.warning(f"[NOAAProvider] Forecast API {resp.status_code}")

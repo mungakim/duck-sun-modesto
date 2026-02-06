@@ -16,9 +16,17 @@ Open-Meteo aggregates multiple models including:
 import httpx
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import TypedDict, List, Optional, Dict, Any
+
+# SSL: Use OS certificate store for PyInstaller exe compatibility
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+except ImportError:
+    def get_ca_bundle():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
 
 # Get logger (configuration is done in scheduler.py)
 logger = logging.getLogger(__name__)
@@ -135,7 +143,7 @@ async def fetch_open_meteo(days: int = 8) -> ForecastResult:
     
     logger.debug(f"[fetch_open_meteo] Request params: {params}")
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=get_ca_bundle()) as client:
         logger.info(f"[fetch_open_meteo] Making request to Open-Meteo API...")
         resp = await client.get(url, params=params, timeout=30.0)
         logger.info(f"[fetch_open_meteo] Response status: {resp.status_code}")
@@ -365,7 +373,7 @@ async def fetch_hrrr_forecast(force_refresh: bool = False) -> Optional[HRRRForec
     }
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=get_ca_bundle()) as client:
             logger.info(f"[HRRR] Making request to Open-Meteo (model=hrrr)...")
             resp = await client.get(url, params=params, timeout=30.0)
             logger.info(f"[HRRR] Response status: {resp.status_code}")

@@ -11,9 +11,17 @@ to verify if the models are matching real conditions.
 
 import httpx
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Optional, TypedDict
+
+# SSL: Use OS certificate store for PyInstaller exe compatibility
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+except ImportError:
+    def get_ca_bundle():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +62,7 @@ class MetarProvider:
         logger.info("[MetarProvider] Fetching KMOD observation...")
 
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=10.0, verify=get_ca_bundle()) as client:
                 resp = client.get(self.METAR_URL)
 
                 if resp.status_code != 200:
@@ -198,7 +206,7 @@ class MetarProvider:
         logger.info("[MetarProvider] Async fetch KMOD observation...")
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=get_ca_bundle()) as client:
                 resp = await client.get(self.METAR_URL)
 
                 if resp.status_code != 200:
