@@ -1,11 +1,15 @@
 """
 Weather.com Provider for Duck Sun Modesto
 
-Fetches 10-day forecast from Weather.com TWC v3 API for Downtown Modesto, CA.
-Falls back to web scraping via curl_cffi if API fails.
+Fetches 10-day forecast from Weather.com for Downtown Modesto, CA.
+Uses curl_cffi with Chrome impersonation for both API and scraping paths.
 
-Always attempts a fresh API call. Cache is only used as a fallback when
-both API and scraping fail, and only if the cache is < 6 hours old.
+Primary: TWC v3 internal API (JSON, requires TWC_API_KEY)
+Fallback: Web scraping of weather.com/weather/tenday page
+
+Rate limited to 6 curl_cffi requests/day (scraping-style endpoint).
+Cache is only used when rate-limited AND fresh (< 6 hours old).
+Stale cache is never served — rate limit is overridden if cache expires.
 
 Weight: 4.0 (same as AccuWeather - commercial provider)
 """
@@ -47,6 +51,7 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
 CACHE_MAX_AGE_HOURS = 6  # Only use cache if less than 6 hours old
+DAILY_CALL_LIMIT = 6  # Cap curl_cffi requests per day (scraping-style endpoint)
 
 
 class WeatherComDay(TypedDict):
@@ -98,17 +103,72 @@ class WeatherComProvider:
             return None
 
     def _save_cache(self, data: List['WeatherComDay']) -> None:
-        """Save forecast data to cache."""
+        """Save forecast data to cache with call counter."""
         try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            existing = self._load_cache()
+            call_count = 0
+
+            if existing and existing.get('call_date') == today:
+                call_count = existing.get('call_count', 0)
+
+            call_count += 1
+
             cache = {
                 'timestamp': datetime.now().isoformat(),
+                'call_date': today,
+                'call_count': call_count,
+                'daily_limit': DAILY_CALL_LIMIT,
                 'data': data
             }
             with open(CACHE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, indent=2)
-            logger.info(f"[WeatherComProvider] Cache saved ({len(data)} days)")
+            logger.info(f"[WeatherComProvider] Cache saved ({len(data)} days, call #{call_count}/{DAILY_CALL_LIMIT} today)")
         except Exception as e:
             logger.error(f"[WeatherComProvider] Cache save failed: {e}")
+
+    def _should_use_cache(self) -> bool:
+        """
+        Check if we should skip the API call and use cache instead.
+
+        Returns True ONLY if:
+        - Rate limit has been reached today, AND
+        - Cache is still fresh (< CACHE_MAX_AGE_HOURS old)
+
+        If cache is stale, we override the rate limit and fetch fresh data
+        to prevent serving outdated forecasts.
+        """
+        cache = self._load_cache()
+        if not cache:
+            return False
+
+        today = datetime.now().strftime('%Y-%m-%d')
+        if cache.get('call_date') != today:
+            return False  # New day, rate limit reset
+
+        call_count = cache.get('call_count', 0)
+        if call_count < DAILY_CALL_LIMIT:
+            return False  # Under the limit, go ahead and fetch
+
+        # Rate limit reached - check if cache is still fresh enough to use
+        try:
+            age = datetime.now() - datetime.fromisoformat(cache['timestamp'])
+            age_hours = age.total_seconds() / 3600
+
+            if age_hours > CACHE_MAX_AGE_HOURS:
+                logger.warning(
+                    f"[WeatherComProvider] Rate limit reached ({call_count}/{DAILY_CALL_LIMIT}) "
+                    f"but cache is stale ({age_hours:.1f}h) - overriding limit to fetch fresh"
+                )
+                return False  # Override: stale cache is worse than an extra API call
+
+            logger.info(
+                f"[WeatherComProvider] Rate limit reached ({call_count}/{DAILY_CALL_LIMIT}), "
+                f"using fresh cache ({age_hours:.1f}h old)"
+            )
+            return True
+        except Exception:
+            return False
 
     def _get_fresh_cache(self) -> Optional[List['WeatherComDay']]:
         """Return cached data only if it's fresh (< CACHE_MAX_AGE_HOURS old)."""
@@ -121,7 +181,7 @@ class WeatherComProvider:
             age_hours = age.total_seconds() / 3600
 
             if age_hours > CACHE_MAX_AGE_HOURS:
-                logger.warning(f"[WeatherComProvider] Cache too old ({age_hours:.1f}h > {CACHE_MAX_AGE_HOURS}h max) - will fetch fresh")
+                logger.warning(f"[WeatherComProvider] Cache too old ({age_hours:.1f}h > {CACHE_MAX_AGE_HOURS}h max) - rejecting")
                 return None
 
             logger.info(f"[WeatherComProvider] Using fresh cache ({age_hours:.1f}h old, limit {CACHE_MAX_AGE_HOURS}h)")
@@ -149,10 +209,12 @@ class WeatherComProvider:
 
     def fetch_sync(self) -> Optional[List[WeatherComDay]]:
         """
-        Synchronously fetch 10-day forecast from Weather.com's API.
+        Synchronously fetch 10-day forecast from Weather.com.
 
-        Always attempts a fresh API call. Only falls back to cache if the
-        API call fails AND cache is less than CACHE_MAX_AGE_HOURS old.
+        Fetching strategy:
+        1. If rate limit reached AND cache is fresh (< 6h), use cache
+        2. Otherwise, always try API first, then scraping, then fresh cache
+        3. Never serve cache older than CACHE_MAX_AGE_HOURS
 
         Returns:
             List of WeatherComDay dicts, or None on failure
@@ -161,12 +223,18 @@ class WeatherComProvider:
             logger.error("[WeatherComProvider] Missing curl_cffi dependency")
             return None
 
-        # Construct API URL with parameters
-        # TWC_API_KEY must be set in .env
+        # Check rate limit - only skip API if cache is fresh enough
+        if self._should_use_cache():
+            return self._get_fresh_cache()
+
+        # Try API endpoint first (requires TWC_API_KEY)
         api_key = os.getenv("TWC_API_KEY")
         if not api_key:
-            logger.error("[WeatherComProvider] TWC_API_KEY not set in environment")
-            return None
+            logger.warning("[WeatherComProvider] TWC_API_KEY not set - skipping API, trying scraping")
+            scraped = self._fetch_via_scraping()
+            if scraped:
+                return scraped
+            return self._get_fresh_cache()
         params = {
             "geocode": self.GEOCODE,
             "format": "json",
