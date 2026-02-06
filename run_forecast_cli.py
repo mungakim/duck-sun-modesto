@@ -55,20 +55,6 @@ def main():
         return 1
 
     print()
-    print("Opening Excel report...")
-
-    # Find and open the latest xlsx file
-    reports_dir = script_dir / "reports"
-    xlsx_files = list(reports_dir.rglob("*.xlsx"))
-
-    if xlsx_files:
-        latest = max(xlsx_files, key=lambda f: f.stat().st_mtime)
-        print(f"Opening: {latest}")
-        os.startfile(str(latest))
-    else:
-        print("No xlsx file found")
-
-    print()
     print("=" * 50)
     print("  Done!")
     print("=" * 50)
