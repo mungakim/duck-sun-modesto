@@ -881,18 +881,22 @@ async def main():
         )
 
         # Copy xlsx to network drive (X:\Operatns\Pwrsched\Weather) with same folder structure
-        # Skip if DUCK_SUN_SKIP_NETWORK_COPY is set (exe running from network drive)
+        # Skip if already on the network drive (exe running from X:\)
         network_excel_path = None
         if os.environ.get("DUCK_SUN_SKIP_NETWORK_COPY"):
-            logger.info("[main] Skipping network copy (already on network drive)")
+            logger.info("[main] Skipping network copy (env override)")
         elif excel_path and excel_path.exists():
             try:
                 network_subdir = NETWORK_REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d")
                 network_subdir.mkdir(parents=True, exist_ok=True)
                 network_excel_path = network_subdir / excel_path.name
-                import shutil
-                shutil.copy2(excel_path, network_excel_path)
-                logger.info(f"[main] Copied xlsx to network: {network_excel_path}")
+                # Don't copy file onto itself (happens when exe runs from X: drive)
+                if excel_path.resolve() == network_excel_path.resolve():
+                    logger.info(f"[main] Excel already on network drive: {network_excel_path}")
+                else:
+                    import shutil
+                    shutil.copy2(excel_path, network_excel_path)
+                    logger.info(f"[main] Copied xlsx to network: {network_excel_path}")
             except Exception as e:
                 logger.warning(f"[main] Failed to copy xlsx to network drive: {e}")
                 network_excel_path = None
@@ -925,6 +929,15 @@ async def main():
             logger.warning(f"  Degraded: {', '.join(degraded)}")
         logger.info(f"  Duration: {duration:.2f} seconds")
         logger.info("=" * 60)
+
+        # Auto-open the Excel report (best path: network > local)
+        open_path = network_excel_path or excel_path
+        if open_path and open_path.exists() and sys.platform == 'win32':
+            try:
+                os.startfile(str(open_path))
+                logger.info(f"[main] Opened report: {open_path}")
+            except Exception as e:
+                logger.debug(f"[main] Could not auto-open report: {e}")
 
         return 0
 
