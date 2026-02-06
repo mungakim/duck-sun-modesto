@@ -16,6 +16,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:
+    import certifi
+    HAS_CERTIFI = True
+except ImportError:
+    HAS_CERTIFI = False
+    certifi = None
+
 logger = logging.getLogger(__name__)
 
 # Cache the extracted cert file path
@@ -88,7 +95,8 @@ def get_ca_bundle_for_curl() -> str | bool:
     Priority:
     1. DUCK_SUN_CA_BUNDLE environment variable (explicit override)
     2. Windows certificate store (if on Windows)
-    3. False (skip verification - matches httpx providers, avoids proxy failures)
+    3. certifi CA bundle (standard Python SSL certificates)
+    4. False (skip verification - last resort for corporate proxies)
 
     Returns:
         Path to CA bundle file, or False to skip verification
@@ -107,12 +115,21 @@ def get_ca_bundle_for_curl() -> str | bool:
     if windows_bundle:
         return windows_bundle
 
-    # Fall back to skipping verification
+    # Try certifi CA bundle (works in PyInstaller exe when bundled with --collect-data certifi)
+    if HAS_CERTIFI:
+        try:
+            certifi_bundle = certifi.where()
+            if certifi_bundle and os.path.exists(certifi_bundle):
+                logger.info(f"[ssl_helper] Using certifi CA bundle: {certifi_bundle}")
+                return certifi_bundle
+        except Exception as e:
+            logger.warning(f"[ssl_helper] certifi fallback failed: {e}")
+
+    # Final fallback: skip verification
     # This matches what httpx-based providers (NOAA, Met.no, MID.org, Open-Meteo,
     # METAR) already do with verify=False. Behind corporate proxies with SSL
-    # inspection, curl_cffi's bundled Mozilla CA bundle won't have the proxy's
-    # CA cert, so using True (default bundle) would fail. Better to skip
-    # verification than to fail entirely and serve stale cached data.
+    # inspection, neither certifi nor curl_cffi's bundled Mozilla CA will have
+    # the proxy's CA cert. Better to skip than fail and serve stale cached data.
     logger.warning("[ssl_helper] No CA bundle available - falling back to verify=False")
     return False
 
