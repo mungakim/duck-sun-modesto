@@ -319,11 +319,15 @@ class WeatherComProvider:
                 else:
                     condition = narrative[i][:50] if i < len(narrative) else "Unknown"
 
-                # Get precipitation probability (max of day/night)
+                # Get precipitation probability (daytime value to match weather.com website)
                 day_precip = precip_chances[day_dp_idx] if day_dp_idx < len(precip_chances) else None
                 night_precip = precip_chances[night_dp_idx] if night_dp_idx < len(precip_chances) else None
-                precip_values = [p for p in [day_precip, night_precip] if p is not None]
-                precip_prob = max(precip_values) if precip_values else 0
+                if day_precip is not None:
+                    precip_prob = day_precip
+                elif night_precip is not None:
+                    precip_prob = night_precip
+                else:
+                    precip_prob = 0
 
                 results.append({
                     "date": date_str,

@@ -153,7 +153,7 @@ The PDF report includes:
 - Rate limit (6/day) only uses cache if cache is < 6 hours old
 - If rate limit reached AND cache is stale, rate limit is overridden — freshness always wins
 - Fallback chain: TWC API → web scraping → fresh cache (< 6h) → None
-- `precip_prob` extracted from `daypart[0].precipChance` (was previously hardcoded to 0)
+- `precip_prob` extracted from `daypart[0].precipChance` daytime value (matches weather.com website display; was previously hardcoded to 0, then briefly used max(day,night) which inflated values)
 - `condition` extracted from `daypart[0].wxPhraseLong` (was previously truncated narrative)
 
 **CacheManager-level (cache_manager.py):**
