@@ -135,3 +135,45 @@ The PDF report includes:
 - **AccuWeather:** Predicted 48-51°F → Winner (0-3°F error)
 - **NOAA:** Predicted 58°F → Miss (+7°F)
 - **Open-Meteo:** Predicted 60°F → Major miss (+9°F)
+
+## Data Freshness & Cache Reliability
+
+**CRITICAL: Weather.com temps MUST match the weather.com website.** Any drift of 3-4°F indicates stale cached data being served instead of a fresh API call. This has happened before (Feb 2026) and must not recur.
+
+### Root Cause of Stale Data (Feb 2026 Incident)
+1. SSL cert extraction from Windows cert store failed behind MID corporate proxy
+2. `ssl_helper.py` fell back to curl_cffi's bundled Mozilla CA (didn't have proxy CA)
+3. All curl_cffi requests failed → provider returned None → CacheManager served days-old LKG data
+4. No maximum cache age was enforced, so 3-day-old forecasts were silently used
+
+### Safeguards Now In Place
+
+**Provider-level (weather_com.py):**
+- Always attempts fresh API call (no premature cache returns)
+- Rate limit (6/day) only uses cache if cache is < 6 hours old
+- If rate limit reached AND cache is stale, rate limit is overridden — freshness always wins
+- Fallback chain: TWC API → web scraping → fresh cache (< 6h) → None
+- `precip_prob` extracted from `daypart[0].precipChance` (was previously hardcoded to 0)
+- `condition` extracted from `daypart[0].wxPhraseLong` (was previously truncated narrative)
+
+**CacheManager-level (cache_manager.py):**
+- Per-provider `MAX_CACHE_HOURS` thresholds enforced:
+  - 18h: weather_com, wunderground, accuweather, google_weather
+  - 24h: noaa, met_no, open_meteo
+  - 12h: hrrr
+  - 48h: mid_org
+- Cache exceeding max age is **rejected** — falls through to DEFAULT values
+- Stale data is never silently served as if it were valid
+
+**SSL-level (ssl_helper.py):**
+- Priority: `DUCK_SUN_CA_BUNDLE` env var → Windows cert store → `verify=False`
+- Final fallback is `verify=False` (skip verification), matching what httpx-based providers do
+- This prevents SSL failures from cascading into stale cache usage
+
+### How To Diagnose Stale Data
+If weather.com temps in the report don't match the website:
+1. Check for SSL errors in the terminal output ("Failed to extract Windows certs")
+2. Compare report temps against `outputs/weathercom_cache.json` timestamp
+3. Compare against `outputs/cache/weather_com_lkg.json` timestamp
+4. If both are old, the API call is failing — check `TWC_API_KEY` and SSL configuration
+5. Both weather_com.py and wunderground.py use curl_cffi — if one fails, the other likely does too

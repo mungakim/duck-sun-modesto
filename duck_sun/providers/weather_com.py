@@ -1,8 +1,15 @@
 """
 Weather.com Provider for Duck Sun Modesto
 
-Scrapes 10-day forecast from Weather.com for Downtown Modesto, CA.
-Uses curl_cffi with Chrome impersonation to bypass anti-bot measures.
+Fetches 10-day forecast from Weather.com for Downtown Modesto, CA.
+Uses curl_cffi with Chrome impersonation for both API and scraping paths.
+
+Primary: TWC v3 internal API (JSON, requires TWC_API_KEY)
+Fallback: Web scraping of weather.com/weather/tenday page
+
+Rate limited to 6 curl_cffi requests/day (scraping-style endpoint).
+Cache is only used when rate-limited AND fresh (< 6 hours old).
+Stale cache is never served — rate limit is overridden if cache expires.
 
 Weight: 4.0 (same as AccuWeather - commercial provider)
 """
@@ -40,10 +47,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting configuration
+# Cache configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
-DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
+CACHE_MAX_AGE_HOURS = 6  # Only use cache if less than 6 hours old
+DAILY_CALL_LIMIT = 6  # Cap curl_cffi requests per day (scraping-style endpoint)
 
 
 class WeatherComDay(TypedDict):
@@ -94,7 +102,7 @@ class WeatherComProvider:
             logger.warning(f"[WeatherComProvider] Cache load error: {e}")
             return None
 
-    def _save_cache(self, data: List['WeatherComDay'], increment_call: bool = True) -> None:
+    def _save_cache(self, data: List['WeatherComDay']) -> None:
         """Save forecast data to cache with call counter."""
         try:
             today = datetime.now().strftime('%Y-%m-%d')
@@ -104,8 +112,7 @@ class WeatherComProvider:
             if existing and existing.get('call_date') == today:
                 call_count = existing.get('call_count', 0)
 
-            if increment_call:
-                call_count += 1
+            call_count += 1
 
             cache = {
                 'timestamp': datetime.now().isoformat(),
@@ -116,37 +123,71 @@ class WeatherComProvider:
             }
             with open(CACHE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, indent=2)
-            logger.info(f"[WeatherComProvider] Cache saved: call #{call_count}/{DAILY_CALL_LIMIT} today")
+            logger.info(f"[WeatherComProvider] Cache saved ({len(data)} days, call #{call_count}/{DAILY_CALL_LIMIT} today)")
         except Exception as e:
             logger.error(f"[WeatherComProvider] Cache save failed: {e}")
 
-    def _is_rate_limited(self) -> bool:
-        """Check if daily rate limit has been reached."""
+    def _should_use_cache(self) -> bool:
+        """
+        Check if we should skip the API call and use cache instead.
+
+        Returns True ONLY if:
+        - Rate limit has been reached today, AND
+        - Cache is still fresh (< CACHE_MAX_AGE_HOURS old)
+
+        If cache is stale, we override the rate limit and fetch fresh data
+        to prevent serving outdated forecasts.
+        """
         cache = self._load_cache()
         if not cache:
             return False
 
         today = datetime.now().strftime('%Y-%m-%d')
         if cache.get('call_date') != today:
-            logger.info("[WeatherComProvider] New day - rate limit reset")
-            return False
+            return False  # New day, rate limit reset
 
         call_count = cache.get('call_count', 0)
-        if call_count >= DAILY_CALL_LIMIT:
-            logger.warning(f"[WeatherComProvider] RATE LIMIT REACHED ({call_count}/{DAILY_CALL_LIMIT} calls today)")
-            return True
+        if call_count < DAILY_CALL_LIMIT:
+            return False  # Under the limit, go ahead and fetch
 
-        logger.info(f"[WeatherComProvider] Daily calls: {call_count}/{DAILY_CALL_LIMIT}")
-        return False
-
-    def _get_cached_data(self) -> Optional[List['WeatherComDay']]:
-        """Return cached data if available."""
-        cache = self._load_cache()
-        if cache and cache.get('data'):
+        # Rate limit reached - check if cache is still fresh enough to use
+        try:
             age = datetime.now() - datetime.fromisoformat(cache['timestamp'])
-            logger.info(f"[WeatherComProvider] Using cached data ({age.total_seconds()/3600:.1f}h old)")
+            age_hours = age.total_seconds() / 3600
+
+            if age_hours > CACHE_MAX_AGE_HOURS:
+                logger.warning(
+                    f"[WeatherComProvider] Rate limit reached ({call_count}/{DAILY_CALL_LIMIT}) "
+                    f"but cache is stale ({age_hours:.1f}h) - overriding limit to fetch fresh"
+                )
+                return False  # Override: stale cache is worse than an extra API call
+
+            logger.info(
+                f"[WeatherComProvider] Rate limit reached ({call_count}/{DAILY_CALL_LIMIT}), "
+                f"using fresh cache ({age_hours:.1f}h old)"
+            )
+            return True
+        except Exception:
+            return False
+
+    def _get_fresh_cache(self) -> Optional[List['WeatherComDay']]:
+        """Return cached data only if it's fresh (< CACHE_MAX_AGE_HOURS old)."""
+        cache = self._load_cache()
+        if not cache or not cache.get('data'):
+            return None
+
+        try:
+            age = datetime.now() - datetime.fromisoformat(cache['timestamp'])
+            age_hours = age.total_seconds() / 3600
+
+            if age_hours > CACHE_MAX_AGE_HOURS:
+                logger.warning(f"[WeatherComProvider] Cache too old ({age_hours:.1f}h > {CACHE_MAX_AGE_HOURS}h max) - rejecting")
+                return None
+
+            logger.info(f"[WeatherComProvider] Using fresh cache ({age_hours:.1f}h old, limit {CACHE_MAX_AGE_HOURS}h)")
             return cache['data']
-        return None
+        except Exception:
+            return None
 
     def _parse_temp(self, temp_str: str) -> Optional[int]:
         """Extract integer temperature from string like '60°' or '60'."""
@@ -168,9 +209,12 @@ class WeatherComProvider:
 
     def fetch_sync(self) -> Optional[List[WeatherComDay]]:
         """
-        Synchronously fetch 10-day forecast from Weather.com's API.
+        Synchronously fetch 10-day forecast from Weather.com.
 
-        Rate limited to 6 calls/day to avoid anti-bot detection.
+        Fetching strategy:
+        1. If rate limit reached AND cache is fresh (< 6h), use cache
+        2. Otherwise, always try API first, then scraping, then fresh cache
+        3. Never serve cache older than CACHE_MAX_AGE_HOURS
 
         Returns:
             List of WeatherComDay dicts, or None on failure
@@ -179,20 +223,18 @@ class WeatherComProvider:
             logger.error("[WeatherComProvider] Missing curl_cffi dependency")
             return None
 
-        # Check rate limit - return cached data if limit reached
-        if self._is_rate_limited():
-            cached = self._get_cached_data()
-            if cached:
-                return cached
-            logger.warning("[WeatherComProvider] Rate limited and no cache available")
-            return None
+        # Check rate limit - only skip API if cache is fresh enough
+        if self._should_use_cache():
+            return self._get_fresh_cache()
 
-        # Construct API URL with parameters
-        # TWC_API_KEY must be set in .env
+        # Try API endpoint first (requires TWC_API_KEY)
         api_key = os.getenv("TWC_API_KEY")
         if not api_key:
-            logger.error("[WeatherComProvider] TWC_API_KEY not set in environment")
-            return None
+            logger.warning("[WeatherComProvider] TWC_API_KEY not set - skipping API, trying scraping")
+            scraped = self._fetch_via_scraping()
+            if scraped:
+                return scraped
+            return self._get_fresh_cache()
         params = {
             "geocode": self.GEOCODE,
             "format": "json",
@@ -217,8 +259,10 @@ class WeatherComProvider:
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
-                # Fall back to scraping if API fails
-                return self._fetch_via_scraping()
+                scraped = self._fetch_via_scraping()
+                if scraped:
+                    return scraped
+                return self._get_fresh_cache()
 
             data = response.json()
 
@@ -228,9 +272,19 @@ class WeatherComProvider:
             temp_min = data.get('temperatureMin', [])
             narrative = data.get('narrative', [])
 
+            # Extract daypart data for precipitation and conditions
+            # daypart[0] contains alternating day/night arrays (2 entries per day)
+            daypart = data.get('daypart', [{}])
+            dp = daypart[0] if daypart else {}
+            precip_chances = dp.get('precipChance', [])
+            wx_phrases = dp.get('wxPhraseLong', [])
+
             if not temp_max or not temp_min:
                 logger.error("[WeatherComProvider] No temperature data in API response")
-                return self._fetch_via_scraping()
+                scraped = self._fetch_via_scraping()
+                if scraped:
+                    return scraped
+                return self._get_fresh_cache()
 
             results: List[WeatherComDay] = []
             num_days = min(10, len(temp_max), len(temp_min))
@@ -255,8 +309,21 @@ class WeatherComProvider:
                 # Get date
                 date_str = self._get_date_for_day(i)
 
-                # Get condition from narrative
-                condition = narrative[i][:50] if i < len(narrative) else "Unknown"
+                # Get condition from daypart wxPhraseLong (daytime preferred)
+                day_dp_idx = i * 2
+                night_dp_idx = i * 2 + 1
+                if day_dp_idx < len(wx_phrases) and wx_phrases[day_dp_idx]:
+                    condition = wx_phrases[day_dp_idx]
+                elif night_dp_idx < len(wx_phrases) and wx_phrases[night_dp_idx]:
+                    condition = wx_phrases[night_dp_idx]
+                else:
+                    condition = narrative[i][:50] if i < len(narrative) else "Unknown"
+
+                # Get precipitation probability (max of day/night)
+                day_precip = precip_chances[day_dp_idx] if day_dp_idx < len(precip_chances) else None
+                night_precip = precip_chances[night_dp_idx] if night_dp_idx < len(precip_chances) else None
+                precip_values = [p for p in [day_precip, night_precip] if p is not None]
+                precip_prob = max(precip_values) if precip_values else 0
 
                 results.append({
                     "date": date_str,
@@ -266,7 +333,7 @@ class WeatherComProvider:
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
                     "condition": condition,
-                    "precip_prob": 0
+                    "precip_prob": precip_prob
                 })
 
                 logger.debug(f"[WeatherComProvider] {date_str}: Hi={high_f}F, Lo={low_f}F")
@@ -277,7 +344,15 @@ class WeatherComProvider:
 
         except Exception as e:
             logger.error(f"[WeatherComProvider] API fetch failed: {e}", exc_info=True)
-            return self._fetch_via_scraping()
+            # Try scraping fallback, then fresh cache as last resort
+            scraped = self._fetch_via_scraping()
+            if scraped:
+                return scraped
+            cached = self._get_fresh_cache()
+            if cached:
+                return cached
+            logger.error("[WeatherComProvider] All fetch methods failed and no fresh cache available")
+            return None
 
     def _fetch_via_scraping(self) -> Optional[List[WeatherComDay]]:
         """Fallback to web scraping if API fails."""
@@ -313,6 +388,8 @@ class WeatherComProvider:
                 class_=lambda x: x and 'highTempValue' in str(x) if x else False
             )
             low_temps = soup.find_all(attrs={"data-testid": "lowTempValue"})
+            precip_elems = soup.find_all(attrs={"data-testid": "PercentageValue"})
+            condition_elems = soup.find_all(attrs={"data-testid": "wxPhrase"})
 
             if not high_temps or not low_temps:
                 logger.error("[WeatherComProvider] No forecast data found in page")
@@ -333,6 +410,20 @@ class WeatherComProvider:
                 day_name = day_names[i].text.strip()[:3] if i < len(day_names) else f"D{i}"
                 date_str = self._get_date_for_day(i)
 
+                # Extract precipitation percentage from scraped page
+                precip_prob = 0
+                if i < len(precip_elems):
+                    precip_text = precip_elems[i].text.strip().replace('%', '')
+                    try:
+                        precip_prob = int(precip_text)
+                    except ValueError:
+                        pass
+
+                # Extract condition text from scraped page
+                condition = "Unknown"
+                if i < len(condition_elems):
+                    condition = condition_elems[i].text.strip()
+
                 results.append({
                     "date": date_str,
                     "day_name": day_name,
@@ -340,8 +431,8 @@ class WeatherComProvider:
                     "low_f": float(low_f),
                     "high_c": round(high_c, 2),
                     "low_c": round(low_c, 2),
-                    "condition": "Unknown",
-                    "precip_prob": 0
+                    "condition": condition,
+                    "precip_prob": precip_prob
                 })
 
             logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via scraping")
@@ -377,11 +468,11 @@ if __name__ == "__main__":
 
     if data:
         print(f"\n[RESULTS] Weather.com 10-Day Forecast ({len(data)} days):")
-        print("-" * 50)
-        print(f"{'Day':<15} | {'High':<6} | {'Low':<6}")
-        print("-" * 35)
+        print("-" * 70)
+        print(f"{'Date':<12} {'Day':<5} | {'High':<6} | {'Low':<6} | {'Precip':<7} | {'Condition'}")
+        print("-" * 70)
         for day in data:
-            print(f"{day['day_name']:<15} | {day['high_f']:.0f}F    | {day['low_f']:.0f}F")
+            print(f"{day['date']:<12} {day['day_name']:<5} | {day['high_f']:.0f}F    | {day['low_f']:.0f}F    | {day['precip_prob']:>3}%    | {day['condition']}")
     else:
         print("[FAILED] Could not fetch Weather.com data")
 

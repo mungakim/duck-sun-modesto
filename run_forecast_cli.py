@@ -73,9 +73,9 @@ def main():
     print("  Done!")
     print("=" * 50)
 
-    # Brief pause so user can see the output
-    import time
-    time.sleep(3)
+    # Keep terminal open so user can review output and any errors
+    print()
+    input("Press Enter to close...")
 
     return 0
 
