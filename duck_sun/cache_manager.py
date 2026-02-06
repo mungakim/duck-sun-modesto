@@ -148,7 +148,7 @@ class CacheManager:
             {"date": (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d"), "high_f": 58, "low_f": 43, "condition": "Default"},
             {"date": (datetime.now() + timedelta(days=4)).strftime("%Y-%m-%d"), "high_f": 59, "low_f": 44, "condition": "Default"},
         ],
-        "weathercom": [
+        "weather_com": [
             {"date": datetime.now().strftime("%Y-%m-%d"), "high_f": 55, "low_f": 40, "condition": "Default"},
             {"date": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"), "high_f": 56, "low_f": 41, "condition": "Default"},
             {"date": (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"), "high_f": 57, "low_f": 42, "condition": "Default"},

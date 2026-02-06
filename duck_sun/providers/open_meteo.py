@@ -453,7 +453,7 @@ async def fetch_hrrr_forecast(force_refresh: bool = False) -> Optional[HRRRForec
 def get_precipitation_probabilities(
     om_data: Dict[str, Any],
     hrrr_data: Optional[HRRRForecast],
-    weathercom_data: Optional[List[Dict]],
+    weather_com_data: Optional[List[Dict]],
     accu_data: Optional[List[Dict]]
 ) -> Dict[str, Dict[str, Any]]:
     """
@@ -462,9 +462,9 @@ def get_precipitation_probabilities(
     Returns:
         Dict[date_str, {
             'hrrr': int or None,
-            'om': int or None,
-            'weathercom': int or None,
-            'accu': int or None,
+            'open_meteo': int or None,
+            'weather_com': int or None,
+            'accuweather': int or None,
             'consensus': int  # weighted average
         }]
     """
@@ -476,7 +476,7 @@ def get_precipitation_probabilities(
         if date_str:
             if date_str not in precip_by_date:
                 precip_by_date[date_str] = {}
-            precip_by_date[date_str]['om'] = day.get('precip_prob')
+            precip_by_date[date_str]['open_meteo'] = day.get('precip_prob')
 
     # HRRR daily precip (highest priority for short-term)
     if hrrr_data:
@@ -486,13 +486,13 @@ def get_precipitation_probabilities(
             precip_by_date[date_str]['hrrr'] = prob
 
     # Weather.com precip
-    if weathercom_data:
-        for day in weathercom_data:
+    if weather_com_data:
+        for day in weather_com_data:
             date_str = day.get('date')
             if date_str:
                 if date_str not in precip_by_date:
                     precip_by_date[date_str] = {}
-                precip_by_date[date_str]['weathercom'] = day.get('precip_prob')
+                precip_by_date[date_str]['weather_com'] = day.get('precip_prob')
 
     # AccuWeather precip
     if accu_data:
@@ -501,11 +501,11 @@ def get_precipitation_probabilities(
             if date_str:
                 if date_str not in precip_by_date:
                     precip_by_date[date_str] = {}
-                precip_by_date[date_str]['accu'] = day.get('precip_prob')
+                precip_by_date[date_str]['accuweather'] = day.get('precip_prob')
 
     # Calculate consensus (weighted average)
-    # Weights: HRRR=3 (best short-term), Weather.com=2, Accu=2, OM=1
-    weights = {'hrrr': 3, 'weathercom': 2, 'accu': 2, 'om': 1}
+    # Weights: HRRR=3 (best short-term), Weather.com=2, AccuWeather=2, Open-Meteo=1
+    weights = {'hrrr': 3, 'weather_com': 2, 'accuweather': 2, 'open_meteo': 1}
 
     for date_str, probs in precip_by_date.items():
         total_val, total_weight = 0.0, 0.0

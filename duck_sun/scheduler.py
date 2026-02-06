@@ -49,9 +49,6 @@ from duck_sun.excel_report import generate_excel_report
 from duck_sun.resilience import with_retry, RetryConfig, categorize_error
 from duck_sun.cache_manager import CacheManager, FetchResult
 
-# Verification system (Truth Tracker)
-from duck_sun.verification import TruthTracker, run_daily_verification
-
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
 
@@ -603,40 +600,6 @@ async def main():
         cache_mgr = CacheManager()
         cache_mgr.increment_run_count()
 
-        # --- STEP 0: AUTOMATED VERIFICATION (Truth Tracker) ---
-        logger.info("")
-        logger.info("STEP 0: Running Truth Tracker (Yesterday's Verification)...")
-        logger.info("-" * 40)
-
-        tracker = TruthTracker()
-        try:
-            verify_result = await run_daily_verification(tracker)
-            if verify_result:
-                leaderboard = verify_result.get('leaderboard', [])
-                if leaderboard:
-                    top_dog = leaderboard[0]['source']
-                    top_mae = leaderboard[0]['combined_mae']
-                    logger.info(f"LEADERBOARD UPDATE: {top_dog} is currently #1 (MAE: {top_mae}C)")
-
-                    # Log top 3
-                    for entry in leaderboard[:3]:
-                        logger.info(f"  #{entry['rank']} {entry['source']}: "
-                                  f"High MAE={entry['high_error_mae']}C, "
-                                  f"Low MAE={entry['low_error_mae']}C")
-
-                    # ADVANCED: Dynamic Weight Alert (if Google falls out of Top 3)
-                    google_rank = next((x['rank'] for x in leaderboard if x['source'] == 'Google'), 99)
-                    if google_rank > 3:
-                        logger.error(f"GOOGLE WEATHER ACCURACY ALERT: Ranked #{google_rank}")
-                else:
-                    logger.info("No verification data yet (need 24+ hours of forecasts)")
-            else:
-                logger.info("Could not fetch yesterday's actuals - skipping verification")
-        except Exception as e:
-            logger.warning(f"Verification failed (non-critical): {e}")
-        finally:
-            tracker.close()
-
         # --- STEP 1: Fetch ALL Data Sources ---
         logger.info("")
         logger.info("STEP 1: Fetching weather data from ALL 9 providers...")
@@ -729,12 +692,15 @@ async def main():
         engine = UncannyEngine()
         logger.info("[main] Normalizing temperatures from all sources...")
 
-        # Pass additional sources to normalize_temps if available
+        # Pass all available sources to normalize_temps for weighted ensemble
         df = engine.normalize_temps(
             om_data,
             noaa_data if noaa_data else None,
             met_data if met_data else None,
             accu_data=accu_data if accu_data else None,
+            weather_com_data=weather_com_data if weather_com_data else None,
+            wunderground_data=wunderground_data if wunderground_data else None,
+            google_data=google_data if google_data else None,
             mid_data=mid_data if mid_data else None
         )
 

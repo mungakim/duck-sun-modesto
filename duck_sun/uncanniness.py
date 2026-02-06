@@ -2,8 +2,9 @@
 Uncanny Engine for Duck Sun Modesto
 
 Architecture:
-1. Thermodynamics: WEIGHTED ENSEMBLE (NOAA 5x > AccuWeather 3x > Met.no 3x > Weather.com 2x > Open-Meteo 1x)
-2. Energy: Open-Meteo (Physics)
+1. Thermodynamics: WEIGHTED ENSEMBLE
+   Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
+2. Energy: Open-Meteo (Physics) + Google Cloud Timing (Hybrid Solar)
 3. Logic Override: NOAA Text Narratives ("Dense Fog") force the model's hand.
 4. Variance Detection: Flags high spread (>10°F) with WARN-ONLY alerts (never blocks)
 
@@ -31,8 +32,10 @@ class UncannyEngine:
     """
     The Hybrid Architecture Engine with WEIGHTED ENSEMBLE Consensus.
 
-    Temperature consensus: Weighted Ensemble (NOAA 5x > AccuWeather 3x > Met.no 3x > Weather.com 2x > Open-Meteo 1x)
-    Solar physics: Always Open-Meteo radiation data
+    Temperature consensus: 8-source weighted ensemble
+      Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) >
+      NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
+    Solar physics: Open-Meteo radiation + Google cloud timing (hybrid)
     Logic override: NOAA text narratives trigger fog probability boosts
     Variance detection: Flags high spread (>10°F) with WARN-ONLY alerts
 
@@ -59,18 +62,22 @@ class UncannyEngine:
         noaa_data: Optional[List[Dict]],
         met_no_data: Optional[List[Dict]],
         accu_data: Optional[List[Dict]] = None,
-        weathercom_data: Optional[List[Dict]] = None,
+        weather_com_data: Optional[List[Dict]] = None,
+        wunderground_data: Optional[List[Dict]] = None,
+        google_data: Optional[Dict[str, Any]] = None,
         mid_data: Optional[Dict] = None,
         smoke_data: Optional[List[Dict]] = None
     ) -> pd.DataFrame:
         """
-        Merge temps using WEIGHTED ENSEMBLE strategy.
+        Merge temps using WEIGHTED ENSEMBLE strategy with all 8 sources.
 
-        Sources (weighted):
-        - NOAA: 5.0 (highest trust)
-        - AccuWeather: 3.0
+        Sources (weighted per ensemble.py):
+        - Google: 6.0 (MetNet-3 neural model)
+        - AccuWeather: 4.0
+        - Weather.com: 4.0
+        - WUnderground: 4.0
+        - NOAA: 3.0
         - Met.no: 3.0
-        - Weather.com: 2.0 (baseline reference)
         - MID.org: 2.0 (local microclimate)
         - Open-Meteo: 1.0 (fallback)
 
@@ -163,8 +170,8 @@ class UncannyEngine:
 
         # Weather.com temperatures
         df['temp_weathercom'] = np.nan
-        if weathercom_data:
-            wc_by_date = {d['date']: d for d in weathercom_data}
+        if weather_com_data:
+            wc_by_date = {d['date']: d for d in weather_com_data}
             wc_merged = 0
             for idx, row in df.iterrows():
                 date_str = row['time'].strftime('%Y-%m-%d')
@@ -215,6 +222,64 @@ class UncannyEngine:
         else:
             logger.info("[UncannyEngine] No MID.org data available")
 
+        # Weather Underground temperatures (same format as Weather.com)
+        df['temp_wunderground'] = np.nan
+        if wunderground_data:
+            wu_by_date = {d['date']: d for d in wunderground_data
+                          if d.get('high_c') is not None and d.get('low_c') is not None}
+            wu_merged = 0
+            for idx, row in df.iterrows():
+                date_str = row['time'].strftime('%Y-%m-%d')
+                if date_str in wu_by_date:
+                    day_data = wu_by_date[date_str]
+                    hour = row['time'].hour
+                    high_c = day_data['high_c']
+                    low_c = day_data['low_c']
+                    if 6 <= hour < 10:
+                        temp = low_c + (high_c - low_c) * 0.3
+                    elif 10 <= hour < 16:
+                        temp = high_c - (high_c - low_c) * 0.1
+                    elif 16 <= hour < 20:
+                        temp = high_c - (high_c - low_c) * 0.4
+                    else:
+                        temp = low_c + (high_c - low_c) * 0.1
+                    df.at[idx, 'temp_wunderground'] = temp
+                    wu_merged += 1
+            logger.info(f"[UncannyEngine] Interpolated {wu_merged} Weather Underground records")
+        else:
+            logger.info("[UncannyEngine] No Weather Underground data available")
+
+        # Google Weather temperatures (from daily aggregates)
+        df['temp_google'] = np.nan
+        if google_data and isinstance(google_data, dict):
+            google_daily = google_data.get('daily', [])
+            if google_daily:
+                g_by_date = {d['date']: d for d in google_daily
+                             if d.get('high_c') is not None and d.get('low_c') is not None}
+                g_merged = 0
+                for idx, row in df.iterrows():
+                    date_str = row['time'].strftime('%Y-%m-%d')
+                    if date_str in g_by_date:
+                        day_data = g_by_date[date_str]
+                        hour = row['time'].hour
+                        high_c = day_data['high_c']
+                        low_c = day_data['low_c']
+                        if 6 <= hour < 10:
+                            temp = low_c + (high_c - low_c) * 0.3
+                        elif 10 <= hour < 16:
+                            temp = high_c - (high_c - low_c) * 0.1
+                        elif 16 <= hour < 20:
+                            temp = high_c - (high_c - low_c) * 0.4
+                        else:
+                            temp = low_c + (high_c - low_c) * 0.1
+                        df.at[idx, 'temp_google'] = temp
+                        g_merged += 1
+                logger.info(f"[UncannyEngine] Interpolated {g_merged} Google Weather records")
+            else:
+                logger.info("[UncannyEngine] No Google Weather daily data available")
+        else:
+            logger.info("[UncannyEngine] No Google Weather data available")
+
         # === COMPUTE WEIGHTED ENSEMBLE CONSENSUS ===
         df['temp_consensus'] = np.nan
         df['variance_level'] = "LOW"
@@ -224,12 +289,14 @@ class UncannyEngine:
         variance_counts = {"LOW": 0, "MODERATE": 0, "CRITICAL": 0}
 
         for idx, row in df.iterrows():
-            # Build source dict for this hour
+            # Build source dict for this hour (names must match ensemble.py SOURCE_WEIGHTS)
             sources = {
+                "Google": row['temp_google'] if pd.notna(row.get('temp_google')) else None,
                 "NOAA": row['temp_noaa'] if pd.notna(row['temp_noaa']) else None,
                 "AccuWeather": row['temp_accu'] if pd.notna(row.get('temp_accu')) else None,
                 "Met.no": row['temp_met'] if pd.notna(row['temp_met']) else None,
                 "Weather.com": row['temp_weathercom'] if pd.notna(row.get('temp_weathercom')) else None,
+                "WUnderground": row['temp_wunderground'] if pd.notna(row.get('temp_wunderground')) else None,
                 "MID.org": row['temp_mid'] if pd.notna(row.get('temp_mid')) else None,
                 "Open-Meteo": row['temp_om'] if pd.notna(row['temp_om']) else None,
             }
