@@ -1,6 +1,6 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-02-06T08:01:09.037888",
+  "timestamp": "2026-02-06T08:16:17.632842",
   "api_success": true,
   "data": [
     {
@@ -10,7 +10,7 @@
       "high_f": 71.0,
       "low_f": 45.0,
       "precip_prob": 3,
-      "condition": "Mostly cloudy"
+      "condition": "Intermittent clouds"
     },
     {
       "date": "2026-02-07",
