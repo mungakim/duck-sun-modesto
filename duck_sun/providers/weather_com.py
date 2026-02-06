@@ -255,7 +255,15 @@ class WeatherComProvider:
                     "Referer": "https://weather.com/",
                     "Origin": "https://weather.com",
                 }
-                response = session.get(url, headers=headers, timeout=30, verify=get_ca_bundle_for_curl())
+                verify = get_ca_bundle_for_curl()
+                try:
+                    response = session.get(url, headers=headers, timeout=30, verify=verify)
+                except Exception as ssl_err:
+                    if 'SSL' in str(ssl_err) or 'certificate' in str(ssl_err).lower():
+                        logger.warning(f"[WeatherComProvider] SSL failed with verify={verify}, retrying with verify=False")
+                        response = session.get(url, headers=headers, timeout=30, verify=False)
+                    else:
+                        raise
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
@@ -369,13 +377,21 @@ class WeatherComProvider:
 
             # Use a session to handle cookies - first visit homepage to get session cookies
             with Session(impersonate="chrome110") as session:
-                # First request to get cookies
-                logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
-                home_resp = session.get("https://weather.com/", timeout=15, verify=get_ca_bundle_for_curl())
-                logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
-
-                # Now fetch the forecast page with cookies
-                response = session.get(scrape_url, timeout=30, verify=get_ca_bundle_for_curl())
+                verify = get_ca_bundle_for_curl()
+                try:
+                    # First request to get cookies
+                    logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
+                    home_resp = session.get("https://weather.com/", timeout=15, verify=verify)
+                    logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
+                    # Now fetch the forecast page with cookies
+                    response = session.get(scrape_url, timeout=30, verify=verify)
+                except Exception as ssl_err:
+                    if 'SSL' in str(ssl_err) or 'certificate' in str(ssl_err).lower():
+                        logger.warning(f"[WeatherComProvider] Scraping SSL failed, retrying with verify=False")
+                        home_resp = session.get("https://weather.com/", timeout=15, verify=False)
+                        response = session.get(scrape_url, timeout=30, verify=False)
+                    else:
+                        raise
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] Scraping HTTP {response.status_code}")
