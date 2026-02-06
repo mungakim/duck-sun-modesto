@@ -115,20 +115,6 @@
         "DEFAULT": 0
       }
     },
-    "smoke": {
-      "total_fetches": 66,
-      "api_successes": 11,
-      "cache_hits": 55,
-      "default_fallbacks": 0,
-      "error_types": {},
-      "staleness_distribution": {
-        "FRESH": 11,
-        "ACCEPTABLE": 0,
-        "STALE_WARN": 20,
-        "STALE_ERROR": 35,
-        "DEFAULT": 0
-      }
-    },
     "noaa": {
       "total_fetches": 67,
       "api_successes": 61,
