@@ -198,7 +198,7 @@ class MetarProvider:
         logger.info("[MetarProvider] Async fetch KMOD observation...")
 
         try:
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(self.METAR_URL)
 
                 if resp.status_code != 200:

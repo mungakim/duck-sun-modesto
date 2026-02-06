@@ -108,7 +108,7 @@ class NOAAProvider:
         logger.info(f"[NOAAProvider] Verifying gridpoint for KMOD ({self.KMOD_LAT}, {self.KMOD_LON})...")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(self.POINTS_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
@@ -215,7 +215,7 @@ class NOAAProvider:
         logger.info("[NOAAProvider] Async fetch from api.weather.gov (Gridpoints)...")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(self.GRIDPOINT_URL, headers=self.HEADERS)
 
                 if resp.status_code != 200:
@@ -279,7 +279,7 @@ class NOAAProvider:
         """
         logger.info("[NOAAProvider] Fetching text forecast periods (Website Match)...")
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(self.FORECAST_URL, headers=self.HEADERS)
                 if resp.status_code != 200:
                     logger.warning(f"[NOAAProvider] Forecast API {resp.status_code}")

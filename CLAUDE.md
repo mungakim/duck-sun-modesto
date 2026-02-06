@@ -141,10 +141,9 @@ The PDF report includes:
 **CRITICAL: Weather.com temps MUST match the weather.com website.** Any drift of 3-4°F indicates stale cached data being served instead of a fresh API call. This has happened before (Feb 2026) and must not recur.
 
 ### Root Cause of Stale Data (Feb 2026 Incident)
-1. SSL cert extraction from Windows cert store failed behind MID corporate proxy
-2. `ssl_helper.py` fell back to curl_cffi's bundled Mozilla CA (didn't have proxy CA)
-3. All curl_cffi requests failed → provider returned None → CacheManager served days-old LKG data
-4. No maximum cache age was enforced, so 3-day-old forecasts were silently used
+1. MID firewall blocked some HTTPS connections (there is NO corporate proxy — confirmed by IT Security)
+2. Provider requests failed → returned None → CacheManager served days-old LKG data
+3. No maximum cache age was enforced, so 3-day-old forecasts were silently used
 
 ### Safeguards Now In Place
 
@@ -165,16 +164,20 @@ The PDF report includes:
 - Cache exceeding max age is **rejected** — falls through to DEFAULT values
 - Stale data is never silently served as if it were valid
 
-**SSL-level (ssl_helper.py):**
-- Priority: `DUCK_SUN_CA_BUNDLE` env var → Windows cert store → `certifi.where()` → `verify=False`
-- certifi is the key fallback for PyInstaller exe (bundle with `--collect-data certifi`)
-- Final fallback is `verify=False` (skip verification) only if certifi is also unavailable
-- This prevents SSL failures from cascading into stale cache usage
+**SSL-level (ssl_helper.py + pip-system-certs):**
+- `pip-system-certs` patches `certifi.where()` to return the OS certificate store path
+- httpx uses this automatically (Python ssl module honors certifi)
+- curl_cffi uses `get_ca_bundle_for_curl()` from `ssl_helper.py` which returns `certifi.where()`
+- Priority: `DUCK_SUN_CA_BUNDLE` env var → `certifi.where()` (patched by pip-system-certs) → curl default CA store
+- **No `verify=False` anywhere in the codebase** — all connections use proper SSL verification
+- MID IT Security confirmed: there is NO corporate proxy. Firewall-level whitelisting is managed by IT Systems
+- For PyInstaller exe: bundle certifi with `--collect-data certifi`
 
 ### How To Diagnose Stale Data
 If weather.com temps in the report don't match the website:
-1. Check for SSL errors in the terminal output ("Failed to extract Windows certs")
+1. Check for SSL errors in the terminal output (certificate verification failures)
 2. Compare report temps against `outputs/weathercom_cache.json` timestamp
 3. Compare against `outputs/cache/weather_com_lkg.json` timestamp
-4. If both are old, the API call is failing — check `TWC_API_KEY` and SSL configuration
+4. If both are old, the API call is failing — check `TWC_API_KEY` and verify `pip-system-certs` is installed
 5. Both weather_com.py and wunderground.py use curl_cffi — if one fails, the other likely does too
+6. If firewall is blocking connections, contact IT Systems (Scott Bays) for domain whitelisting
