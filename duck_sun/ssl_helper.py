@@ -4,14 +4,20 @@ SSL Helper for Certificate Store Integration
 Provides CA bundle resolution for curl_cffi, which uses libcurl's SSL
 stack and doesn't automatically use the OS certificate store.
 
-With pip-system-certs installed, certifi.where() returns the OS cert
-store path, which both httpx and curl_cffi can use for proper SSL
-verification.
+httpx uses Python's ssl module, which pip-system-certs patches to use
+the OS cert store automatically. But curl_cffi uses libcurl and needs
+a PEM file. This module exports the Windows cert store to a PEM file
+so curl_cffi trusts the same certificates as the OS (including any
+firewall/inspection CA certs that Windows trusts).
 """
 
+import base64
 import logging
 import os
+import ssl
 import sys
+import tempfile
+from pathlib import Path
 
 try:
     import certifi
@@ -22,18 +28,69 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Cache the exported PEM path for process lifetime
+_cached_windows_pem: str | None = None
+
+
+def _export_windows_cert_store() -> str | None:
+    """
+    Export Windows certificate store to a PEM file.
+
+    Uses Python's ssl module to read the OS trust store (which includes
+    any certs Windows trusts, such as firewall inspection CAs), then
+    writes them to a PEM file that curl_cffi/libcurl can use.
+
+    The file is cached in a temp directory for the process lifetime.
+
+    Returns:
+        Path to PEM file, or None if not on Windows or export fails.
+    """
+    global _cached_windows_pem
+
+    if _cached_windows_pem and os.path.exists(_cached_windows_pem):
+        return _cached_windows_pem
+
+    if sys.platform != 'win32':
+        return None
+
+    try:
+        context = ssl.create_default_context()
+        der_certs = context.get_ca_certs(binary_form=True)
+
+        if not der_certs:
+            logger.warning("[ssl_helper] No certificates found in Windows store")
+            return None
+
+        # Write to a persistent temp file
+        cert_dir = Path(tempfile.gettempdir()) / "duck_sun_certs"
+        cert_dir.mkdir(exist_ok=True)
+        cert_file = cert_dir / "windows_ca_bundle.pem"
+
+        with open(cert_file, 'wb') as f:
+            for der_cert in der_certs:
+                pem = b"-----BEGIN CERTIFICATE-----\n"
+                pem += base64.encodebytes(der_cert)
+                pem += b"-----END CERTIFICATE-----\n"
+                f.write(pem)
+
+        logger.info(f"[ssl_helper] Exported {len(der_certs)} Windows certs to: {cert_file}")
+        _cached_windows_pem = str(cert_file)
+        return _cached_windows_pem
+
+    except Exception as e:
+        logger.warning(f"[ssl_helper] Windows cert export failed: {e}")
+        return None
+
 
 def get_ca_bundle_for_curl() -> str | bool:
     """
     Get the appropriate CA bundle for curl_cffi.
 
-    With pip-system-certs installed, certifi.where() returns the OS
-    certificate store, so curl_cffi will trust the same certs as the OS.
-
     Priority:
     1. DUCK_SUN_CA_BUNDLE environment variable (explicit override)
-    2. certifi CA bundle (pip-system-certs patches this to use OS certs)
-    3. True (use curl's default CA store)
+    2. Windows cert store export (includes firewall/inspection CAs)
+    3. certifi CA bundle (standard Mozilla CA bundle)
+    4. True (use curl's default CA store)
 
     Returns:
         Path to CA bundle file, or True for curl's default
@@ -47,7 +104,12 @@ def get_ca_bundle_for_curl() -> str | bool:
         else:
             logger.warning(f"[ssl_helper] DUCK_SUN_CA_BUNDLE path not found: {env_bundle}")
 
-    # Use certifi CA bundle (pip-system-certs patches this to use OS certs)
+    # Export Windows cert store (includes any firewall/inspection CAs)
+    windows_pem = _export_windows_cert_store()
+    if windows_pem:
+        return windows_pem
+
+    # Fallback to certifi (standard Mozilla CA bundle)
     if HAS_CERTIFI:
         try:
             certifi_bundle = certifi.where()
@@ -58,5 +120,5 @@ def get_ca_bundle_for_curl() -> str | bool:
             logger.warning(f"[ssl_helper] certifi.where() failed: {e}")
 
     # Use curl's default CA store (SSL verification stays ON)
-    logger.warning("[ssl_helper] certifi not available - using curl default CA store")
+    logger.warning("[ssl_helper] No CA bundle available - using curl default CA store")
     return True
