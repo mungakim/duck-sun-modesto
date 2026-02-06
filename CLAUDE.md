@@ -166,8 +166,9 @@ The PDF report includes:
 - Stale data is never silently served as if it were valid
 
 **SSL-level (ssl_helper.py):**
-- Priority: `DUCK_SUN_CA_BUNDLE` env var → Windows cert store → `verify=False`
-- Final fallback is `verify=False` (skip verification), matching what httpx-based providers do
+- Priority: `DUCK_SUN_CA_BUNDLE` env var → Windows cert store → `certifi.where()` → `verify=False`
+- certifi is the key fallback for PyInstaller exe (bundle with `--collect-data certifi`)
+- Final fallback is `verify=False` (skip verification) only if certifi is also unavailable
 - This prevents SSL failures from cascading into stale cache usage
 
 ### How To Diagnose Stale Data
