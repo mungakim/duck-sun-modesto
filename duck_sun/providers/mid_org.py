@@ -18,9 +18,17 @@ The MID data is valuable because:
 import httpx
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+# SSL: Use OS certificate store for PyInstaller exe compatibility
+try:
+    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+except ImportError:
+    def get_ca_bundle():
+        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +130,7 @@ class MIDOrgProvider:
         logger.info("[MIDOrgProvider] Fetching from MID API...")
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
                 # Fetch 48-hour summary
                 summary_url = f"{MID_API_BASE}/weather/twoday/summary"
                 summary_resp = await client.get(summary_url, headers=self.HEADERS)
@@ -167,7 +175,7 @@ class MIDOrgProvider:
         Returns list of hourly records with temperature, wind, barometer, rain.
         """
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
                 detail_url = f"{MID_API_BASE}/weather/twoday/detail"
                 resp = await client.get(detail_url, headers=self.HEADERS)
 
