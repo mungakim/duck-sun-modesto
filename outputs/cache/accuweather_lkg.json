@@ -1,6 +1,6 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-02-06T05:26:29.611945",
+  "timestamp": "2026-02-06T08:01:09.037888",
   "api_success": true,
   "data": [
     {
@@ -46,7 +46,7 @@
       "high_f": 59.0,
       "low_f": 44.0,
       "precip_prob": 59,
-      "condition": "Mostly sunny"
+      "condition": "Dreary"
     }
   ]
 }

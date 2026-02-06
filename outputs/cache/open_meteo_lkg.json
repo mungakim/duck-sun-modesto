@@ -1,9 +1,9 @@
 {
   "provider": "open_meteo",
-  "timestamp": "2026-02-06T05:26:27.018257",
+  "timestamp": "2026-02-06T08:01:06.110390",
   "api_success": true,
   "data": {
-    "generated_at": "2026-02-06T05:26:27.017054",
+    "generated_at": "2026-02-06T08:01:06.109501",
     "location": "Modesto, CA",
     "daily_summary": [
       {
@@ -53,7 +53,7 @@
         "cloud_cover": 100,
         "radiation": 0.0,
         "temperature_c": 11.4,
-        "dewpoint_c": 10.3,
+        "dewpoint_c": 10.2,
         "wind_speed_kmh": 4.3
       },
       {
@@ -63,148 +63,148 @@
         "cloud_cover": 100,
         "radiation": 0.0,
         "temperature_c": 10.9,
-        "dewpoint_c": 9.9,
-        "wind_speed_kmh": 3.2
+        "dewpoint_c": 10.1,
+        "wind_speed_kmh": 5.6
       },
       {
         "time": "2026-02-06T06:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 93,
+        "cloud_cover": 70,
         "radiation": 0.0,
-        "temperature_c": 10.4,
-        "dewpoint_c": 9.9,
-        "wind_speed_kmh": 5.8
+        "temperature_c": 9.6,
+        "dewpoint_c": 9.3,
+        "wind_speed_kmh": 3.4
       },
       {
         "time": "2026-02-06T07:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 100,
+        "cloud_cover": 88,
         "radiation": 0.0,
-        "temperature_c": 9.7,
-        "dewpoint_c": 9.7,
-        "wind_speed_kmh": 5.6
+        "temperature_c": 9.3,
+        "dewpoint_c": 8.7,
+        "wind_speed_kmh": 4.2
       },
       {
         "time": "2026-02-06T08:00",
-        "solar_factor": 0.015,
+        "solar_factor": 0.032,
         "is_duck_hour": false,
-        "cloud_cover": 100,
-        "radiation": 43.8,
-        "temperature_c": 10.2,
-        "dewpoint_c": 10.2,
-        "wind_speed_kmh": 2.6
+        "cloud_cover": 40,
+        "radiation": 40.2,
+        "temperature_c": 10.0,
+        "dewpoint_c": 9.9,
+        "wind_speed_kmh": 3.0
       },
       {
         "time": "2026-02-06T09:00",
-        "solar_factor": 0.067,
+        "solar_factor": 0.058,
         "is_duck_hour": true,
         "cloud_cover": 100,
-        "radiation": 200.8,
-        "temperature_c": 13.2,
-        "dewpoint_c": 13.2,
-        "wind_speed_kmh": 2.2
+        "radiation": 173.5,
+        "temperature_c": 12.2,
+        "dewpoint_c": 12.2,
+        "wind_speed_kmh": 4.7
       },
       {
         "time": "2026-02-06T10:00",
-        "solar_factor": 0.116,
+        "solar_factor": 0.078,
         "is_duck_hour": true,
         "cloud_cover": 100,
-        "radiation": 347.0,
-        "temperature_c": 16.1,
-        "dewpoint_c": 16.1,
-        "wind_speed_kmh": 1.1
+        "radiation": 235.2,
+        "temperature_c": 13.1,
+        "dewpoint_c": 13.1,
+        "wind_speed_kmh": 5.2
       },
       {
         "time": "2026-02-06T11:00",
-        "solar_factor": 0.164,
+        "solar_factor": 0.101,
         "is_duck_hour": true,
         "cloud_cover": 100,
-        "radiation": 490.8,
-        "temperature_c": 17.8,
-        "dewpoint_c": 16.8,
-        "wind_speed_kmh": 1.8
+        "radiation": 301.5,
+        "temperature_c": 14.6,
+        "dewpoint_c": 13.4,
+        "wind_speed_kmh": 3.1
       },
       {
         "time": "2026-02-06T12:00",
-        "solar_factor": 0.191,
+        "solar_factor": 0.184,
         "is_duck_hour": true,
-        "cloud_cover": 100,
-        "radiation": 574.0,
-        "temperature_c": 19.4,
-        "dewpoint_c": 16.5,
-        "wind_speed_kmh": 3.3
+        "cloud_cover": 87,
+        "radiation": 424.0,
+        "temperature_c": 16.4,
+        "dewpoint_c": 14.4,
+        "wind_speed_kmh": 5.0
       },
       {
         "time": "2026-02-06T13:00",
-        "solar_factor": 0.281,
+        "solar_factor": 0.538,
         "is_duck_hour": true,
-        "cloud_cover": 83,
-        "radiation": 603.5,
-        "temperature_c": 20.4,
-        "dewpoint_c": 15.8,
-        "wind_speed_kmh": 9.1
+        "cloud_cover": 26,
+        "radiation": 592.2,
+        "temperature_c": 18.4,
+        "dewpoint_c": 14.9,
+        "wind_speed_kmh": 7.6
       },
       {
         "time": "2026-02-06T14:00",
-        "solar_factor": 0.198,
+        "solar_factor": 0.597,
         "is_duck_hour": true,
-        "cloud_cover": 94,
-        "radiation": 520.0,
-        "temperature_c": 20.9,
-        "dewpoint_c": 12.3,
-        "wind_speed_kmh": 12.1
+        "cloud_cover": 8,
+        "radiation": 569.5,
+        "temperature_c": 19.1,
+        "dewpoint_c": 14.3,
+        "wind_speed_kmh": 10.6
       },
       {
         "time": "2026-02-06T15:00",
-        "solar_factor": 0.296,
+        "solar_factor": 0.521,
         "is_duck_hour": true,
-        "cloud_cover": 50,
-        "radiation": 409.8,
-        "temperature_c": 21.5,
-        "dewpoint_c": 12.0,
-        "wind_speed_kmh": 11.3
+        "cloud_cover": 2,
+        "radiation": 475.2,
+        "temperature_c": 19.8,
+        "dewpoint_c": 12.3,
+        "wind_speed_kmh": 13.2
       },
       {
         "time": "2026-02-06T16:00",
-        "solar_factor": 0.314,
+        "solar_factor": 0.357,
         "is_duck_hour": true,
-        "cloud_cover": 5,
-        "radiation": 292.8,
-        "temperature_c": 20.8,
-        "dewpoint_c": 11.4,
-        "wind_speed_kmh": 11.2
+        "cloud_cover": 2,
+        "radiation": 326.0,
+        "temperature_c": 19.6,
+        "dewpoint_c": 11.6,
+        "wind_speed_kmh": 11.3
       },
       {
         "time": "2026-02-06T17:00",
-        "solar_factor": 0.152,
+        "solar_factor": 0.161,
         "is_duck_hour": false,
         "cloud_cover": 2,
-        "radiation": 138.5,
-        "temperature_c": 19.1,
-        "dewpoint_c": 11.1,
-        "wind_speed_kmh": 8.8
+        "radiation": 146.8,
+        "temperature_c": 18.1,
+        "dewpoint_c": 11.6,
+        "wind_speed_kmh": 7.9
       },
       {
         "time": "2026-02-06T18:00",
-        "solar_factor": 0.013,
+        "solar_factor": 0.007,
         "is_duck_hour": false,
-        "cloud_cover": 0,
+        "cloud_cover": 71,
         "radiation": 11.8,
-        "temperature_c": 16.2,
-        "dewpoint_c": 10.5,
-        "wind_speed_kmh": 7.5
+        "temperature_c": 15.4,
+        "dewpoint_c": 10.6,
+        "wind_speed_kmh": 8.0
       },
       {
         "time": "2026-02-06T19:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 0,
+        "cloud_cover": 3,
         "radiation": 0.0,
-        "temperature_c": 14.6,
-        "dewpoint_c": 10.4,
-        "wind_speed_kmh": 8.4
+        "temperature_c": 14.0,
+        "dewpoint_c": 9.6,
+        "wind_speed_kmh": 8.5
       },
       {
         "time": "2026-02-06T20:00",
@@ -212,29 +212,29 @@
         "is_duck_hour": false,
         "cloud_cover": 2,
         "radiation": 0.0,
-        "temperature_c": 13.3,
-        "dewpoint_c": 10.1,
-        "wind_speed_kmh": 8.1
+        "temperature_c": 12.9,
+        "dewpoint_c": 9.0,
+        "wind_speed_kmh": 8.6
       },
       {
         "time": "2026-02-06T21:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 3,
+        "cloud_cover": 1,
         "radiation": 0.0,
-        "temperature_c": 12.4,
-        "dewpoint_c": 10.0,
+        "temperature_c": 11.8,
+        "dewpoint_c": 8.5,
         "wind_speed_kmh": 8.4
       },
       {
         "time": "2026-02-06T22:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 1,
+        "cloud_cover": 4,
         "radiation": 0.0,
-        "temperature_c": 12.0,
-        "dewpoint_c": 9.9,
-        "wind_speed_kmh": 9.3
+        "temperature_c": 11.0,
+        "dewpoint_c": 8.6,
+        "wind_speed_kmh": 7.9
       },
       {
         "time": "2026-02-06T23:00",
@@ -242,29 +242,29 @@
         "is_duck_hour": false,
         "cloud_cover": 0,
         "radiation": 0.0,
-        "temperature_c": 11.9,
-        "dewpoint_c": 8.9,
-        "wind_speed_kmh": 11.3
+        "temperature_c": 10.8,
+        "dewpoint_c": 8.0,
+        "wind_speed_kmh": 9.8
       },
       {
         "time": "2026-02-07T00:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 3,
+        "cloud_cover": 55,
         "radiation": 0.0,
-        "temperature_c": 10.8,
-        "dewpoint_c": 9.2,
-        "wind_speed_kmh": 8.7
+        "temperature_c": 10.6,
+        "dewpoint_c": 7.3,
+        "wind_speed_kmh": 11.6
       },
       {
         "time": "2026-02-07T01:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 2,
+        "cloud_cover": 3,
         "radiation": 0.0,
-        "temperature_c": 10.2,
-        "dewpoint_c": 8.6,
-        "wind_speed_kmh": 9.7
+        "temperature_c": 10.3,
+        "dewpoint_c": 7.9,
+        "wind_speed_kmh": 11.0
       },
       {
         "time": "2026-02-07T02:00",
@@ -272,9 +272,9 @@
         "is_duck_hour": false,
         "cloud_cover": 2,
         "radiation": 0.0,
-        "temperature_c": 10.1,
-        "dewpoint_c": 8.2,
-        "wind_speed_kmh": 11.2
+        "temperature_c": 9.9,
+        "dewpoint_c": 7.7,
+        "wind_speed_kmh": 10.7
       },
       {
         "time": "2026-02-07T03:00",
@@ -282,259 +282,259 @@
         "is_duck_hour": false,
         "cloud_cover": 2,
         "radiation": 0.0,
-        "temperature_c": 9.9,
-        "dewpoint_c": 8.0,
-        "wind_speed_kmh": 11.2
+        "temperature_c": 9.1,
+        "dewpoint_c": 7.2,
+        "wind_speed_kmh": 7.3
       },
       {
         "time": "2026-02-07T04:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 7,
+        "cloud_cover": 4,
         "radiation": 0.0,
-        "temperature_c": 8.9,
-        "dewpoint_c": 7.5,
-        "wind_speed_kmh": 4.9
+        "temperature_c": 8.3,
+        "dewpoint_c": 6.7,
+        "wind_speed_kmh": 6.2
       },
       {
         "time": "2026-02-07T05:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 37,
+        "cloud_cover": 14,
         "radiation": 0.0,
-        "temperature_c": 8.1,
-        "dewpoint_c": 7.0,
-        "wind_speed_kmh": 6.5
+        "temperature_c": 7.4,
+        "dewpoint_c": 6.0,
+        "wind_speed_kmh": 4.7
       },
       {
         "time": "2026-02-07T06:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 100,
+        "cloud_cover": 11,
         "radiation": 0.0,
-        "temperature_c": 7.6,
-        "dewpoint_c": 6.4,
-        "wind_speed_kmh": 6.0
+        "temperature_c": 6.9,
+        "dewpoint_c": 5.5,
+        "wind_speed_kmh": 7.1
       },
       {
         "time": "2026-02-07T07:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 100,
+        "cloud_cover": 8,
         "radiation": 0.0,
-        "temperature_c": 7.2,
-        "dewpoint_c": 6.1,
-        "wind_speed_kmh": 6.2
+        "temperature_c": 7.6,
+        "dewpoint_c": 5.3,
+        "wind_speed_kmh": 12.3
       },
       {
         "time": "2026-02-07T08:00",
-        "solar_factor": 0.018,
+        "solar_factor": 0.064,
         "is_duck_hour": false,
-        "cloud_cover": 100,
-        "radiation": 54.0,
-        "temperature_c": 8.0,
-        "dewpoint_c": 7.5,
-        "wind_speed_kmh": 4.1
+        "cloud_cover": 7,
+        "radiation": 61.0,
+        "temperature_c": 8.6,
+        "dewpoint_c": 6.4,
+        "wind_speed_kmh": 11.2
       },
       {
         "time": "2026-02-07T09:00",
-        "solar_factor": 0.092,
+        "solar_factor": 0.078,
         "is_duck_hour": true,
-        "cloud_cover": 92,
+        "cloud_cover": 100,
         "radiation": 233.0,
-        "temperature_c": 10.7,
-        "dewpoint_c": 9.1,
-        "wind_speed_kmh": 6.9
+        "temperature_c": 11.3,
+        "dewpoint_c": 7.6,
+        "wind_speed_kmh": 13.3
       },
       {
         "time": "2026-02-07T10:00",
-        "solar_factor": 0.415,
+        "solar_factor": 0.154,
         "is_duck_hour": true,
-        "cloud_cover": 7,
-        "radiation": 393.0,
-        "temperature_c": 13.3,
-        "dewpoint_c": 9.7,
-        "wind_speed_kmh": 9.2
+        "cloud_cover": 94,
+        "radiation": 405.0,
+        "temperature_c": 13.7,
+        "dewpoint_c": 8.5,
+        "wind_speed_kmh": 13.1
       },
       {
         "time": "2026-02-07T11:00",
-        "solar_factor": 0.581,
+        "solar_factor": 0.602,
         "is_duck_hour": true,
-        "cloud_cover": 3,
-        "radiation": 534.0,
-        "temperature_c": 15.1,
-        "dewpoint_c": 9.9,
-        "wind_speed_kmh": 10.0
+        "cloud_cover": 1,
+        "radiation": 546.0,
+        "temperature_c": 16.0,
+        "dewpoint_c": 9.2,
+        "wind_speed_kmh": 10.3
       },
       {
         "time": "2026-02-07T12:00",
-        "solar_factor": 0.676,
+        "solar_factor": 0.692,
         "is_duck_hour": true,
-        "cloud_cover": 3,
-        "radiation": 621.0,
-        "temperature_c": 17.3,
-        "dewpoint_c": 9.2,
+        "cloud_cover": 0,
+        "radiation": 623.0,
+        "temperature_c": 18.3,
+        "dewpoint_c": 9.9,
         "wind_speed_kmh": 11.3
       },
       {
         "time": "2026-02-07T13:00",
-        "solar_factor": 0.669,
+        "solar_factor": 0.71,
         "is_duck_hour": true,
-        "cloud_cover": 5,
-        "radiation": 624.0,
-        "temperature_c": 19.0,
-        "dewpoint_c": 9.7,
-        "wind_speed_kmh": 14.2
+        "cloud_cover": 0,
+        "radiation": 639.0,
+        "temperature_c": 20.1,
+        "dewpoint_c": 10.2,
+        "wind_speed_kmh": 10.7
       },
       {
         "time": "2026-02-07T14:00",
-        "solar_factor": 0.554,
+        "solar_factor": 0.614,
         "is_duck_hour": true,
-        "cloud_cover": 21,
-        "radiation": 584.0,
-        "temperature_c": 20.1,
-        "dewpoint_c": 10.2,
-        "wind_speed_kmh": 15.0
+        "cloud_cover": 9,
+        "radiation": 590.0,
+        "temperature_c": 21.1,
+        "dewpoint_c": 10.6,
+        "wind_speed_kmh": 11.2
       },
       {
         "time": "2026-02-07T15:00",
-        "solar_factor": 0.523,
+        "solar_factor": 0.146,
         "is_duck_hour": true,
-        "cloud_cover": 2,
-        "radiation": 477.0,
-        "temperature_c": 20.2,
-        "dewpoint_c": 9.4,
-        "wind_speed_kmh": 13.8
+        "cloud_cover": 100,
+        "radiation": 439.0,
+        "temperature_c": 21.1,
+        "dewpoint_c": 10.8,
+        "wind_speed_kmh": 13.1
       },
       {
         "time": "2026-02-07T16:00",
-        "solar_factor": 0.318,
+        "solar_factor": 0.109,
         "is_duck_hour": true,
-        "cloud_cover": 13,
-        "radiation": 315.0,
-        "temperature_c": 19.5,
-        "dewpoint_c": 9.4,
-        "wind_speed_kmh": 14.2
+        "cloud_cover": 100,
+        "radiation": 328.0,
+        "temperature_c": 20.9,
+        "dewpoint_c": 10.4,
+        "wind_speed_kmh": 12.6
       },
       {
         "time": "2026-02-07T17:00",
-        "solar_factor": 0.07,
+        "solar_factor": 0.042,
         "is_duck_hour": false,
-        "cloud_cover": 54,
-        "radiation": 101.0,
-        "temperature_c": 17.8,
-        "dewpoint_c": 9.7,
-        "wind_speed_kmh": 10.4
+        "cloud_cover": 100,
+        "radiation": 125.0,
+        "temperature_c": 19.2,
+        "dewpoint_c": 10.5,
+        "wind_speed_kmh": 9.2
       },
       {
         "time": "2026-02-07T18:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 1,
+        "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 15.1,
-        "dewpoint_c": 9.0,
-        "wind_speed_kmh": 7.7
+        "temperature_c": 16.2,
+        "dewpoint_c": 10.7,
+        "wind_speed_kmh": 7.6
       },
       {
         "time": "2026-02-07T19:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 0,
+        "cloud_cover": 100,
         "radiation": 0.0,
-        "temperature_c": 13.6,
-        "dewpoint_c": 8.0,
-        "wind_speed_kmh": 8.5
+        "temperature_c": 14.6,
+        "dewpoint_c": 10.8,
+        "wind_speed_kmh": 8.0
       },
       {
         "time": "2026-02-07T20:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 2,
+        "cloud_cover": 42,
         "radiation": 0.0,
-        "temperature_c": 13.0,
-        "dewpoint_c": 8.0,
-        "wind_speed_kmh": 9.3
+        "temperature_c": 13.3,
+        "dewpoint_c": 8.8,
+        "wind_speed_kmh": 8.6
       },
       {
         "time": "2026-02-07T21:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 5,
+        "cloud_cover": 0,
         "radiation": 0.0,
         "temperature_c": 12.4,
-        "dewpoint_c": 7.9,
-        "wind_speed_kmh": 8.9
+        "dewpoint_c": 8.3,
+        "wind_speed_kmh": 9.5
       },
       {
         "time": "2026-02-07T22:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 0,
+        "cloud_cover": 6,
         "radiation": 0.0,
-        "temperature_c": 12.1,
-        "dewpoint_c": 7.3,
-        "wind_speed_kmh": 6.5
+        "temperature_c": 11.5,
+        "dewpoint_c": 7.8,
+        "wind_speed_kmh": 8.1
       },
       {
         "time": "2026-02-07T23:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 5,
+        "cloud_cover": 2,
         "radiation": 0.0,
-        "temperature_c": 12.2,
-        "dewpoint_c": 6.7,
-        "wind_speed_kmh": 6.4
+        "temperature_c": 10.4,
+        "dewpoint_c": 7.4,
+        "wind_speed_kmh": 6.9
       },
       {
         "time": "2026-02-08T00:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 6,
+        "cloud_cover": 7,
         "radiation": 0.0,
-        "temperature_c": 11.7,
-        "dewpoint_c": 6.2,
-        "wind_speed_kmh": 4.8
+        "temperature_c": 9.1,
+        "dewpoint_c": 7.1,
+        "wind_speed_kmh": 3.4
       },
       {
         "time": "2026-02-08T01:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 0,
+        "cloud_cover": 17,
         "radiation": 0.0,
-        "temperature_c": 11.3,
-        "dewpoint_c": 5.9,
-        "wind_speed_kmh": 2.6
+        "temperature_c": 8.7,
+        "dewpoint_c": 6.3,
+        "wind_speed_kmh": 7.2
       },
       {
         "time": "2026-02-08T02:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 5,
+        "cloud_cover": 8,
         "radiation": 0.0,
-        "temperature_c": 10.9,
-        "dewpoint_c": 5.4,
-        "wind_speed_kmh": 4.6
+        "temperature_c": 8.9,
+        "dewpoint_c": 6.1,
+        "wind_speed_kmh": 6.6
       },
       {
         "time": "2026-02-08T03:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 5,
+        "cloud_cover": 8,
         "radiation": 0.0,
-        "temperature_c": 10.6,
-        "dewpoint_c": 5.3,
-        "wind_speed_kmh": 5.1
+        "temperature_c": 9.1,
+        "dewpoint_c": 5.5,
+        "wind_speed_kmh": 5.8
       },
       {
         "time": "2026-02-08T04:00",
         "solar_factor": 0.0,
         "is_duck_hour": false,
-        "cloud_cover": 5,
+        "cloud_cover": 26,
         "radiation": 0.0,
-        "temperature_c": 10.2,
-        "dewpoint_c": 5.6,
-        "wind_speed_kmh": 1.9
+        "temperature_c": 9.3,
+        "dewpoint_c": 5.7,
+        "wind_speed_kmh": 2.3
       },
       {
         "time": "2026-02-08T05:00",
@@ -1931,21 +1931,21 @@
       {
         "date": "2026-02-06",
         "day_name": "Fri",
-        "high_c": 21.5,
-        "low_c": 9.7,
-        "high_f": 71,
+        "high_c": 19.8,
+        "low_c": 9.3,
+        "high_f": 68,
         "low_f": 49,
         "precip_prob": 8,
-        "weather_code": 3,
-        "condition": "Overcast"
+        "weather_code": 45,
+        "condition": "Fog"
       },
       {
         "date": "2026-02-07",
         "day_name": "Sat",
-        "high_c": 20.2,
-        "low_c": 7.2,
-        "high_f": 68,
-        "low_f": 45,
+        "high_c": 21.1,
+        "low_c": 6.9,
+        "high_f": 70,
+        "low_f": 44,
         "precip_prob": 1,
         "weather_code": 3,
         "condition": "Overcast"
@@ -1954,9 +1954,9 @@
         "date": "2026-02-08",
         "day_name": "Sun",
         "high_c": 21.1,
-        "low_c": 9.6,
+        "low_c": 8.7,
         "high_f": 70,
-        "low_f": 49,
+        "low_f": 48,
         "precip_prob": 7,
         "weather_code": 3,
         "condition": "Overcast"
@@ -1979,7 +1979,7 @@
         "low_c": 8.0,
         "high_f": 56,
         "low_f": 46,
-        "precip_prob": 19,
+        "precip_prob": 27,
         "weather_code": 81,
         "condition": "Showers"
       },
@@ -1990,7 +1990,7 @@
         "low_c": 6.5,
         "high_f": 59,
         "low_f": 44,
-        "precip_prob": 17,
+        "precip_prob": 18,
         "weather_code": 3,
         "condition": "Overcast"
       },
@@ -2001,7 +2001,7 @@
         "low_c": 5.2,
         "high_f": 61,
         "low_f": 41,
-        "precip_prob": 4,
+        "precip_prob": 5,
         "weather_code": 1,
         "condition": "Mostly Clear"
       },
@@ -2012,7 +2012,7 @@
         "low_c": 5.1,
         "high_f": 60,
         "low_f": 41,
-        "precip_prob": 15,
+        "precip_prob": 19,
         "weather_code": 51,
         "condition": "Light Drizzle"
       }

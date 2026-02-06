@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-02-06T05:26:29.609496",
+  "timestamp": "2026-02-06T08:01:09.035592",
   "location_key": "327145",
   "call_date": "2026-02-06",
-  "call_count": 1,
+  "call_count": 2,
   "daily_limit": 42,
   "data": [
     {
@@ -48,7 +48,7 @@
       "high_f": 59.0,
       "low_f": 44.0,
       "precip_prob": 59,
-      "condition": "Mostly sunny"
+      "condition": "Dreary"
     }
   ]
 }
