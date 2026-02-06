@@ -1023,14 +1023,14 @@ def generate_excel_report(
     # Legend row - row 35 with empty row 34 as gap after solar forecast
     grid_row = 35
     legend_items = [
+        ("Tule Fog", "B4A0C8"),
+        ("Dense Fog", "FFB4B4"),
+        ("Fog Possible", "FFFFB4"),
+        ("Heavy Clouds", "FFD2A0"),
         ("Cloudy", "DCDCDC"),
         ("Some Sun", "C8E6FF"),
         ("Good Sun", "C8FFC8"),
         ("Full Sun", "90EE90"),
-        ("Fog Possible", "FFFFB4"),
-        ("Heavy Clouds", "FFD2A0"),
-        ("Dense Fog", "FFB4B4"),
-        ("Tule Fog", "B4A0C8"),
     ]
 
     for col_idx, (label, color) in enumerate(legend_items):
