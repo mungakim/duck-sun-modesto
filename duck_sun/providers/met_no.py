@@ -17,10 +17,11 @@ from typing import List, Optional, TypedDict
 
 # SSL: Use OS certificate store for PyInstaller exe compatibility
 try:
-    from duck_sun.ssl_helper import get_ca_bundle_for_curl as get_ca_bundle
+    from duck_sun.ssl_helper import get_httpx_ssl_context
 except ImportError:
-    def get_ca_bundle():
-        return os.getenv("DUCK_SUN_CA_BUNDLE", True)
+    import ssl as _ssl
+    def get_httpx_ssl_context():
+        return _ssl.create_default_context()
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class MetNoProvider:
         }
 
         try:
-            with httpx.Client(timeout=15.0, verify=get_ca_bundle()) as client:
+            with httpx.Client(timeout=15.0, verify=get_httpx_ssl_context()) as client:
                 resp = client.get(self.BASE_URL, params=params, headers=self.HEADERS)
 
                 if resp.status_code != 200:
@@ -129,7 +130,7 @@ class MetNoProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=15.0, verify=get_ca_bundle()) as client:
+            async with httpx.AsyncClient(timeout=15.0, verify=get_httpx_ssl_context()) as client:
                 resp = await client.get(self.BASE_URL, params=params, headers=self.HEADERS)
 
                 if resp.status_code != 200:
