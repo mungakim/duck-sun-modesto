@@ -1,6 +1,6 @@
 {
   "provider": "google_weather",
-  "timestamp": "2026-02-06T10:40:15.087863",
+  "timestamp": "2026-02-06T10:56:47.153056",
   "api_success": true,
   "data": {
     "hourly": [
@@ -1279,15 +1279,6 @@
     ],
     "daily": [
       {
-        "date": "2026-02-05",
-        "high_c": 11.2,
-        "low_c": 9.1,
-        "high_f": 52,
-        "low_f": 48,
-        "precip_prob": 0,
-        "condition": "Unknown"
-      },
-      {
         "date": "2026-02-06",
         "high_c": 20.7,
         "low_c": 7.8,
@@ -1322,18 +1313,9 @@
         "low_f": 46,
         "precip_prob": 20,
         "condition": "Light rain"
-      },
-      {
-        "date": "2026-02-10",
-        "high_c": 9.5,
-        "low_c": 7.7,
-        "high_f": 49,
-        "low_f": 46,
-        "precip_prob": 20,
-        "condition": "Light rain"
       }
     ],
     "source": "Google Weather API (MetNet-3)",
-    "fetched_at": "2026-02-06T10:40:15.087404"
+    "fetched_at": "2026-02-06T10:56:47.152613"
   }
 }

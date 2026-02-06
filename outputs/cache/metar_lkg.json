@@ -1,12 +1,12 @@
 {
   "provider": "metar",
-  "timestamp": "2026-02-06T10:40:16.749782",
+  "timestamp": "2026-02-06T10:56:47.743263",
   "api_success": true,
   "data": {
-    "raw": "KMOD 061836Z 00000KT 3SM HZ CLR 15/11 A3012 RMK AO2 T01500106",
+    "raw": "KMOD 061853Z 00000KT 3SM HZ CLR 16/11 A3012 RMK AO2 SLP199 T01560111",
     "station": "KMOD",
-    "observation_time": "2026/02/06 18:36",
-    "temp_c": 15,
+    "observation_time": "2026/02/06 18:53",
+    "temp_c": 16,
     "dewpoint_c": 11,
     "wind_speed_kt": 0,
     "wind_dir": 0,
