@@ -1,6 +1,6 @@
 {
   "provider": "weather_com",
-  "timestamp": "2026-02-06T08:16:18.893203",
+  "timestamp": "2026-02-06T08:57:44.797088",
   "api_success": true,
   "data": [
     {
@@ -10,8 +10,8 @@
       "low_f": 45.0,
       "high_c": 21.67,
       "low_c": 7.22,
-      "condition": "AM Drizzle",
-      "precip_prob": 30
+      "condition": "Partly Cloudy",
+      "precip_prob": 15
     },
     {
       "date": "2026-02-07",
@@ -21,17 +21,17 @@
       "high_c": 21.67,
       "low_c": 6.67,
       "condition": "Mostly Sunny",
-      "precip_prob": 10
+      "precip_prob": 8
     },
     {
       "date": "2026-02-08",
       "day_name": "Sun",
-      "high_f": 69.0,
+      "high_f": 70.0,
       "low_f": 50.0,
-      "high_c": 20.56,
+      "high_c": 21.11,
       "low_c": 10.0,
       "condition": "Partly Cloudy",
-      "precip_prob": 9
+      "precip_prob": 8
     },
     {
       "date": "2026-02-09",
@@ -41,7 +41,7 @@
       "high_c": 16.11,
       "low_c": 7.78,
       "condition": "Cloudy",
-      "precip_prob": 54
+      "precip_prob": 8
     },
     {
       "date": "2026-02-10",
@@ -81,7 +81,7 @@
       "high_c": 17.22,
       "low_c": 6.11,
       "condition": "Partly Cloudy",
-      "precip_prob": 32
+      "precip_prob": 20
     },
     {
       "date": "2026-02-14",
@@ -91,14 +91,14 @@
       "high_c": 14.44,
       "low_c": 5.56,
       "condition": "AM Showers",
-      "precip_prob": 59
+      "precip_prob": 37
     },
     {
       "date": "2026-02-15",
       "day_name": "Sun",
-      "high_f": 55.0,
+      "high_f": 56.0,
       "low_f": 38.0,
-      "high_c": 12.78,
+      "high_c": 13.33,
       "low_c": 3.33,
       "condition": "Showers",
       "precip_prob": 59
