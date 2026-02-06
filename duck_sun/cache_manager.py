@@ -103,13 +103,27 @@ class CacheManager:
 
     Features:
     - Persistent Last Known Good (LKG) storage
-    - Tiered staleness detection
+    - Tiered staleness detection with max age enforcement
     - Analytics tracking
     - Default values ensure PDF never shows "--"
     """
 
     CACHE_DIR = Path("outputs/cache")
     ANALYTICS_FILE = Path("outputs/lessons_learned.json")
+
+    # Maximum cache age per provider (hours). Beyond this, prefer DEFAULT values
+    # over stale cached data. Providers not listed here have no max age (unlimited).
+    MAX_CACHE_HOURS: Dict[str, float] = {
+        "weather_com": 18,      # TWC API - forecasts change frequently
+        "wunderground": 18,     # Same TWC data source
+        "accuweather": 18,      # Commercial provider - keep fresh
+        "google_weather": 18,   # MetNet-3 updates frequently
+        "noaa": 24,             # NOAA updates every 12h but 24h is acceptable
+        "met_no": 24,           # ECMWF model runs every 6-12h
+        "open_meteo": 24,       # Physics models update every 6h
+        "mid_org": 48,          # Local ground truth - less frequent updates
+        "hrrr": 12,             # HRRR updates hourly, stale quickly
+    }
 
     # Default values when ALL else fails - ensures PDF never shows "--"
     # These are reasonable Modesto winter values
@@ -325,29 +339,41 @@ class CacheManager:
                 source="API"
             )
 
-        # Tiers 2-4: Cached data
+        # Tiers 2-4: Cached data (with max age enforcement)
         lkg = self.load_lkg(provider)
         if lkg is not None:
             tier = lkg.tier
-            stats["cache_hits"] += 1
-            stats["staleness_distribution"][tier.value] += 1
-            self._save_analytics()
+            max_hours = self.MAX_CACHE_HOURS.get(provider)
 
-            if tier == CacheTier.ACCEPTABLE:
-                logger.info(f"[CacheManager] {provider}: Using cached data ({lkg.age_hours:.1f}h old)")
-            elif tier == CacheTier.STALE_WARN:
-                logger.warning(f"[CacheManager] {provider}: Using STALE data ({lkg.age_hours:.1f}h old)")
-            elif tier == CacheTier.STALE_ERROR:
-                logger.error(f"[CacheManager] {provider}: Using VERY STALE data ({lkg.age_hours:.1f}h old)!")
+            # Enforce max cache age: reject cache that exceeds provider threshold
+            if max_hours is not None and lkg.age_hours > max_hours:
+                logger.error(
+                    f"[CacheManager] {provider}: Cache EXPIRED ({lkg.age_hours:.1f}h > {max_hours}h max) "
+                    f"- rejecting stale data, falling through to DEFAULT"
+                )
+                stats["staleness_distribution"]["STALE_ERROR"] += 1
+                self._save_analytics()
+                # Fall through to DEFAULT below
+            else:
+                stats["cache_hits"] += 1
+                stats["staleness_distribution"][tier.value] += 1
+                self._save_analytics()
 
-            return FetchResult(
-                provider=provider,
-                data=lkg.data,
-                tier=tier,
-                timestamp=lkg.timestamp,
-                source="CACHE",
-                error_message=api_error
-            )
+                if tier == CacheTier.ACCEPTABLE:
+                    logger.info(f"[CacheManager] {provider}: Using cached data ({lkg.age_hours:.1f}h old)")
+                elif tier == CacheTier.STALE_WARN:
+                    logger.warning(f"[CacheManager] {provider}: Using STALE data ({lkg.age_hours:.1f}h old)")
+                elif tier == CacheTier.STALE_ERROR:
+                    logger.error(f"[CacheManager] {provider}: Using VERY STALE data ({lkg.age_hours:.1f}h old)!")
+
+                return FetchResult(
+                    provider=provider,
+                    data=lkg.data,
+                    tier=tier,
+                    timestamp=lkg.timestamp,
+                    source="CACHE",
+                    error_message=api_error
+                )
 
         # Tier 5: Default values (last resort)
         logger.error(f"[CacheManager] {provider}: No cache! Using DEFAULT values")

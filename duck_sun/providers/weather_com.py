@@ -1,8 +1,11 @@
 """
 Weather.com Provider for Duck Sun Modesto
 
-Scrapes 10-day forecast from Weather.com for Downtown Modesto, CA.
-Uses curl_cffi with Chrome impersonation to bypass anti-bot measures.
+Fetches 10-day forecast from Weather.com TWC v3 API for Downtown Modesto, CA.
+Falls back to web scraping via curl_cffi if API fails.
+
+Always attempts a fresh API call. Cache is only used as a fallback when
+both API and scraping fail, and only if the cache is < 6 hours old.
 
 Weight: 4.0 (same as AccuWeather - commercial provider)
 """
@@ -40,10 +43,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting configuration
+# Cache configuration
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
-DAILY_CALL_LIMIT = 3  # Hard cap: max 3 web scrapes per day
+CACHE_MAX_AGE_HOURS = 6  # Only use cache if less than 6 hours old
 
 
 class WeatherComDay(TypedDict):
@@ -94,59 +97,37 @@ class WeatherComProvider:
             logger.warning(f"[WeatherComProvider] Cache load error: {e}")
             return None
 
-    def _save_cache(self, data: List['WeatherComDay'], increment_call: bool = True) -> None:
-        """Save forecast data to cache with call counter."""
+    def _save_cache(self, data: List['WeatherComDay']) -> None:
+        """Save forecast data to cache."""
         try:
-            today = datetime.now().strftime('%Y-%m-%d')
-            existing = self._load_cache()
-            call_count = 0
-
-            if existing and existing.get('call_date') == today:
-                call_count = existing.get('call_count', 0)
-
-            if increment_call:
-                call_count += 1
-
             cache = {
                 'timestamp': datetime.now().isoformat(),
-                'call_date': today,
-                'call_count': call_count,
-                'daily_limit': DAILY_CALL_LIMIT,
                 'data': data
             }
             with open(CACHE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, indent=2)
-            logger.info(f"[WeatherComProvider] Cache saved: call #{call_count}/{DAILY_CALL_LIMIT} today")
+            logger.info(f"[WeatherComProvider] Cache saved ({len(data)} days)")
         except Exception as e:
             logger.error(f"[WeatherComProvider] Cache save failed: {e}")
 
-    def _is_rate_limited(self) -> bool:
-        """Check if daily rate limit has been reached."""
+    def _get_fresh_cache(self) -> Optional[List['WeatherComDay']]:
+        """Return cached data only if it's fresh (< CACHE_MAX_AGE_HOURS old)."""
         cache = self._load_cache()
-        if not cache:
-            return False
+        if not cache or not cache.get('data'):
+            return None
 
-        today = datetime.now().strftime('%Y-%m-%d')
-        if cache.get('call_date') != today:
-            logger.info("[WeatherComProvider] New day - rate limit reset")
-            return False
-
-        call_count = cache.get('call_count', 0)
-        if call_count >= DAILY_CALL_LIMIT:
-            logger.warning(f"[WeatherComProvider] RATE LIMIT REACHED ({call_count}/{DAILY_CALL_LIMIT} calls today)")
-            return True
-
-        logger.info(f"[WeatherComProvider] Daily calls: {call_count}/{DAILY_CALL_LIMIT}")
-        return False
-
-    def _get_cached_data(self) -> Optional[List['WeatherComDay']]:
-        """Return cached data if available."""
-        cache = self._load_cache()
-        if cache and cache.get('data'):
+        try:
             age = datetime.now() - datetime.fromisoformat(cache['timestamp'])
-            logger.info(f"[WeatherComProvider] Using cached data ({age.total_seconds()/3600:.1f}h old)")
+            age_hours = age.total_seconds() / 3600
+
+            if age_hours > CACHE_MAX_AGE_HOURS:
+                logger.warning(f"[WeatherComProvider] Cache too old ({age_hours:.1f}h > {CACHE_MAX_AGE_HOURS}h max) - will fetch fresh")
+                return None
+
+            logger.info(f"[WeatherComProvider] Using fresh cache ({age_hours:.1f}h old, limit {CACHE_MAX_AGE_HOURS}h)")
             return cache['data']
-        return None
+        except Exception:
+            return None
 
     def _parse_temp(self, temp_str: str) -> Optional[int]:
         """Extract integer temperature from string like '60°' or '60'."""
@@ -170,21 +151,14 @@ class WeatherComProvider:
         """
         Synchronously fetch 10-day forecast from Weather.com's API.
 
-        Rate limited to 6 calls/day to avoid anti-bot detection.
+        Always attempts a fresh API call. Only falls back to cache if the
+        API call fails AND cache is less than CACHE_MAX_AGE_HOURS old.
 
         Returns:
             List of WeatherComDay dicts, or None on failure
         """
         if not HAS_CURL_CFFI:
             logger.error("[WeatherComProvider] Missing curl_cffi dependency")
-            return None
-
-        # Check rate limit - return cached data if limit reached
-        if self._is_rate_limited():
-            cached = self._get_cached_data()
-            if cached:
-                return cached
-            logger.warning("[WeatherComProvider] Rate limited and no cache available")
             return None
 
         # Construct API URL with parameters
@@ -217,8 +191,10 @@ class WeatherComProvider:
 
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
-                # Fall back to scraping if API fails
-                return self._fetch_via_scraping()
+                scraped = self._fetch_via_scraping()
+                if scraped:
+                    return scraped
+                return self._get_fresh_cache()
 
             data = response.json()
 
@@ -237,7 +213,10 @@ class WeatherComProvider:
 
             if not temp_max or not temp_min:
                 logger.error("[WeatherComProvider] No temperature data in API response")
-                return self._fetch_via_scraping()
+                scraped = self._fetch_via_scraping()
+                if scraped:
+                    return scraped
+                return self._get_fresh_cache()
 
             results: List[WeatherComDay] = []
             num_days = min(10, len(temp_max), len(temp_min))
@@ -297,7 +276,15 @@ class WeatherComProvider:
 
         except Exception as e:
             logger.error(f"[WeatherComProvider] API fetch failed: {e}", exc_info=True)
-            return self._fetch_via_scraping()
+            # Try scraping fallback, then fresh cache as last resort
+            scraped = self._fetch_via_scraping()
+            if scraped:
+                return scraped
+            cached = self._get_fresh_cache()
+            if cached:
+                return cached
+            logger.error("[WeatherComProvider] All fetch methods failed and no fresh cache available")
+            return None
 
     def _fetch_via_scraping(self) -> Optional[List[WeatherComDay]]:
         """Fallback to web scraping if API fails."""
