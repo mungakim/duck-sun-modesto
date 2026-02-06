@@ -164,13 +164,12 @@ The PDF report includes:
 - Cache exceeding max age is **rejected** — falls through to DEFAULT values
 - Stale data is never silently served as if it were valid
 
-**SSL-level (ssl_helper.py + pip-system-certs):**
-- `pip-system-certs` patches `certifi.where()` to return the OS certificate store path
-- httpx uses this automatically (Python ssl module honors certifi)
-- curl_cffi uses `get_ca_bundle_for_curl()` from `ssl_helper.py` which returns `certifi.where()`
-- Priority: `DUCK_SUN_CA_BUNDLE` env var → `certifi.where()` (patched by pip-system-certs) → curl default CA store
+**SSL-level (ssl_helper.py):**
+- httpx: `pip-system-certs` patches Python's `ssl.create_default_context()` to use the OS cert store
+- curl_cffi: `ssl_helper.py` exports the Windows cert store to a PEM file so libcurl trusts the same CAs as Windows
+- This handles firewall SSL inspection: if the firewall's CA is in the Windows cert store, curl_cffi will trust it
+- Priority for curl_cffi: `DUCK_SUN_CA_BUNDLE` env var → Windows cert store export → certifi bundle → curl default
 - **No `verify=False` anywhere in the codebase** — all connections use proper SSL verification
-- MID IT Security confirmed: there is NO corporate proxy. Firewall-level whitelisting is managed by IT Systems
 - For PyInstaller exe: bundle certifi with `--collect-data certifi`
 
 ### How To Diagnose Stale Data
