@@ -398,11 +398,12 @@ def generate_excel_report(
     ws.column_dimensions['A'].width = 1   # Left margin spacer
     ws.column_dimensions['B'].width = 1   # Left margin spacer
     ws.column_dimensions[col(1)].width = 11  # PGE CITYGATE / MID GAS NOM label column (C) - wider for labels
-    # Solar forecast columns (9AM-4PM) = col(2) through col(9) - UNIFORM width
-    for i in range(2, 10):
-        ws.column_dimensions[col(i)].width = 8  # Uniform width for solar columns
-    # Remaining data columns
-    for i in range(10, 20):
+    ws.column_dimensions[col(2)].width = 16  # D: PGE CITYGATE/MID GAS NOM input + Solar DATE column
+    # Solar forecast hour columns (9AM-4PM) = col(3) through col(10)
+    for i in range(3, 11):
+        ws.column_dimensions[col(i)].width = 8  # Uniform width for solar hour columns
+    # Remaining data columns (temp grid)
+    for i in range(11, 20):
         ws.column_dimensions[col(i)].width = 7.5
 
     # Page setup: ZERO top margin to move report up, LANDSCAPE, fit to ONE page
@@ -455,7 +456,8 @@ def generate_excel_report(
     pge_label.value = "PGE CITYGATE:   "
     pge_label.font = Font(name='Arial', size=8, bold=True)
     pge_label.alignment = center_align
-    # NO border on the label cell
+    # Right border on label ensures shared border with D3 renders
+    pge_label.border = Border(right=Side(style='medium'))
     pge_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
     pge_input = ws[f'{col(2)}3']
     pge_input.border = pge_input_border
@@ -959,11 +961,11 @@ def generate_excel_report(
 
             duck_data[today].sort(key=lambda x: x['hour'])
 
-    # Solar header row
+    # Solar header row (shifted right by 1 so DATE lands in wide col D)
     grid_row = 25
     header_labels = ['DATE', '9AM', '10', '11', '12PM', '1', '2', '3', '4PM']
     for col_idx, label in enumerate(header_labels):
-        col_letter = col(1 + col_idx)
+        col_letter = col(2 + col_idx)
         cell = ws[f'{col_letter}{grid_row}']
         cell.value = label
         cell.fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
@@ -978,15 +980,15 @@ def generate_excel_report(
         date_obj = datetime.strptime(d, '%Y-%m-%d')
         day_name = date_obj.strftime('%A')
 
-        ws.merge_cells(f'{col(1)}{grid_row}:{col(1)}{grid_row + 1}')
-        date_cell = ws[f'{col(1)}{grid_row}']
+        ws.merge_cells(f'{col(2)}{grid_row}:{col(2)}{grid_row + 1}')
+        date_cell = ws[f'{col(2)}{grid_row}']
         date_cell.value = f"{d[5:]}\n{day_name}"
         date_cell.fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
         date_cell.font = Font(name='Arial', size=7, bold=True)
         date_cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         date_cell.border = thin_border
         # Apply border to bottom cell of merged range
-        ws[f'{col(1)}{grid_row + 1}'].border = thin_border
+        ws[f'{col(2)}{grid_row + 1}'].border = thin_border
 
         hours_dict = {h['hour']: h for h in duck_data.get(d, [])}
 
@@ -997,7 +999,7 @@ def generate_excel_report(
 
             color_hex, risk_desc = get_solar_color_and_desc(h_data['risk'], solar_display, condition)
 
-            col_letter = col(2 + h_idx)
+            col_letter = col(3 + h_idx)
 
             val_cell = ws[f'{col_letter}{grid_row}']
             val_cell.value = int(solar_display)
@@ -1027,7 +1029,7 @@ def generate_excel_report(
     ]
 
     for col_idx, (label, color) in enumerate(legend_items):
-        col_letter = col(2 + col_idx)  # Shifted right by 1 to align with values above
+        col_letter = col(3 + col_idx)  # Aligned with solar hour values above
         cell = ws[f'{col_letter}{grid_row}']
         cell.value = label
         cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
