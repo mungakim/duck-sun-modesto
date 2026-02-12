@@ -426,19 +426,19 @@ def generate_excel_report(
     ws.print_options.verticalCentered = False  # Disabled to push content to TOP of page
 
     # =====================
-    # ROW 1: Title (CENTERED across full width) - moved up from row 2
+    # ROW 1: Title (CENTERED across full width) - starts at col(2) to preserve C-D border boundary
     # =====================
-    ws.merge_cells(f'{col(1)}1:{col(18)}1')
-    title_cell = ws[f'{col(1)}1']
+    ws.merge_cells(f'{col(2)}1:{col(18)}1')
+    title_cell = ws[f'{col(2)}1']
     title_cell.value = "MODESTO, CA - DAILY WEATHER FORECAST"
     title_cell.font = Font(name='Arial', size=14, bold=True, color='003C78')
     title_cell.alignment = center_align
 
     # =====================
-    # ROW 2: Timestamp (CENTERED) - moved up from row 3
+    # ROW 2: Timestamp (CENTERED) - starts at col(2) to preserve C-D border boundary
     # =====================
-    ws.merge_cells(f'{col(1)}2:{col(18)}2')
-    ts_cell = ws[f'{col(1)}2']
+    ws.merge_cells(f'{col(2)}2:{col(18)}2')
+    ts_cell = ws[f'{col(2)}2']
     ts_cell.value = timestamp_str
     ts_cell.font = Font(name='Arial', size=11, bold=True)
     ts_cell.alignment = center_align
@@ -883,8 +883,8 @@ def generate_excel_report(
     # SOLAR FORECAST GRID (also centered)
     # =====================
     grid_row = 24
-    ws[f'{col(1)}{grid_row}'] = "SOLAR FORECAST (GOOGLE AI WEATHER API) - W/m² Irradiance"
-    ws[f'{col(1)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
+    ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST (GOOGLE AI WEATHER API) - W/m² Irradiance"
+    ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
     tz = ZoneInfo("America/Los_Angeles")
     forecast_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 4)]
