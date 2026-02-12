@@ -398,7 +398,7 @@ def generate_excel_report(
     ws.column_dimensions['A'].width = 1   # Left margin spacer
     ws.column_dimensions['B'].width = 1   # Left margin spacer
     ws.column_dimensions[col(1)].width = 11  # PGE CITYGATE / MID GAS NOM label column (C) - wider for labels
-    ws.column_dimensions[col(2)].width = 16  # D: PGE CITYGATE/MID GAS NOM input + Solar DATE column
+    ws.column_dimensions[col(2)].width = 13  # D: PGE CITYGATE/MID GAS NOM input + Solar DATE column (96px)
     # Solar forecast hour columns (9AM-4PM) = col(3) through col(10)
     for i in range(3, 11):
         ws.column_dimensions[col(i)].width = 8  # Uniform width for solar hour columns
@@ -464,6 +464,7 @@ def generate_excel_report(
     pge_input.alignment = pge_fit_align
     pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
     pge_input.number_format = '"$"0.000'  # Dollar sign with exactly 3 decimal places
+    pge_input.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White fill forces border render when empty
 
     # =====================
     # ROW 5-8: MID GAS NOM - Left column dates (MM/DD/YY), Right column single cell (D)
