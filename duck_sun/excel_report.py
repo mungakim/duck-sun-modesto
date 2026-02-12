@@ -462,13 +462,14 @@ def generate_excel_report(
     pge_label.alignment = center_align
     # NO border on the label cell
     # Input cell for PGE CITYGATE - two cells styled to look like one box
+    pge_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
     pge_input = ws[f'{col(2)}3']
     pge_input.border = pge_border_left
-    pge_input.alignment = center_align
+    pge_input.alignment = pge_fit_align
     pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
     pge_input.number_format = '"$"0.000'  # Dollar sign with exactly 3 decimal places
     ws[f'{col(3)}3'].border = pge_border_right
-    ws[f'{col(3)}3'].alignment = center_align
+    ws[f'{col(3)}3'].alignment = pge_fit_align
     ws[f'{col(3)}3'].font = Font(name='Arial', size=8, bold=True, color='9E470E')
     ws[f'{col(3)}3'].number_format = '"$"0.000'
 
@@ -500,13 +501,14 @@ def generate_excel_report(
         cell_left.number_format = 'MM/DD/YY'  # Date format: 11/09/26
 
         # Right column - two unmerged cells with no interior border
+        gas_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
         cell_right = ws[f'{col(2)}{row_idx}']
         cell_right.border = gas_border_left
-        cell_right.alignment = center_align
+        cell_right.alignment = gas_fit_align
         cell_right.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
         cell_right.number_format = '#,##0" MMBtus"'  # Format: 8,000 MMBtus
         ws[f'{col(3)}{row_idx}'].border = gas_border_right
-        ws[f'{col(3)}{row_idx}'].alignment = center_align
+        ws[f'{col(3)}{row_idx}'].alignment = gas_fit_align
         ws[f'{col(3)}{row_idx}'].font = Font(name='Arial', size=8, bold=True, color='9E470E')
         ws[f'{col(3)}{row_idx}'].number_format = '#,##0" MMBtus"'
 
