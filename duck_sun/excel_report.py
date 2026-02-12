@@ -443,15 +443,10 @@ def generate_excel_report(
     ts_cell.alignment = center_align
 
     # =====================
-    # ROW 3: PGE CITYGATE - Label cell (NO border) + input cells (D+E) WITH border
-    # NOT merged so user can paste into cells
+    # ROW 3: PGE CITYGATE - Label cell (NO border) + single input cell (D) WITH border
     # =====================
-    pge_border_left = Border(
+    pge_input_border = Border(
         left=Side(style='medium'),
-        top=Side(style='medium'),
-        bottom=Side(style='medium')
-    )
-    pge_border_right = Border(
         right=Side(style='medium'),
         top=Side(style='medium'),
         bottom=Side(style='medium')
@@ -461,37 +456,21 @@ def generate_excel_report(
     pge_label.font = Font(name='Arial', size=8, bold=True)
     pge_label.alignment = center_align
     # NO border on the label cell
-    # Input cell for PGE CITYGATE - two cells styled to look like one box
     pge_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
     pge_input = ws[f'{col(2)}3']
-    pge_input.border = pge_border_left
+    pge_input.border = pge_input_border
     pge_input.alignment = pge_fit_align
     pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
     pge_input.number_format = '"$"0.000'  # Dollar sign with exactly 3 decimal places
-    ws[f'{col(3)}3'].border = pge_border_right
-    ws[f'{col(3)}3'].alignment = pge_fit_align
-    ws[f'{col(3)}3'].font = Font(name='Arial', size=8, bold=True, color='9E470E')
-    ws[f'{col(3)}3'].number_format = '"$"0.000'
 
     # =====================
-    # ROW 5-8: MID GAS NOM - Left column dates (MM/DD/YY), Right column (D+E)
-    # NOT merged so user can paste into cells
+    # ROW 5-8: MID GAS NOM - Left column dates (MM/DD/YY), Right column single cell (D)
     # =====================
-    gas_border_left = Border(
-        left=Side(style='medium'),
-        top=Side(style='medium'),
-        bottom=Side(style='medium')
-    )
-    gas_border_right = Border(
-        right=Side(style='medium'),
-        top=Side(style='medium'),
-        bottom=Side(style='medium')
-    )
     ws[f'{col(1)}5'] = "MID GAS NOM:"
     ws[f'{col(1)}5'].font = Font(name='Arial', size=8, bold=True)
     ws[f'{col(1)}5'].alignment = left_align
 
-    # Create 3 rows of cells - two cells styled to look like one box
+    gas_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
     for row_idx in range(6, 9):
         # Left column - date cells with MM/DD/YY format
         cell_left = ws[f'{col(1)}{row_idx}']
@@ -500,17 +479,12 @@ def generate_excel_report(
         cell_left.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
         cell_left.number_format = 'MM/DD/YY'  # Date format: 11/09/26
 
-        # Right column - two unmerged cells with no interior border
-        gas_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
+        # Right column - single cell (D) with full border
         cell_right = ws[f'{col(2)}{row_idx}']
-        cell_right.border = gas_border_left
+        cell_right.border = thick_border
         cell_right.alignment = gas_fit_align
         cell_right.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
         cell_right.number_format = '#,##0" MMBtus"'  # Format: 8,000 MMBtus
-        ws[f'{col(3)}{row_idx}'].border = gas_border_right
-        ws[f'{col(3)}{row_idx}'].alignment = gas_fit_align
-        ws[f'{col(3)}{row_idx}'].font = Font(name='Arial', size=8, bold=True, color='9E470E')
-        ws[f'{col(3)}{row_idx}'].number_format = '#,##0" MMBtus"'
 
     # =====================
     # MID WEATHER 48-HOUR SUMMARY (right side) - Extended range to fit title
