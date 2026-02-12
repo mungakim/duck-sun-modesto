@@ -460,11 +460,11 @@ def generate_excel_report(
     pge_label.border = Border(right=Side(style='medium'))
     pge_fit_align = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)
     pge_input = ws[f'{col(2)}3']
+    pge_input.value = " "  # Space forces Excel to render all borders when cell appears empty
     pge_input.border = pge_input_border
     pge_input.alignment = pge_fit_align
     pge_input.font = Font(name='Arial', size=8, bold=True, color='9E470E')  # Bold, Orange darker
     pge_input.number_format = '"$"0.000'  # Dollar sign with exactly 3 decimal places
-    pge_input.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White fill forces border render when empty
 
     # =====================
     # ROW 5-8: MID GAS NOM - Left column dates (MM/DD/YY), Right column single cell (D)
