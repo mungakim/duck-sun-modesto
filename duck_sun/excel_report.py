@@ -397,7 +397,7 @@ def generate_excel_report(
     # Set column widths - balanced to fit on one landscape page with readable text
     ws.column_dimensions['A'].width = 1   # Left margin spacer
     ws.column_dimensions['B'].width = 1   # Left margin spacer
-    ws.column_dimensions[col(1)].width = 11  # PGE CITYGATE / MID GAS NOM label column (C) - wider for labels
+    ws.column_dimensions[col(1)].width = 14  # PGE CITYGATE / MID GAS NOM / Source label column (C) - wide for source names
     # Solar forecast columns (9AM-4PM) = col(2) through col(9) - UNIFORM width
     for i in range(2, 10):
         ws.column_dimensions[col(i)].width = 8  # Uniform width for solar columns
@@ -581,16 +581,6 @@ def generate_excel_report(
     # =====================
     # TEMPERATURE GRID starting at Row 10 (moved up from row 11)
     # =====================
-    SOURCE_WEIGHT_DISPLAY = {
-        'OPEN-METEO': '1.0',
-        'NOAA (GOV)': '3.0',
-        'MET.NO (EU)': '3.0',
-        'ACCUWEATHER': '4.0',
-        'WEATHER.COM': '4.0',
-        'WUNDERGRND': '4.0',
-        'GOOGLE (AI)': '6.0',
-    }
-
     # URLs for clickable source links
     SOURCE_URLS = {
         'NOAA (GOV)': 'https://forecast.weather.gov/MapClick.php?lat=37.6684&lon=-120.99',
@@ -770,14 +760,14 @@ def generate_excel_report(
             if is_excluded_high and v1 is not None:
                 cell_hi.value = "-"
             else:
-                cell_hi.value = str(v1) if v1 else "--"
+                cell_hi.value = str(v1) if v1 is not None else "--"
             cell_hi.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_hi.font = Font(name='Arial', size=9)
             cell_hi.alignment = center_align
             cell_hi.border = thin_border
 
             cell_lo = ws[f'{col_lo}{grid_row}']
-            cell_lo.value = str(v2) if v2 else "--"
+            cell_lo.value = str(v2) if v2 is not None else "--"
             cell_lo.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_lo.font = Font(name='Arial', size=9)
             cell_lo.alignment = center_align
@@ -818,18 +808,20 @@ def generate_excel_report(
         avg_hi, _ = calculate_weighted_average_excluding_om_max(hi_vals, weights)
         avg_lo = calculate_weighted_average(lo_vals, weights)
 
+        logger.debug(f"[generate_excel_report] Wtd avg {k}: hi_vals={hi_vals} lo_vals={lo_vals} -> avg_hi={avg_hi} avg_lo={avg_lo}")
+
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
         cell_hi = ws[f'{col_hi}{grid_row}']
-        cell_hi.value = str(avg_hi) if avg_hi else "--"
+        cell_hi.value = str(avg_hi) if avg_hi is not None else "--"
         cell_hi.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_hi.font = Font(name='Arial', size=9, bold=True)
         cell_hi.alignment = center_align
         cell_hi.border = thin_border
 
         cell_lo = ws[f'{col_lo}{grid_row}']
-        cell_lo.value = str(avg_lo) if avg_lo else "--"
+        cell_lo.value = str(avg_lo) if avg_lo is not None else "--"
         cell_lo.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_lo.font = Font(name='Arial', size=9, bold=True)
         cell_lo.alignment = center_align
