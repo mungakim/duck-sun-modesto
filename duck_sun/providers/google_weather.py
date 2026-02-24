@@ -372,13 +372,17 @@ class GoogleWeatherProvider:
         """
         Aggregate hourly data to daily highs/lows.
 
-        IMPORTANT: Uses DIFFERENT day definitions for temps vs precip:
-        - TEMPERATURE: Meteorological day (6am-6am) - industry standard
+        IMPORTANT: Uses DIFFERENT day definitions for highs vs lows vs precip:
+        - HIGH TEMP: Meteorological day (6am-6am) - captures afternoon peak correctly
+        - LOW TEMP: Calendar day (midnight-midnight) - matches AccuWeather/Weather.com
+          convention where "Tuesday's low" = the early morning low of Tuesday itself,
+          NOT the overnight low going into Wednesday morning.
         - PRECIPITATION: Calendar day (midnight-midnight) - matches user expectation
 
-        This prevents overnight rain from incorrectly inflating the previous day's
-        precipitation probability (e.g., rain at midnight Wednesday being shown as
-        Tuesday's precip).
+        The met-day (6am-6am) low was causing systematic cold bias: when temps drop
+        day-over-day, the pre-dawn hours of the NEXT morning (e.g., 3am Wednesday)
+        were being attributed to Tuesday's low, producing values 10+°F colder than
+        all other sources.
         """
         logger.info(f"[GoogleWeatherProvider] _aggregate_to_daily called with {len(hourly_data)} hourly records")
 
@@ -388,10 +392,11 @@ class GoogleWeatherProvider:
             logger.error(f"[GoogleWeatherProvider] Failed to create timezone: {e}")
             return []
 
-        # Separate containers for met-day (temps) and calendar-day (precip)
-        daily_temps: Dict[str, List[float]] = {}      # Uses meteorological day
-        daily_precip: Dict[str, List[int]] = {}       # Uses CALENDAR day
-        daily_conditions: Dict[str, List[str]] = {}   # Uses meteorological day
+        # Separate containers: met-day for highs, calendar-day for lows & precip
+        daily_temps: Dict[str, List[float]] = {}      # Met-day (6am-6am) — used for HIGH
+        daily_low_temps: Dict[str, List[float]] = {}  # Calendar day (midnight-midnight) — used for LOW
+        daily_precip: Dict[str, List[int]] = {}       # Calendar day (midnight-midnight)
+        daily_conditions: Dict[str, List[str]] = {}   # Met-day
         daily_max_hour: Dict[str, int] = {}           # Track max local hour per met-day
         processed_count = 0
         error_count = 0
@@ -425,11 +430,17 @@ class GoogleWeatherProvider:
                 if calendar_date not in daily_precip:
                     daily_precip[calendar_date] = []
 
-                # Temps and conditions use meteorological day
+                # HIGH temps and conditions use meteorological day (6am-6am)
                 daily_temps[met_date].append(hour['temp_c'])
                 daily_max_hour[met_date] = max(daily_max_hour[met_date], dt.hour)
                 if hour.get('is_daytime', True):
                     daily_conditions[met_date].append(hour['condition'])
+
+                # LOW temps use CALENDAR day (midnight-midnight)
+                # This matches how AccuWeather/Weather.com report lows
+                if calendar_date not in daily_low_temps:
+                    daily_low_temps[calendar_date] = []
+                daily_low_temps[calendar_date].append(hour['temp_c'])
 
                 # Precip uses CALENDAR day
                 daily_precip[calendar_date].append(hour['precip_prob'])
@@ -458,13 +469,17 @@ class GoogleWeatherProvider:
                 logger.info(f"[GoogleWeatherProvider] Skipping partial day {met_date} (max local hour={max_hour}, need >=14 for reliable high)")
                 continue
 
-            high_c = max(temps)
-            low_c = min(temps)
+            high_c = max(temps)  # Met-day high (6am-6am) captures afternoon peak
+            # Calendar-day low (midnight-midnight) — prevents next-morning cold
+            # from being attributed to this day when temps are dropping
+            cal_lows = daily_low_temps.get(met_date, temps)
+            low_c = min(cal_lows)
             high_f = round(high_c * 9/5 + 32)
             low_f = round(low_c * 9/5 + 32)
 
             # PRECIP: Use calendar day's max probability
-            # This prevents overnight rain attribution to previous day
+            # daily_precip is keyed by calendar_date, so look up by met_date
+            # (which equals calendar_date for hours >= 6am)
             precip = max(daily_precip.get(met_date, [0]))
 
             # Most common daytime condition
