@@ -9,6 +9,25 @@ import sys
 import traceback
 from pathlib import Path
 
+# PyInstaller hidden imports - these ensure all provider modules are bundled
+# into the exe even though the main import chain is deferred inside main().
+# Without these, PyInstaller's static analysis may miss submodules imported
+# via duck_sun.providers.__init__.py.
+import duck_sun.providers.google_weather  # noqa: F401
+import duck_sun.providers.weather_com  # noqa: F401
+import duck_sun.providers.wunderground  # noqa: F401
+import duck_sun.providers.mid_org  # noqa: F401
+import duck_sun.providers.metar  # noqa: F401
+import duck_sun.providers.noaa  # noqa: F401
+import duck_sun.providers.met_no  # noqa: F401
+import duck_sun.providers.accuweather  # noqa: F401
+import duck_sun.providers.open_meteo  # noqa: F401
+import duck_sun.ssl_helper  # noqa: F401
+import duck_sun.resilience  # noqa: F401
+import duck_sun.cache_manager  # noqa: F401
+import duck_sun.uncanniness  # noqa: F401
+import duck_sun.excel_report  # noqa: F401
+
 def main():
     print("=" * 50)
     print("  Duck Sun Modesto - Daily Forecast")
