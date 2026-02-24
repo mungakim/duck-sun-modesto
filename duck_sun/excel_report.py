@@ -591,6 +591,17 @@ def generate_excel_report(
         'GOOGLE (AI)': '6.0',
     }
 
+    # Numeric weights for Excel formula cell references
+    SOURCE_WEIGHTS_NUMERIC = {
+        'OPEN-METEO': 1.0,
+        'NOAA (GOV)': 3.0,
+        'MET.NO (EU)': 3.0,
+        'ACCUWEATHER': 4.0,
+        'WEATHER.COM': 4.0,
+        'WUNDERGRND': 4.0,
+        'GOOGLE (AI)': 6.0,
+    }
+
     # URLs for clickable source links
     SOURCE_URLS = {
         'NOAA (GOV)': 'https://forecast.weather.gov/MapClick.php?lat=37.6684&lon=-120.99',
@@ -651,14 +662,20 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Row 11: Day names header - empty merged cell for label area
+    # Row 11: Day names header - weight header + source header (un-merged)
     grid_row = 11
-    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
-    empty_header = ws[f'{col(1)}{grid_row}']
-    empty_header.value = ""
-    empty_header.fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
-    empty_header.border = thin_border
-    ws[f'{col(2)}{grid_row}'].border = thin_border
+    wt_header = ws[f'{col(1)}{grid_row}']
+    wt_header.value = "WT"
+    wt_header.fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
+    wt_header.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
+    wt_header.alignment = center_align
+    wt_header.border = thin_border
+    src_header = ws[f'{col(2)}{grid_row}']
+    src_header.value = ""
+    src_header.fill = PatternFill(start_color="003C78", end_color="003C78", fill_type="solid")
+    src_header.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
+    src_header.alignment = center_align
+    src_header.border = thin_border
 
     for i, day in enumerate(om_daily):
         label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
@@ -675,16 +692,20 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Row 12: Dates with SOURCE label (instead of DATE)
+    # Row 12: Dates with SOURCE label (un-merged)
     grid_row = 12
-    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
-    source_header = ws[f'{col(1)}{grid_row}']
+    wt_date_cell = ws[f'{col(1)}{grid_row}']
+    wt_date_cell.value = ""
+    wt_date_cell.fill = PatternFill(start_color="466EA0", end_color="466EA0", fill_type="solid")
+    wt_date_cell.font = Font(name='Arial', size=7, color='FFFFFF')
+    wt_date_cell.alignment = center_align
+    wt_date_cell.border = thin_border
+    source_header = ws[f'{col(2)}{grid_row}']
     source_header.value = "SOURCE"
     source_header.fill = PatternFill(start_color="466EA0", end_color="466EA0", fill_type="solid")
     source_header.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
     source_header.alignment = center_align
     source_header.border = thin_border
-    ws[f'{col(2)}{grid_row}'].border = thin_border
 
     for i, day in enumerate(om_daily):
         date_str = day.get('date', '')[5:]
@@ -740,14 +761,21 @@ def generate_excel_report(
     for src_idx, (label, getter, source_index) in enumerate(sources):
         grid_row = 13 + src_idx
 
-        # MERGED col(1)+col(2) for wider source label (no weight shown, centered)
-        ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
-        source_cell = ws[f'{col(1)}{grid_row}']
-        source_cell.value = label  # Just the source name, no weight
+        # Weight column - numeric value for Excel formula references
+        weight_val = SOURCE_WEIGHTS_NUMERIC.get(label, 1.0)
+        wt_cell = ws[f'{col(1)}{grid_row}']
+        wt_cell.value = weight_val
+        wt_cell.fill = PatternFill(start_color="E6E6E6", end_color="E6E6E6", fill_type="solid")
+        wt_cell.font = Font(name='Arial', size=7)
+        wt_cell.alignment = center_align
+        wt_cell.border = thin_border
+
+        # Source name column
+        source_cell = ws[f'{col(2)}{grid_row}']
+        source_cell.value = label
         source_cell.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
-        source_cell.alignment = center_align  # Centered
+        source_cell.alignment = center_align
         source_cell.border = thin_border
-        ws[f'{col(2)}{grid_row}'].border = thin_border
 
         # Add clickable hyperlink if URL exists for this source
         if label in SOURCE_URLS:
@@ -766,85 +794,91 @@ def generate_excel_report(
             col_hi = col(3 + i * 2)
             col_lo = col(4 + i * 2)
 
+            # High temp cell - numeric value (or "-" for auto-excluded OM)
             cell_hi = ws[f'{col_hi}{grid_row}']
             if is_excluded_high and v1 is not None:
                 cell_hi.value = "-"
+            elif v1 is not None:
+                cell_hi.value = int(v1)
             else:
-                cell_hi.value = str(v1) if v1 else "--"
+                cell_hi.value = None
             cell_hi.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_hi.font = Font(name='Arial', size=9)
             cell_hi.alignment = center_align
             cell_hi.border = thin_border
 
+            # Low temp cell - numeric value
             cell_lo = ws[f'{col_lo}{grid_row}']
-            cell_lo.value = str(v2) if v2 else "--"
+            cell_lo.value = int(v2) if v2 is not None else None
             cell_lo.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_lo.font = Font(name='Arial', size=9)
             cell_lo.alignment = center_align
             cell_lo.border = thin_border
 
-    # Weighted Averages row - MERGED col(1)+col(2) for wider label
+    # Weighted Averages row - Excel SUMPRODUCT formulas (un-merged)
     grid_row = 20
-    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
-    wtd_cell = ws[f'{col(1)}{grid_row}']
+    # Weight column - empty for averages row
+    wtd_wt_cell = ws[f'{col(1)}{grid_row}']
+    wtd_wt_cell.value = None
+    wtd_wt_cell.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
+    wtd_wt_cell.border = thin_border
+    # Label column
+    wtd_cell = ws[f'{col(2)}{grid_row}']
     wtd_cell.value = "Wtd. Average"
     wtd_cell.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
     wtd_cell.font = Font(name='Arial', size=7, bold=True)
     wtd_cell.alignment = center_align
     wtd_cell.border = thin_border
-    ws[f'{col(2)}{grid_row}'].border = thin_border
 
-    for i, day in enumerate(om_daily):
-        k = day.get('date', '')
-        hi_vals = [
-            day.get('high_f'),
-            noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
-            accu_daily.get(k, {}).get('high_f'),
-            weather_com_daily.get(k, {}).get('high_f'),
-            wunderground_daily.get(k, {}).get('high_f'),
-            google_daily.get(k, {}).get('high_f')
-        ]
-        lo_vals = [
-            day.get('low_f'),
-            noaa_daily.get(k, {}).get('low_f'),
-            met_daily.get(k, {}).get('low_f'),
-            accu_daily.get(k, {}).get('low_f'),
-            weather_com_daily.get(k, {}).get('low_f'),
-            wunderground_daily.get(k, {}).get('low_f'),
-            google_daily.get(k, {}).get('low_f')
-        ]
+    # Weight column letter (fixed reference for formulas)
+    wt_col_letter = col(1)  # Column C (with COL_OFFSET=2)
 
-        avg_hi, _ = calculate_weighted_average_excluding_om_max(hi_vals, weights)
-        avg_lo = calculate_weighted_average(lo_vals, weights)
-
+    for i in range(len(om_daily)):
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
+        # Excel SUMPRODUCT formula for weighted average
+        # Skips non-numeric cells (empty, "-", "--") via ISNUMBER check
+        # User can delete any errant value and the average auto-recalculates
+        hi_formula = (
+            f'=IFERROR(ROUND(SUMPRODUCT(IF(ISNUMBER({col_hi}13:{col_hi}19),'
+            f'{col_hi}13:{col_hi}19,0)*${wt_col_letter}$13:${wt_col_letter}$19)'
+            f'/SUMPRODUCT(IF(ISNUMBER({col_hi}13:{col_hi}19),1,0)'
+            f'*${wt_col_letter}$13:${wt_col_letter}$19),0),"")'
+        )
+        lo_formula = (
+            f'=IFERROR(ROUND(SUMPRODUCT(IF(ISNUMBER({col_lo}13:{col_lo}19),'
+            f'{col_lo}13:{col_lo}19,0)*${wt_col_letter}$13:${wt_col_letter}$19)'
+            f'/SUMPRODUCT(IF(ISNUMBER({col_lo}13:{col_lo}19),1,0)'
+            f'*${wt_col_letter}$13:${wt_col_letter}$19),0),"")'
+        )
+
         cell_hi = ws[f'{col_hi}{grid_row}']
-        cell_hi.value = str(avg_hi) if avg_hi else "--"
+        cell_hi.value = hi_formula
         cell_hi.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_hi.font = Font(name='Arial', size=9, bold=True)
         cell_hi.alignment = center_align
         cell_hi.border = thin_border
 
         cell_lo = ws[f'{col_lo}{grid_row}']
-        cell_lo.value = str(avg_lo) if avg_lo else "--"
+        cell_lo.value = lo_formula
         cell_lo.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_lo.font = Font(name='Arial', size=9, bold=True)
         cell_lo.alignment = center_align
         cell_lo.border = thin_border
 
-    # PRECIP % row - MERGED col(1)+col(2) for wider label
+    # PRECIP % row - un-merged for consistent column layout
     grid_row = 21
-    ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
-    precip_cell = ws[f'{col(1)}{grid_row}']
+    precip_wt_cell = ws[f'{col(1)}{grid_row}']
+    precip_wt_cell.value = None
+    precip_wt_cell.fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
+    precip_wt_cell.border = thin_border
+    precip_cell = ws[f'{col(2)}{grid_row}']
     precip_cell.value = "PRECIP %"
     precip_cell.fill = PatternFill(start_color="B4D2FF", end_color="B4D2FF", fill_type="solid")
     precip_cell.font = Font(name='Arial', size=7, bold=True)
     precip_cell.alignment = center_align
     precip_cell.border = thin_border
-    ws[f'{col(2)}{grid_row}'].border = thin_border
 
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
