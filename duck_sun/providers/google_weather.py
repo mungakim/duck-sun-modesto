@@ -372,13 +372,8 @@ class GoogleWeatherProvider:
         """
         Aggregate hourly data to daily highs/lows.
 
-        IMPORTANT: Uses DIFFERENT day definitions for temps vs precip:
-        - TEMPERATURE: Meteorological day (6am-6am) - industry standard
-        - PRECIPITATION: Calendar day (midnight-midnight) - matches user expectation
-
-        This prevents overnight rain from incorrectly inflating the previous day's
-        precipitation probability (e.g., rain at midnight Wednesday being shown as
-        Tuesday's precip).
+        Uses calendar day (midnight-midnight) for all aggregations:
+        temperatures, precipitation, and conditions.
         """
         logger.info(f"[GoogleWeatherProvider] _aggregate_to_daily called with {len(hourly_data)} hourly records")
 
@@ -388,11 +383,11 @@ class GoogleWeatherProvider:
             logger.error(f"[GoogleWeatherProvider] Failed to create timezone: {e}")
             return []
 
-        # Separate containers for met-day (temps) and calendar-day (precip)
-        daily_temps: Dict[str, List[float]] = {}      # Uses meteorological day
-        daily_precip: Dict[str, List[int]] = {}       # Uses CALENDAR day
-        daily_conditions: Dict[str, List[str]] = {}   # Uses meteorological day
-        daily_max_hour: Dict[str, int] = {}           # Track max local hour per met-day
+        # All containers use calendar day (midnight-midnight)
+        daily_temps: Dict[str, List[float]] = {}
+        daily_precip: Dict[str, List[int]] = {}
+        daily_conditions: Dict[str, List[str]] = {}
+        daily_max_hour: Dict[str, int] = {}           # Track max local hour per day
         processed_count = 0
         error_count = 0
 
@@ -405,34 +400,23 @@ class GoogleWeatherProvider:
                 else:
                     dt = datetime.fromisoformat(time_str).astimezone(tz)
 
-                # CALENDAR day for precipitation (midnight-midnight)
-                # This matches user expectation: rain at 1am Wed = Wednesday's rain
-                calendar_date = dt.strftime('%Y-%m-%d')
-
-                # METEOROLOGICAL day for temps (6am-6am)
-                # This is industry standard for hi/lo temp reporting
-                if dt.hour < 6:
-                    met_day = dt - timedelta(days=1)
-                else:
-                    met_day = dt
-                met_date = met_day.strftime('%Y-%m-%d')
+                # Calendar day for all aggregations (midnight-midnight)
+                cal_date = dt.strftime('%Y-%m-%d')
 
                 # Initialize containers
-                if met_date not in daily_temps:
-                    daily_temps[met_date] = []
-                    daily_conditions[met_date] = []
-                    daily_max_hour[met_date] = 0
-                if calendar_date not in daily_precip:
-                    daily_precip[calendar_date] = []
+                if cal_date not in daily_temps:
+                    daily_temps[cal_date] = []
+                    daily_conditions[cal_date] = []
+                    daily_max_hour[cal_date] = 0
+                if cal_date not in daily_precip:
+                    daily_precip[cal_date] = []
 
-                # Temps and conditions use meteorological day
-                daily_temps[met_date].append(hour['temp_c'])
-                daily_max_hour[met_date] = max(daily_max_hour[met_date], dt.hour)
+                daily_temps[cal_date].append(hour['temp_c'])
+                daily_max_hour[cal_date] = max(daily_max_hour[cal_date], dt.hour)
                 if hour.get('is_daytime', True):
-                    daily_conditions[met_date].append(hour['condition'])
+                    daily_conditions[cal_date].append(hour['condition'])
 
-                # Precip uses CALENDAR day
-                daily_precip[calendar_date].append(hour['precip_prob'])
+                daily_precip[cal_date].append(hour['precip_prob'])
 
                 processed_count += 1
 
@@ -441,21 +425,21 @@ class GoogleWeatherProvider:
                 logger.warning(f"[GoogleWeatherProvider] Error aggregating hour: {e}")
                 continue
 
-        logger.info(f"[GoogleWeatherProvider] Aggregation loop: {processed_count} processed, {error_count} errors, {len(daily_temps)} unique met-days")
+        logger.info(f"[GoogleWeatherProvider] Aggregation loop: {processed_count} processed, {error_count} errors, {len(daily_temps)} unique days")
 
-        # Build daily results (keyed by meteorological day for temps)
+        # Build daily results
         results: List[GoogleDailyData] = []
-        for met_date in sorted(daily_temps.keys()):
-            temps = daily_temps[met_date]
+        for date_key in sorted(daily_temps.keys()):
+            temps = daily_temps[date_key]
             if not temps:
                 continue
 
             # Skip partial days that lack afternoon data — the "high" would just
             # be a morning temp, not the actual daytime peak. This happens at the
             # edges of the 96-hour API window (first/last day).
-            max_hour = daily_max_hour.get(met_date, 0)
+            max_hour = daily_max_hour.get(date_key, 0)
             if max_hour < 14:
-                logger.info(f"[GoogleWeatherProvider] Skipping partial day {met_date} (max local hour={max_hour}, need >=14 for reliable high)")
+                logger.info(f"[GoogleWeatherProvider] Skipping partial day {date_key} (max local hour={max_hour}, need >=14 for reliable high)")
                 continue
 
             high_c = max(temps)
@@ -463,16 +447,14 @@ class GoogleWeatherProvider:
             high_f = round(high_c * 9/5 + 32)
             low_f = round(low_c * 9/5 + 32)
 
-            # PRECIP: Use calendar day's max probability
-            # This prevents overnight rain attribution to previous day
-            precip = max(daily_precip.get(met_date, [0]))
+            precip = max(daily_precip.get(date_key, [0]))
 
             # Most common daytime condition
-            conditions = daily_conditions.get(met_date, ["Unknown"])
+            conditions = daily_conditions.get(date_key, ["Unknown"])
             condition = max(set(conditions), key=conditions.count) if conditions else "Unknown"
 
             results.append({
-                "date": met_date,
+                "date": date_key,
                 "high_c": round(high_c, 1),
                 "low_c": round(low_c, 1),
                 "high_f": high_f,

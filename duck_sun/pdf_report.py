@@ -40,13 +40,12 @@ class DuckSunPDF(FPDF):
 
 def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
     """
-    Calculate daily high/low from hourly data using meteorological day (6am-6am).
+    Calculate daily high/low from hourly data using calendar day (midnight-midnight).
 
-    Meteorological day boundaries align with how weather services (yr.no, etc.)
-    report daily highs/lows - the "high" for Tuesday is the max temp from
-    Tuesday 6am to Wednesday 5:59am local time.
+    Each hour's temperature is assigned to its calendar date. All hours from
+    00:00 to 23:59 local time belong to that date's high/low.
     """
-    logger.debug(f"[calculate_daily_stats] Processing {len(hourly_data) if hourly_data else 0} hourly records (6am-6am windows)")
+    logger.debug(f"[calculate_daily_stats] Processing {len(hourly_data) if hourly_data else 0} hourly records (calendar day windows)")
 
     daily_stats = {}
     tz = ZoneInfo(timezone)
@@ -63,16 +62,10 @@ def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "
             else:
                 dt = datetime.fromisoformat(t)
 
-            # Meteorological day: 6am-6am window
-            # Hours before 6am belong to the previous day's high/low
-            if dt.hour < 6:
-                met_day = dt - timedelta(days=1)
-            else:
-                met_day = dt
-
-            k = met_day.strftime('%Y-%m-%d')
+            # Calendar day: midnight-midnight
+            k = dt.strftime('%Y-%m-%d')
             if k not in daily_stats:
-                daily_stats[k] = {'temps': [], 'day_name': met_day.strftime('%a')}
+                daily_stats[k] = {'temps': [], 'day_name': dt.strftime('%a')}
             daily_stats[k]['temps'].append(float(val))
 
         except Exception as e:
@@ -89,7 +82,7 @@ def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "
                 'low_f': round(min(d['temps']) * 1.8 + 32)
             }
 
-    logger.debug(f"[calculate_daily_stats] Calculated stats for {len(result)} days (6am-6am)")
+    logger.debug(f"[calculate_daily_stats] Calculated stats for {len(result)} days (calendar day)")
     return result
 
 
