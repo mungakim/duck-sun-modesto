@@ -36,7 +36,7 @@ def col(n):
 
 
 def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
-    """Calculate daily high/low from hourly data using meteorological day (6am-6am)."""
+    """Calculate daily high/low from hourly data using calendar day (midnight-midnight)."""
     daily_stats = {}
     tz = ZoneInfo(timezone)
 
@@ -52,14 +52,10 @@ def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "
             else:
                 dt = datetime.fromisoformat(t)
 
-            if dt.hour < 6:
-                met_day = dt - timedelta(days=1)
-            else:
-                met_day = dt
-
-            k = met_day.strftime('%Y-%m-%d')
+            # Calendar day: midnight-midnight
+            k = dt.strftime('%Y-%m-%d')
             if k not in daily_stats:
-                daily_stats[k] = {'temps': [], 'day_name': met_day.strftime('%a')}
+                daily_stats[k] = {'temps': [], 'day_name': dt.strftime('%a')}
             daily_stats[k]['temps'].append(float(val))
 
         except Exception as e:
