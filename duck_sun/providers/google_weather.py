@@ -220,6 +220,35 @@ class GoogleWeatherProvider:
                 logger.error(f"[GoogleWeatherProvider] Stale cache fallback failed: {e}")
         return None
 
+    def _parse_google_error(self, resp) -> str:
+        """Parse Google API error response for diagnostic logging.
+
+        Google APIs return structured JSON errors with code, message, status,
+        and details[].reason fields. This extracts them into a loggable string
+        so operators can immediately diagnose 403/401 failures without needing
+        to manually curl the API.
+        """
+        try:
+            body = resp.json()
+            error = body.get("error", {})
+            code = error.get("code", resp.status_code)
+            message = error.get("message", "No message")
+            status = error.get("status", "UNKNOWN")
+
+            # Extract reason(s) from details array (e.g. SERVICE_DISABLED, BILLING_DISABLED)
+            details = error.get("details", [])
+            detail_reasons = []
+            for d in details:
+                reason = d.get("reason", "")
+                if reason:
+                    detail_reasons.append(reason)
+
+            detail_str = f", reasons=[{', '.join(detail_reasons)}]" if detail_reasons else ""
+            return f"code={code}, status={status}, message={message}{detail_str}"
+        except Exception:
+            # Response isn't JSON - fall back to truncated raw text
+            return f"raw_response={resp.text[:500]}"
+
     async def fetch_forecast(self, hours: int = 96) -> Optional[Dict[str, Any]]:
         """
         Fetch hourly forecast from Google Weather API.
@@ -265,15 +294,30 @@ class GoogleWeatherProvider:
                     resp = await client.get(self.BASE_URL, params=params)
 
                     if resp.status_code == 401:
-                        logger.error("[GoogleWeatherProvider] Unauthorized - check API key")
+                        error_info = self._parse_google_error(resp)
+                        logger.error(f"[GoogleWeatherProvider] 401 Unauthorized: {error_info}")
+                        logger.error("[GoogleWeatherProvider] ACTION: Verify GOOGLE_MAPS_API_KEY is valid and not expired")
                         return self._get_stale_cache_fallback()
 
                     if resp.status_code == 403:
-                        logger.error("[GoogleWeatherProvider] Forbidden - API not enabled or quota exceeded")
+                        error_info = self._parse_google_error(resp)
+                        logger.error(f"[GoogleWeatherProvider] 403 Forbidden: {error_info}")
+
+                        # Log actionable guidance based on Google error status
+                        if "PERMISSION_DENIED" in error_info:
+                            logger.error("[GoogleWeatherProvider] ACTION: Enable 'Weather API' in Google Cloud Console -> APIs & Services")
+                        elif "RESOURCE_EXHAUSTED" in error_info:
+                            logger.error("[GoogleWeatherProvider] ACTION: Quota exceeded - check Cloud Console quotas or wait for reset")
+                        elif "billing" in error_info.lower():
+                            logger.error("[GoogleWeatherProvider] ACTION: Enable billing on the Google Cloud project")
+                        else:
+                            logger.error("[GoogleWeatherProvider] ACTION: Check API key restrictions in Cloud Console -> Credentials")
+
                         return self._get_stale_cache_fallback()
 
                     if resp.status_code != 200:
-                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code} (response body redacted)")
+                        error_info = self._parse_google_error(resp)
+                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code}: {error_info}")
                         return self._get_stale_cache_fallback()
 
                     data = resp.json()
