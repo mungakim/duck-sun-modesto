@@ -122,7 +122,7 @@ DUCK_SUN_CA_BUNDLE=C:\path\to\mid-ca-bundle.pem  # MID corporate CA certificate
 | Location | File | Purpose |
 |----------|------|---------|
 | `reports/YYYY-MM/YYYY-MM-DD/` | `daily_forecast_*.xlsx` | Local Excel report |
-| `X:\Operatns\Pwrsched\Weather\YYYY-MM\YYYY-MM-DD\` | `daily_forecast_*.xlsx` | Network share for team |
+| `<network-share>\YYYY-MM\YYYY-MM-DD\` | `daily_forecast_*.xlsx` | Network share for team |
 | `outputs/` | `solar_data_*.json` | Raw JSON data |
 | `outputs/cache/` | `*_lkg.json` | Provider cache files |
 | `logs/` | `duck_sun.log` | Execution logs |
