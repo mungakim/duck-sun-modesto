@@ -214,12 +214,26 @@ def get_solar_color_and_desc(risk_level: str, solar_value: float, condition: str
 
 def get_daily_condition_display(condition: str, dewpoint_c: float = None, temp_c: float = None,
                                  visibility_low: bool = False) -> tuple:
-    """Map condition to display text and color for daily descriptor."""
+    """
+    Map condition to (display_text, fill_color).
+
+    Preserves the original source text (e.g. AccuWeather's "Partly sunny",
+    "Mostly sunny") while selecting a fill color based on the condition
+    category. Only TULE FOG overrides the display text because it's a
+    safety-critical call-out.
+    """
     if not condition or condition == "Unknown":
         return ("--", "F0F0F0")
 
     cond_lower = condition.lower()
 
+    # Title-case the display text so "Partly sunny" -> "Partly Sunny"
+    display = condition.strip().title()
+    # Excel day columns are narrow - truncate at 14 chars as a safety net
+    if len(display) > 14:
+        display = display[:14]
+
+    # Tule Fog is a safety-critical override for Central Valley winters
     is_potential_fog = False
     if dewpoint_c is not None and temp_c is not None:
         temp_dewpoint_spread = temp_c - dewpoint_c
@@ -229,47 +243,52 @@ def get_daily_condition_display(condition: str, dewpoint_c: float = None, temp_c
     if 'fog' in cond_lower or 'mist' in cond_lower:
         if is_potential_fog or visibility_low:
             return ("TULE FOG", "B40000")
-        else:
-            return ("Fog", "FFE6B4")
+        return (display, "FFE6B4")
 
+    # Precipitation
     if 'thunderstorm' in cond_lower or 'storm' in cond_lower:
-        return ("Storms", "6464B4")
-    elif 'heavy rain' in cond_lower:
-        return ("Heavy Rain", "648CC8")
-    elif 'rain shower' in cond_lower or 'showers' in cond_lower:
-        return ("Showers", "8CAADC")
-    elif 'light rain' in cond_lower:
-        return ("Light Rain", "B4C8E6")
-    elif 'drizzle' in cond_lower:
-        return ("Drizzle", "B4C8E6")
-    elif 'rain' in cond_lower:
-        return ("Rain", "78A0D2")
+        return (display, "6464B4")
+    if 'heavy rain' in cond_lower:
+        return (display, "648CC8")
+    if 'rain shower' in cond_lower or 'showers' in cond_lower:
+        return (display, "8CAADC")
+    if 'light rain' in cond_lower:
+        return (display, "B4C8E6")
+    if 'drizzle' in cond_lower:
+        return (display, "B4C8E6")
+    if 'rain' in cond_lower:
+        return (display, "78A0D2")
 
+    # Snow / ice
     if 'snow' in cond_lower or 'sleet' in cond_lower or 'ice' in cond_lower:
-        return ("SNOW", "C8DCFF")
+        return (display, "C8DCFF")
 
+    # Cloud cover tiers
     if 'overcast' in cond_lower:
-        return ("Overcast", "C8C8C8")
-    elif 'cloudy' in cond_lower:
+        return (display, "C8C8C8")
+    if 'cloudy' in cond_lower:
         if 'partly' in cond_lower:
-            return ("Partly Cloudy", "E6F5FF")
-        elif 'mostly' in cond_lower:
-            return ("Mostly Cloudy", "D2DCE6")
-        else:
-            return ("Cloudy", "C8D2DC")
+            return (display, "E6F5FF")
+        if 'mostly' in cond_lower:
+            return (display, "D2DCE6")
+        return (display, "C8D2DC")
 
-    if 'clear' in cond_lower or 'sunny' in cond_lower:
-        return ("Sunny", "FFFAC8")
-    elif 'fair' in cond_lower:
-        return ("Fair", "FAFADC")
+    # Sunny tiers - preserve AccuWeather's "Partly sunny" / "Mostly sunny"
+    if 'sunny' in cond_lower or 'clear' in cond_lower:
+        if 'partly' in cond_lower:
+            return (display, "FFF5D2")  # Lighter yellow for partly sunny
+        if 'mostly' in cond_lower:
+            return (display, "FFF0BE")  # Medium yellow for mostly sunny
+        return (display, "FFFAC8")      # Full yellow for sunny/clear
+    if 'fair' in cond_lower:
+        return (display, "FAFADC")
 
     if 'haze' in cond_lower or 'smoke' in cond_lower:
-        return ("SMOKE/HAZE", "FFC896")
+        return (display, "FFC896")
 
     if 'wind' in cond_lower:
-        return ("Windy", "E6F0FF")
+        return (display, "E6F0FF")
 
-    display = condition[:12] if len(condition) > 12 else condition
     return (display, "F5F5F5")
 
 
