@@ -642,10 +642,10 @@ def generate_pdf_report(
         pdf.cell(20, cell_h, 'TODAY', 0, 0, 'L')
 
         pdf.set_font('Helvetica', '', 7)
-        # High cell - greyed out (today's high not yet known / intentionally hidden)
-        pdf.set_fill_color(100, 100, 100)  # Dark grey
+        # High cell - warm red/orange background
+        pdf.set_fill_color(255, 200, 180)
         pdf.set_xy(hi_x, row1_y)
-        pdf.cell(cell_w, cell_h, '', 1, 0, 'C', fill=True)
+        pdf.cell(cell_w, cell_h, f'{today_hi}F', 1, 0, 'C', fill=True)
         # Low cell - cool blue background
         pdf.set_fill_color(180, 210, 255)
         pdf.set_xy(lo_x, row1_y)
@@ -737,8 +737,7 @@ def generate_pdf_report(
 
     # ===================
     # BUILD MERGED CONDITIONS MAP
-    # Priority: AccuWeather (primary) → Google → Open-Meteo (fills gaps beyond day 5)
-    # AccuWeather is applied LAST so it overwrites all other sources where it has data.
+    # Priority: Google (best) → AccuWeather → Open-Meteo (always 8 days)
     # ===================
     daily_conditions = {}
 
@@ -749,22 +748,21 @@ def generate_pdf_report(
         if condition and condition != 'Unknown':
             daily_conditions[date_key] = {'condition': condition, 'source': 'Open-Meteo'}
 
-    # Step 2: Google fills gaps / improves quality for days 0-4 (4-5 days)
-    if google_data:
-        for day_record in google_data.get('daily', []):
-            date_key = day_record.get('date', '')
-            condition = day_record.get('condition', '')
-            if condition and condition != 'Unknown':
-                daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
-
-    # Step 3: AccuWeather overrides everything (primary source per Apr 2026 calibration)
-    # AccuWeather's IconPhrase is the most reliable one-word daily descriptor.
+    # Step 2: AccuWeather overwrites (better quality, 5 days)
     if accu_data:
         for day_record in accu_data:
             date_key = day_record.get('date', '')
             condition = day_record.get('condition', '')
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'AccuWeather'}
+
+    # Step 3: Google overwrites (best quality, 4-5 days)
+    if google_data:
+        for day_record in google_data.get('daily', []):
+            date_key = day_record.get('date', '')
+            condition = day_record.get('condition', '')
+            if condition and condition != 'Unknown':
+                daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
 
     logger.info(f"[generate_pdf_report] Merged conditions: {len(daily_conditions)} days")
     for date_key, info in list(daily_conditions.items())[:3]:
