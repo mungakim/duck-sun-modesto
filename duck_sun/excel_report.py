@@ -626,6 +626,16 @@ def generate_excel_report(
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'AccuWeather'}
 
+    # Log descriptor source attribution (for verification: AccuWeather should win days 0-4)
+    source_counts = {}
+    for info in daily_conditions.values():
+        src = info['source']
+        source_counts[src] = source_counts.get(src, 0) + 1
+    logger.info(f"[generate_excel_report] Descriptor sources: {source_counts}")
+    for date_key in sorted(daily_conditions.keys())[:8]:
+        info = daily_conditions[date_key]
+        logger.info(f"[generate_excel_report]   {date_key}: '{info['condition']}' <- {info['source']}")
+
     # Row 10: Condition descriptors - NO borders on merged empty cells
     grid_row = 10
     ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
