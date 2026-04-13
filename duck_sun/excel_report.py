@@ -519,8 +519,9 @@ def generate_excel_report(
         ws[f'{col(12)}6'].border = thin_border
         ws[f'{col(13)}6'].border = thin_border
 
-        ws[f'{col(14)}6'] = f"{today_data.get('high', '--')}F"
-        ws[f'{col(14)}6'].fill = PatternFill(start_color="FFC8B4", end_color="FFC8B4", fill_type="solid")
+        # Today's High is greyed out (not yet known at morning runtime)
+        ws[f'{col(14)}6'] = ""
+        ws[f'{col(14)}6'].fill = PatternFill(start_color="646464", end_color="646464", fill_type="solid")
         ws[f'{col(14)}6'].alignment = center_align
         ws[f'{col(14)}6'].border = thin_border
 
@@ -597,26 +598,33 @@ def generate_excel_report(
     ]
 
     # Build merged conditions map
+    # Priority: AccuWeather (primary) → Google → Open-Meteo (fills gaps beyond day 5)
+    # AccuWeather is applied LAST so it overwrites all other sources where it has data.
+    # AccuWeather's IconPhrase is the most reliable one-word daily descriptor.
     daily_conditions = {}
+
+    # Step 1: Open-Meteo as base (always has 8 days from WMO weather codes)
     for day_record in om_daily:
         date_key = day_record.get('date', '')
         condition = day_record.get('condition', 'Unknown')
         if condition and condition != 'Unknown':
             daily_conditions[date_key] = {'condition': condition, 'source': 'Open-Meteo'}
 
-    if accu_data:
-        for day_record in accu_data:
-            date_key = day_record.get('date', '')
-            condition = day_record.get('condition', '')
-            if condition and condition != 'Unknown':
-                daily_conditions[date_key] = {'condition': condition, 'source': 'AccuWeather'}
-
+    # Step 2: Google fills gaps / improves quality for days 0-4 (4-5 days)
     if google_data:
         for day_record in google_data.get('daily', []):
             date_key = day_record.get('date', '')
             condition = day_record.get('condition', '')
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
+
+    # Step 3: AccuWeather overrides everything (primary source per Apr 2026 calibration)
+    if accu_data:
+        for day_record in accu_data:
+            date_key = day_record.get('date', '')
+            condition = day_record.get('condition', '')
+            if condition and condition != 'Unknown':
+                daily_conditions[date_key] = {'condition': condition, 'source': 'AccuWeather'}
 
     # Row 10: Condition descriptors - NO borders on merged empty cells
     grid_row = 10
