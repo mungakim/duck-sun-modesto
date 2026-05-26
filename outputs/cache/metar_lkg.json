@@ -1,6 +1,6 @@
 {
   "provider": "metar",
-  "timestamp": "2026-05-26T08:21:32.057165",
+  "timestamp": "2026-05-26T08:32:47.863797",
   "api_success": true,
   "data": {
     "raw": "KMOD 261453Z 29009KT 10SM BKN045 16/08 A2985 RMK AO2 SLP106 T01560083 50000",
