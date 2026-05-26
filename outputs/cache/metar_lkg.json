@@ -1,15 +1,15 @@
 {
   "provider": "metar",
-  "timestamp": "2026-05-26T08:32:47.863797",
+  "timestamp": "2026-05-26T12:37:33.111750",
   "api_success": true,
   "data": {
-    "raw": "KMOD 261453Z 29009KT 10SM BKN045 16/08 A2985 RMK AO2 SLP106 T01560083 50000",
+    "raw": "KMOD 261853Z VRB03KT 10SM BKN048 19/06 A2984 RMK AO2 SLP103 T01940061",
     "station": "KMOD",
-    "observation_time": "2026/05/26 14:53",
-    "temp_c": 16,
-    "dewpoint_c": 8,
-    "wind_speed_kt": 9,
-    "wind_dir": 290,
+    "observation_time": "2026/05/26 18:53",
+    "temp_c": 19,
+    "dewpoint_c": 6,
+    "wind_speed_kt": 3,
+    "wind_dir": null,
     "visibility_sm": 10.0,
     "sky_condition": "Broken"
   }

@@ -1,6 +1,6 @@
 {
   "provider": "accuweather",
-  "timestamp": "2026-05-26T08:32:46.599674",
+  "timestamp": "2026-05-26T12:37:31.464662",
   "api_success": true,
   "data": [
     {
@@ -10,7 +10,7 @@
       "high_f": 71.0,
       "low_f": 49.0,
       "precip_prob": 14,
-      "condition": "Mostly sunny"
+      "condition": "Intermittent clouds"
     },
     {
       "date": "2026-05-27",

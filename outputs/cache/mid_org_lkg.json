@@ -1,11 +1,11 @@
 {
   "provider": "mid_org",
-  "timestamp": "2026-05-26T08:32:47.729683",
+  "timestamp": "2026-05-26T12:37:32.963710",
   "api_success": true,
   "data": {
     "today": {
       "rain": "0.00",
-      "high": "57",
+      "high": "64",
       "low": "55",
       "datestring": "Tuesday May  26,  2026"
     },
