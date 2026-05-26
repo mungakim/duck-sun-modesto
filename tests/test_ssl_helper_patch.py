@@ -7,13 +7,22 @@ import sys
 def test_c_level_verify_mode_setter_bypasses_python_wrapper():
     """The truststore Python 3.14 patch works by going through
     `_ssl._SSLContext.verify_mode.__set__` instead of the Python
-    `SSLContext.verify_mode` property. Verify the bypass mechanism itself."""
+    `SSLContext.verify_mode` property. Verify the bypass mechanism itself.
+
+    Note: On Python 3.14, `ctx.check_hostname = False` has the same broken
+    wrapper as verify_mode (silently no-ops via recursive super()), so we
+    also use the C-level descriptor to set check_hostname here. This keeps
+    the test version-agnostic: it exercises the SAME bypass path that
+    `_patch_ssl_context_setters_for_py314` installs at runtime."""
     import _ssl
 
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False  # required before setting CERT_NONE
 
-    # C-level descriptor must accept assignment without recursing
+    # Disable hostname check via C-level (bypassing 3.14's broken Python setter)
+    _ssl._SSLContext.check_hostname.__set__(ctx, False)
+    assert ctx.check_hostname is False, "C-level check_hostname bypass failed"
+
+    # Now verify_mode=CERT_NONE is allowed
     _ssl._SSLContext.verify_mode.__set__(ctx, ssl.CERT_NONE)
     assert ctx.verify_mode == ssl.CERT_NONE
 
