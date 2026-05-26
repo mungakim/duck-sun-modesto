@@ -92,15 +92,59 @@ class UncannyEngine:
         self.variance_results = []  # Reset variance tracking
 
         hourly = om_data.get('daily_summary', [])
-        if not hourly:
-            logger.error("[UncannyEngine] No hourly data in Open-Meteo result")
-            raise ValueError("No hourly data")
+        if hourly:
+            df = pd.DataFrame(hourly)
+            df['time'] = pd.to_datetime(df['time'])
+            df = df.rename(columns={'temperature_c': 'temp_om'})
+            logger.info(f"[UncannyEngine] Base data: {len(df)} hours from Open-Meteo")
+        else:
+            logger.warning("[UncannyEngine] Open-Meteo hourly data missing - building fallback timeline from other sources")
+            fallback_times = set()
 
-        df = pd.DataFrame(hourly)
-        df['time'] = pd.to_datetime(df['time'])
-        df = df.rename(columns={'temperature_c': 'temp_om'})
+            # Prefer Google's hourly timeline when available
+            if google_data and isinstance(google_data, dict):
+                for h in google_data.get('hourly', []):
+                    time_str = h.get('time')
+                    if time_str:
+                        try:
+                            parsed = pd.to_datetime(time_str, utc=True).tz_convert(self.timezone).tz_localize(None)
+                            fallback_times.add(parsed)
+                        except Exception:
+                            continue
 
-        logger.info(f"[UncannyEngine] Base data: {len(df)} hours from Open-Meteo")
+            # Also include NOAA and Met.no timelines
+            for source_data in (noaa_data, met_no_data):
+                if source_data:
+                    for row in source_data:
+                        time_str = row.get('time')
+                        if time_str:
+                            try:
+                                fallback_times.add(pd.to_datetime(time_str, utc=True).tz_convert(self.timezone).tz_localize(None))
+                            except Exception:
+                                continue
+
+            if not fallback_times:
+                logger.error("[UncannyEngine] No hourly timeline available from any provider")
+                raise ValueError("No hourly timeline available")
+
+            sorted_times = sorted(fallback_times)
+            df = pd.DataFrame({"time": sorted_times, "temp_om": np.nan})
+            logger.info(f"[UncannyEngine] Fallback base data: {len(df)} hours from Google/NOAA/Met.no timelines")
+
+        # Ensure all Open-Meteo physics columns exist even in fallback mode
+        # so downstream duck-curve analysis can run with safe defaults.
+        default_columns = {
+            'dew_point_c': np.nan,
+            'cloud_cover': 50.0,
+            'wind_speed_kph': 8.0,
+            'radiation': 0.0,
+            'dni': 0.0,
+            'precip_prob': 0.0,
+            'precip_mm': 0.0
+        }
+        for col, default_val in default_columns.items():
+            if col not in df.columns:
+                df[col] = default_val
 
         # === MERGE ALL SOURCE TEMPERATURES ===
 
