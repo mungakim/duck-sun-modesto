@@ -1,25 +1,25 @@
 {
   "provider": "mid_org",
-  "timestamp": "2026-02-06T12:25:34.143478",
+  "timestamp": "2026-05-26T07:49:17.677768",
   "api_success": true,
   "data": {
     "today": {
       "rain": "0.00",
-      "high": "62",
-      "low": "51",
-      "datestring": "Friday February  6,  2026"
+      "high": "57",
+      "low": "55",
+      "datestring": "Tuesday May  26,  2026"
     },
     "yesterday": {
       "rain": "0.00",
-      "high": "69",
-      "low": "44",
-      "datestring": "Thursday February  5,  2026"
+      "high": "76",
+      "low": "54",
+      "datestring": "Monday May  25,  2026"
     },
-    "record_high_temp": 72,
-    "record_high_year": 2018,
-    "record_low_temp": 24,
-    "record_low_year": 1989,
-    "avg_high_temp": 59,
-    "avg_low_temp": 41
+    "record_high_temp": 102,
+    "record_high_year": 1951,
+    "record_low_temp": 43,
+    "record_low_year": 1962,
+    "avg_high_temp": 82,
+    "avg_low_temp": 54
   }
 }
