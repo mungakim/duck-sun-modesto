@@ -40,6 +40,52 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _patch_ssl_context_setters_for_py314() -> bool:
+    """Replace Python 3.14's broken SSLContext property setters with thin
+    passthroughs to the C-level `_ssl._SSLContext` descriptors.
+
+    Python 3.14 redefined both `SSLContext.verify_mode` and
+    `SSLContext.check_hostname` setters to delegate via
+    `super(SSLContext, SSLContext).<attr>.__set__`. On 3.14 that super
+    lookup resolves back to the same patched property, producing either
+    infinite recursion (verify_mode) or silent no-ops (check_hostname).
+
+    truststore's `_configure_context` does:
+        ctx.check_hostname = False         # silently NO-OP on 3.14
+        _set_ssl_context_verify_mode(ctx, CERT_NONE)
+        # raises: Cannot set verify_mode to CERT_NONE when check_hostname is enabled
+
+    Replacing the Python wrappers with C-level passthroughs fixes both
+    independently of truststore.
+    """
+    if sys.version_info < (3, 14):
+        return False
+    try:
+        import _ssl
+        import ssl as ssl_mod
+
+        c_ch_desc = _ssl._SSLContext.check_hostname
+        c_vm_desc = _ssl._SSLContext.verify_mode
+
+        ssl_mod.SSLContext.check_hostname = property(
+            lambda self: c_ch_desc.__get__(self),
+            lambda self, value: c_ch_desc.__set__(self, value),
+        )
+        ssl_mod.SSLContext.verify_mode = property(
+            lambda self: c_vm_desc.__get__(self),
+            lambda self, value: c_vm_desc.__set__(self, value),
+        )
+        logger.info(
+            "[ssl_helper] Replaced ssl.SSLContext.{check_hostname,verify_mode} "
+            f"with C-level passthroughs to fix Python "
+            f"{sys.version_info.major}.{sys.version_info.minor} property bugs"
+        )
+        return True
+    except Exception as exc:
+        logger.warning(f"[ssl_helper] SSLContext setter patch failed: {exc}")
+        return False
+
+
 def _patch_truststore_for_py314_recursion() -> bool:
     """Fix truststore<=0.10.4's verify_mode recursion against Python 3.14.
 
@@ -93,7 +139,12 @@ def _patch_truststore_for_py314_recursion() -> bool:
         return False
 
 
-# Apply the patch eagerly so any subsequent truststore.SSLContext() works.
+# Apply both patches eagerly so any subsequent truststore.SSLContext() works.
+# Order matters: replace the global SSLContext wrappers BEFORE truststore
+# starts caching super() proxies against them (which already happened at
+# truststore import; this still fixes ctx.{check_hostname,verify_mode} = X
+# assignments inside truststore's _configure_context).
+_SSL_SETTERS_PATCHED_FOR_PY314 = _patch_ssl_context_setters_for_py314()
 _TRUSTSTORE_PATCHED_FOR_PY314 = _patch_truststore_for_py314_recursion()
 
 # Cache the exported PEM path for process lifetime
@@ -232,9 +283,12 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
     # _patch_truststore_for_py314_recursion() patches it; the resulting
     # context works correctly. If the patch couldn't apply, fall back to
     # stdlib SSL + Windows cert loading (Option 2 below).
-    truststore_usable = (
-        HAS_TRUSTSTORE
-        and (sys.version_info < (3, 14) or _TRUSTSTORE_PATCHED_FOR_PY314)
+    # truststore needs both patches on Python 3.14+: the global SSLContext
+    # property fix (so ctx.check_hostname = False propagates) AND the
+    # _set_ssl_context_verify_mode patch (so its super() proxy works).
+    truststore_usable = HAS_TRUSTSTORE and (
+        sys.version_info < (3, 14)
+        or (_SSL_SETTERS_PATCHED_FOR_PY314 and _TRUSTSTORE_PATCHED_FOR_PY314)
     )
     if truststore_usable:
         try:

@@ -21,32 +21,48 @@ def test_c_level_verify_mode_setter_bypasses_python_wrapper():
     assert ctx.verify_mode == ssl.CERT_REQUIRED
 
 
-def test_patch_is_noop_on_python_pre_314():
-    """The patch should only fire on 3.14+ (where the recursion bug exists).
-    On earlier Pythons, _TRUSTSTORE_PATCHED_FOR_PY314 is False and truststore
-    runs unmodified."""
+def test_patches_are_noops_on_python_pre_314():
+    """Both patches should only fire on 3.14+ (where the property setters
+    are broken). On earlier Pythons, the flags are False and truststore +
+    ssl.SSLContext run unmodified."""
     from duck_sun import ssl_helper
 
     if sys.version_info < (3, 14):
-        assert ssl_helper._TRUSTSTORE_PATCHED_FOR_PY314 is False, (
-            "Patch fired on a Python where it shouldn't have"
-        )
-    # On 3.14+, the patch should fire if truststore is installed (we can't
-    # easily test this without being on 3.14, but the bypass mechanism is
-    # exercised by test_c_level_verify_mode_setter_bypasses_python_wrapper).
+        assert ssl_helper._TRUSTSTORE_PATCHED_FOR_PY314 is False
+        assert ssl_helper._SSL_SETTERS_PATCHED_FOR_PY314 is False
 
 
-def test_truststore_usable_decision_uses_patch_flag():
+def test_truststore_usable_decision_requires_both_patches_on_314():
     """get_httpx_ssl_context's truststore eligibility check must consult
-    the patch flag, not just the Python version. Otherwise we'd disable
-    truststore on 3.14 even after a successful patch."""
+    BOTH the global SSLContext setter patch AND the truststore-specific
+    helper patch. Either one alone is insufficient on 3.14:
+    - Without the setter patch, ctx.check_hostname = False silently fails,
+      so verify_mode=CERT_NONE raises.
+    - Without the truststore helper patch, _set_ssl_context_verify_mode
+      recurses on the broken super() proxy."""
     import inspect
 
     from duck_sun import ssl_helper
 
     src = inspect.getsource(ssl_helper.get_httpx_ssl_context)
-    # The condition must reference both: version check AND patch flag
     assert "_TRUSTSTORE_PATCHED_FOR_PY314" in src, (
-        "get_httpx_ssl_context must consult _TRUSTSTORE_PATCHED_FOR_PY314 "
-        "to re-enable truststore after the 3.14 patch"
+        "Eligibility check must consult truststore-specific patch flag"
     )
+    assert "_SSL_SETTERS_PATCHED_FOR_PY314" in src, (
+        "Eligibility check must consult global SSLContext setter patch flag"
+    )
+
+
+def test_global_ssl_setter_patch_uses_c_level_descriptor():
+    """The Py3.14 patch replaces ssl.SSLContext.{check_hostname,verify_mode}
+    properties with wrappers that go straight to _ssl._SSLContext's C-level
+    descriptors. Verify the patch function references the right C-level API."""
+    import inspect
+
+    from duck_sun import ssl_helper
+
+    src = inspect.getsource(ssl_helper._patch_ssl_context_setters_for_py314)
+    assert "_ssl._SSLContext.check_hostname" in src
+    assert "_ssl._SSLContext.verify_mode" in src
+    assert "ssl_mod.SSLContext.check_hostname = property" in src
+    assert "ssl_mod.SSLContext.verify_mode = property" in src

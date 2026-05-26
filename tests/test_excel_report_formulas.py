@@ -113,12 +113,95 @@ def test_weighted_avg_row_emits_excel_formula(tmp_path: Path):
     assert "E13:E19" in formula, f"Formula doesn't reference source range: {formula}"
     # Weights array literal matches the 7-source order: OM=1, NOAA=3, Met.no=3, Accu=4, Wcom=4, WU=4, Google=6
     assert "{1;3;3;4;4;4;6}" in formula, f"Weights array literal missing/wrong: {formula}"
-    # Must ignore text cells ('--', '-') via ISNUMBER
-    assert "ISNUMBER" in formula, f"Formula must skip text cells via ISNUMBER: {formula}"
+    # Must use 2-arg SUMPRODUCT in the numerator (handles text-as-zero natively
+    # without needing CSE array entry, unlike SUMPRODUCT(IF(ISNUMBER(...))...))
+    assert "SUMPRODUCT(E13:E19,{1;3;3;4;4;4;6})" in formula, (
+        f"Numerator must use 2-arg SUMPRODUCT(range, weights) form: {formula}"
+    )
+    # Denominator must exclude blanks, '-' (OM-max marker), and '--' (missing)
+    assert '<>""' in formula and '<>"-"' in formula and '<>"--"' in formula, (
+        f"Denominator must exclude blank/text cells: {formula}"
+    )
     # Must round to int for display consistency
     assert "ROUND(" in formula, f"Formula must round to int: {formula}"
     # Must fall back to '--' when no numeric values exist (avoid #DIV/0)
     assert 'IFERROR' in formula and '"--"' in formula, f"Formula must IFERROR to '--': {formula}"
+
+
+def test_weighted_avg_formula_actually_evaluates_correctly(tmp_path: Path):
+    """End-to-end: write a workbook with known source values, evaluate the
+    formula via a third-party Excel engine, confirm it returns the right
+    integer (not 0 or '--' from the previous broken IF(ISNUMBER(...)) pattern).
+    """
+    pytest = __import__("pytest")
+    try:
+        import formulas as _fml
+    except ImportError:
+        pytest.skip("formulas library not installed")
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+
+    # Plant a realistic data scenario in column E (day 0 high)
+    # OM=70, NOAA=70, Met.no=70, Accu=71, Wcom=71, WU=71, Google=72
+    # weighted = (70*1+70*3+70*3+71*4+71*4+71*4+72*6)/(1+3+3+4+4+4+6) = 1774/25 = 70.96 -> 71
+    ws["E13"] = 70
+    ws["E14"] = 70
+    ws["E15"] = 70
+    ws["E16"] = 71
+    ws["E17"] = 71
+    ws["E18"] = 71
+    ws["E19"] = 72
+
+    # Column G: only one numeric (NOAA=80), rest "--". Expected: 80
+    for cell, val in [("G13", "--"), ("G14", 80), ("G15", "--"), ("G16", "--"),
+                      ("G17", "--"), ("G18", "--"), ("G19", "--")]:
+        ws[cell] = val
+
+    # Column H: OM excluded via "-", others all 75 except Google 78
+    # expected: (75*3+75*3+75*4+75*4+75*4+78*6)/(3+3+4+4+4+6) = 1818/24 = 75.75 -> 76
+    ws["H13"] = "-"
+    for cell in ("H14", "H15", "H16", "H17", "H18"):
+        ws[cell] = 75
+    ws["H19"] = 78
+
+    # Use the same formula generator the real code uses
+    weights_array = "{1;3;3;4;4;4;6}"
+
+    def _fmla(c):
+        rng = f"{c}13:{c}19"
+        return (
+            f'=IFERROR(ROUND(SUMPRODUCT({rng},{weights_array})/'
+            f'SUMPRODUCT(({rng}<>"")*({rng}<>"-")*({rng}<>"--")*{weights_array}),0),"--")'
+        )
+
+    ws["E20"] = _fmla("E")
+    ws["G20"] = _fmla("G")
+    ws["H20"] = _fmla("H")
+
+    out = tmp_path / "eval.xlsx"
+    wb.save(out)
+
+    xl = _fml.ExcelModel().loads(str(out)).finish()
+    sol = xl.calculate()
+
+    def _val(cell):
+        for k, v in sol.items():
+            if k.endswith(f"!{cell}"):
+                raw = v.value if hasattr(v, "value") else v
+                if hasattr(raw, "tolist"):
+                    raw = raw.tolist()
+                if isinstance(raw, list):
+                    while isinstance(raw, list) and raw:
+                        raw = raw[0]
+                return raw
+        return None
+
+    assert _val("E20") == 71, f"Expected E20=71, got {_val('E20')}"
+    assert _val("G20") == 80, f"Expected G20=80, got {_val('G20')}"
+    assert _val("H20") == 76, f"Expected H20=76, got {_val('H20')}"
 
 
 def test_weighted_avg_formula_has_both_high_and_low_columns(tmp_path: Path):

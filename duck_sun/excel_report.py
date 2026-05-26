@@ -179,7 +179,14 @@ def get_solar_color_and_desc(risk_level: str, solar_value: float, condition: str
 
     if condition and condition not in ('Unknown', 'Open-Meteo'):
         cond_lower = condition.lower()
-        if 'rain' in cond_lower or 'storm' in cond_lower or 'shower' in cond_lower:
+        # Only render rain/storm descriptors when solar value is also low —
+        # otherwise we mislabel sunny hours whose condition text merely
+        # mentions a low-probability storm (e.g. Google MetNet returning
+        # "isolated thunderstorms possible" for an otherwise sunny noon).
+        # Threshold: at 250 W/m² the sun is meaningfully obscured already;
+        # above that, trust the irradiance number over the wording.
+        if ('rain' in cond_lower or 'storm' in cond_lower or 'shower' in cond_lower) \
+                and solar_value < 250:
             desc = "Lt rain" if 'light' in cond_lower else "Rain" if 'rain' in cond_lower else "Storms"
             return "FFD2A0", desc
         elif 'fog' in cond_lower or 'mist' in cond_lower:
@@ -835,14 +842,24 @@ def generate_excel_report(
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
     def _weighted_avg_formula(col_letter: str) -> str:
-        """SUMPRODUCT formula that ignores text/empty cells via ISNUMBER and
-        rounds to int. Returns '--' when no numeric values exist (avoids #DIV/0)."""
+        """SUMPRODUCT formula that ignores text/empty cells, rounds to int.
+
+        Uses 2-arg SUMPRODUCT for the numerator: SUMPRODUCT(range, weights)
+        treats text cells as 0 contribution natively (Excel's documented
+        SUMPRODUCT behavior), no array-formula entry needed. The denominator
+        sums weights only where the cell is numeric (not blank, "-", or "--").
+
+        Earlier attempts used `SUMPRODUCT(IF(ISNUMBER(range), range, 0)*w)`,
+        which only evaluates as an array under explicit CSE entry. Outside
+        Excel 365 dynamic arrays, the IF collapsed to its first element and
+        both sides resolved to 0, producing 0/0 -> IFERROR -> "--".
+        """
         rng = f"{col_letter}13:{col_letter}19"
         return (
-            f"=IFERROR(ROUND("
-            f"SUMPRODUCT(IF(ISNUMBER({rng}),{rng},0)*{WEIGHTED_AVG_ARRAY})/"
-            f"SUMPRODUCT(IF(ISNUMBER({rng}),1,0)*{WEIGHTED_AVG_ARRAY}),"
-            f"0),\"--\")"
+            "=IFERROR(ROUND("
+            f"SUMPRODUCT({rng},{WEIGHTED_AVG_ARRAY})/"
+            f"SUMPRODUCT(({rng}<>\"\")*({rng}<>\"-\")*({rng}<>\"--\")*{WEIGHTED_AVG_ARRAY}),"
+            "0),\"--\")"
         )
 
     for i, day in enumerate(om_daily):
