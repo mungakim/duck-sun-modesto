@@ -911,7 +911,7 @@ async def main():
         logger.error(f"FAILED: {e}", exc_info=True)
         logger.info("")
         logger.info("=" * 60)
-        logger.info(f"ERROR: Run failed after {(datetime.now() - start_time).total_seconds():.2f} seconds")
+        logger.info(f"ERROR: Run failed after {(datetime.now(pacific) - start_time).total_seconds():.2f} seconds")
         logger.info("=" * 60)
         return 1
 
