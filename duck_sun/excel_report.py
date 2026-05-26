@@ -8,7 +8,7 @@ Weights: Google(6x), Accu(4x), Weather.com(4x), WUnderground(4x), NOAA(3x), Met.
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 try:
@@ -917,16 +917,18 @@ def generate_excel_report(
     # SOLAR FORECAST GRID (also centered)
     # =====================
     grid_row = 24
-    ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST (GOOGLE AI WEATHER API) - W/m² Irradiance"
+    ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST - W/m² Irradiance (Hybrid: Google MetNet-3 + Open-Meteo)"
     ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
     tz = ZoneInfo("America/Los_Angeles")
-    forecast_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 4)]
+    # Today + 6 days = 7-day solar forecast window
+    forecast_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 7)]
 
     # Build duck curve data
     duck_data = {d: [] for d in forecast_dates}
     google_hourly = google_data.get('hourly', []) if google_data else []
 
+    # Pass 1: Google MetNet-3 (preferred — neural model w/ satellite + radar fusion)
     for hour_record in google_hourly:
         try:
             time_str = hour_record.get('time', '')
@@ -968,32 +970,70 @@ def generate_excel_report(
             logger.debug(f"[generate_excel_report] Error processing Google hour: {e}")
             continue
 
-    # Fill gaps for today
-    today = datetime.now(tz).strftime('%Y-%m-%d')
-    if today in forecast_dates and df_analyzed is not None:
-        existing_hours = {h['hour'] for h in duck_data.get(today, [])}
-        missing_duck_hours = [h for h in range(9, 17) if h not in existing_hours]
+    # Pass 2: Fill missing hours from df_analyzed (Open-Meteo shortwave_radiation
+    # via UncannyEngine, with fog/smoke penalties already applied).
+    # This was previously today-only; now covers all 7 forecast dates so the
+    # solar grid renders fully even when Google MetNet-3 is unavailable (403/etc).
+    if df_analyzed is not None and not df_analyzed.empty:
+        # Index df_analyzed by (date_str, hour) for O(1) lookup instead of 7 full scans
+        analyzed_by_dh: Dict[Tuple[str, int], Any] = {}
+        for _, row in df_analyzed.iterrows():
+            try:
+                row_time = row['time']
+                row_date_str = row_time.strftime('%Y-%m-%d')
+                row_hour = row_time.hour
+                if row_date_str in forecast_dates and 9 <= row_hour <= 16:
+                    analyzed_by_dh[(row_date_str, row_hour)] = row
+            except Exception:
+                continue
 
-        if missing_duck_hours:
-            for _, row in df_analyzed.iterrows():
-                try:
-                    row_date = row['time'].strftime('%Y-%m-%d')
-                    row_hour = row['time'].hour
-                    if row_date == today and row_hour in missing_duck_hours:
-                        solar_val = row.get('solar_adjusted', 0)
-                        if solar_val == 0:
-                            solar_val = row.get('solar_raw', 0)
-
-                        duck_data[today].append({
-                            'hour': row_hour,
-                            'solar': solar_val,
-                            'risk': row.get('risk_level', 'LOW'),
-                            'condition': None
-                        })
-                except Exception:
+        filled_from_om = 0
+        for date_str in forecast_dates:
+            existing_hours = {h['hour'] for h in duck_data.get(date_str, [])}
+            for h in range(9, 17):
+                if h in existing_hours:
+                    continue
+                row = analyzed_by_dh.get((date_str, h))
+                if row is None:
                     continue
 
-            duck_data[today].sort(key=lambda x: x['hour'])
+                solar_val = row.get('solar_adjusted')
+                if not solar_val:
+                    solar_val = row.get('solar_raw') or row.get('radiation') or 0
+
+                cloud_cover = row.get('cloud_cover', 50) or 50
+                if cloud_cover >= 90:
+                    condition = 'Cloudy'
+                    risk = 'MODERATE'
+                elif cloud_cover >= 70:
+                    condition = 'Mostly cloudy'
+                    risk = 'LOW-MOD'
+                elif cloud_cover >= 40:
+                    condition = 'Partly cloudy'
+                    risk = 'LOW'
+                else:
+                    condition = 'Sunny'
+                    risk = 'LOW'
+
+                # Honor uncanniness risk_level if it already flagged fog/smoke
+                analyzed_risk = row.get('risk_level')
+                if analyzed_risk and analyzed_risk != 'LOW':
+                    risk = analyzed_risk
+
+                duck_data[date_str].append({
+                    'hour': h,
+                    'solar': solar_val,
+                    'risk': risk,
+                    'condition': condition,
+                })
+                filled_from_om += 1
+            duck_data[date_str].sort(key=lambda x: x['hour'])
+
+        if filled_from_om:
+            logger.info(
+                f"[generate_excel_report] Solar grid: filled {filled_from_om} hour-cells "
+                f"from Open-Meteo (Google MetNet-3 unavailable for those slots)"
+            )
 
     # Solar header row (shifted right by 1 so DATE lands in wide col D)
     grid_row = 25
@@ -1049,8 +1089,9 @@ def generate_excel_report(
             desc_cell.alignment = center_align
             desc_cell.border = thin_border
 
-    # Legend row - row 35 with empty row 34 as gap after solar forecast
-    grid_row = 35
+    # Legend row - 1 empty gap row after the 7-day solar forecast block
+    # Solar data rows: 26 + 7 * 2 = 40 (last data row is row 39, descriptor row 40)
+    grid_row = 41
     legend_items = [
         ("Tule Fog", "B4A0C8"),
         ("Dense Fog", "FFB4B4"),

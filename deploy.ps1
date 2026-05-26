@@ -1,39 +1,43 @@
-# Full deploy pipeline: push code → build exe → sign → copy to X: network drive
+# Full deploy pipeline: push code to GitHub, build exe, sign, copy to X: network drive.
 # Usage: .\deploy.ps1
 #
 # This is the "ship a new version" script. Run it after committing code changes.
-# It does NOT run the daily forecast — for that, use .\run_and_push.ps1.
+# It does NOT run the daily forecast - for that, use .\run_and_push.ps1.
 
 $ErrorActionPreference = "Stop"
 
-# === STEP 1: Push pending code commits to GitHub ===
+# STEP 1: Push pending code commits to GitHub
 Write-Host "=== STEP 1/2: Syncing code to GitHub ===" -ForegroundColor Cyan
-$branch = git rev-parse --abbrev-ref HEAD
+$branch = (git rev-parse --abbrev-ref HEAD).Trim()
 Write-Host "Current branch: $branch" -ForegroundColor Gray
 
-# Check if branch is tracked on remote
-$remoteRef = git rev-parse --verify --quiet "refs/remotes/origin/$branch" 2>$null
-if (-not $remoteRef) {
+# Does the branch exist on the remote yet?
+git ls-remote --exit-code --heads origin $branch *> $null
+$branchExistsOnRemote = ($LASTEXITCODE -eq 0)
+$global:LASTEXITCODE = 0
+
+if (-not $branchExistsOnRemote) {
     Write-Host "Branch $branch not on remote; pushing with -u" -ForegroundColor Yellow
     git push -u origin $branch
 } else {
-    git fetch origin $branch 2>&1 | Out-Null
-    $ahead = (git rev-list --count "origin/$branch..HEAD").Trim()
-    if ([int]$ahead -gt 0) {
+    git fetch origin $branch *> $null
+    $aheadStr = (git rev-list --count "origin/$branch..HEAD").Trim()
+    $ahead = [int]$aheadStr
+    if ($ahead -gt 0) {
         Write-Host "$ahead local commit(s) ahead of origin/$branch; pushing..." -ForegroundColor Yellow
         git push origin $branch
     } else {
-        Write-Host "origin/$branch is up to date — nothing to push" -ForegroundColor Gray
+        Write-Host "origin/$branch is up to date - nothing to push" -ForegroundColor Gray
     }
 }
 
-# === STEP 2: Build + sign + deploy exe ===
+# STEP 2: Build + sign + deploy exe
 Write-Host ""
 Write-Host "=== STEP 2/2: Building + signing + deploying exe to X: ===" -ForegroundColor Cyan
 & .\build_exe.ps1
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
-    Write-Host "exe build/deploy failed — see above for errors." -ForegroundColor Red
+    Write-Host "exe build/deploy failed - see above for errors." -ForegroundColor Red
     exit 1
 }
 
