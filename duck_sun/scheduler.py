@@ -459,6 +459,26 @@ async def retry_single_provider(
         return cache_mgr.get_with_fallback(provider_name, None, "Unknown provider")
 
 
+def _om_payload_is_empty(d) -> bool:
+    """True when Open-Meteo data is missing OR is the CacheManager DEFAULT empty payload."""
+    if d is None:
+        return True
+    if not isinstance(d, dict):
+        return not d
+    return not d.get('daily_forecast') and not d.get('daily_summary') and not d.get('hourly')
+
+
+def _c_to_f(c):
+    return None if c is None else round(c * 9 / 5 + 32)
+
+
+def _day_name_from_date(date_str: str) -> str:
+    try:
+        return datetime.fromisoformat(date_str).strftime('%A')
+    except Exception:
+        return ''
+
+
 def _synthesize_baseline_from_alternates(
     google_data: Optional[Dict],
     accu_data: Optional[List],
@@ -485,10 +505,16 @@ def _synthesize_baseline_from_alternates(
 
         if google_daily:
             for day in google_daily:
+                date_str = day.get('date') or ''
+                high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
+                low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
                 daily_forecast.append({
-                    'date': day.get('date'),
+                    'date': date_str,
+                    'day_name': day.get('day_name') or _day_name_from_date(date_str),
                     'high_c': day.get('high_c'),
                     'low_c': day.get('low_c'),
+                    'high_f': high_f,
+                    'low_f': low_f,
                     'precip_prob': day.get('precip_prob', 0),
                     'condition': day.get('condition', 'Unknown'),
                     'source': 'Google (fallback)'
@@ -509,10 +535,16 @@ def _synthesize_baseline_from_alternates(
     # Fall back to AccuWeather if no Google data
     if not daily_forecast and accu_data and isinstance(accu_data, list):
         for day in accu_data:
+            date_str = day.get('date') or ''
+            high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
+            low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
             daily_forecast.append({
-                'date': day.get('date'),
+                'date': date_str,
+                'day_name': day.get('day_name') or _day_name_from_date(date_str),
                 'high_c': day.get('high_c'),
                 'low_c': day.get('low_c'),
+                'high_f': high_f,
+                'low_f': low_f,
                 'precip_prob': day.get('precip_prob', 0),
                 'condition': day.get('condition', 'Unknown'),
                 'source': 'AccuWeather (fallback)'
@@ -534,10 +566,15 @@ def _synthesize_baseline_from_alternates(
         for date_key in sorted(daily_temps.keys())[:8]:
             temps = daily_temps[date_key]
             if temps:
+                hi_c = max(temps)
+                lo_c = min(temps)
                 daily_forecast.append({
                     'date': date_key,
-                    'high_c': max(temps),
-                    'low_c': min(temps),
+                    'day_name': _day_name_from_date(date_key),
+                    'high_c': hi_c,
+                    'low_c': lo_c,
+                    'high_f': _c_to_f(hi_c),
+                    'low_f': _c_to_f(lo_c),
                     'precip_prob': 0,
                     'condition': 'Unknown',
                     'source': 'NOAA (fallback)'
@@ -560,10 +597,15 @@ def _synthesize_baseline_from_alternates(
         for date_key in sorted(daily_temps.keys())[:8]:
             temps = daily_temps[date_key]
             if temps:
+                hi_c = max(temps)
+                lo_c = min(temps)
                 daily_forecast.append({
                     'date': date_key,
-                    'high_c': max(temps),
-                    'low_c': min(temps),
+                    'day_name': _day_name_from_date(date_key),
+                    'high_c': hi_c,
+                    'low_c': lo_c,
+                    'high_f': _c_to_f(hi_c),
+                    'low_f': _c_to_f(lo_c),
                     'precip_prob': 0,
                     'condition': 'Unknown',
                     'source': 'Met.no (fallback)'
@@ -658,7 +700,8 @@ async def main():
         metar_data = results["metar"].data
 
         # Check critical provider - attempt fallback if Open-Meteo unavailable
-        if om_data is None or not om_data:
+        # (treat CacheManager DEFAULT empty payload as unavailable too)
+        if _om_payload_is_empty(om_data):
             logger.warning("Open-Meteo data unavailable - attempting fallback synthesis")
             om_data = _synthesize_baseline_from_alternates(
                 google_data=google_data,
