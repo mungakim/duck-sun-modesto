@@ -730,8 +730,8 @@ def generate_excel_report(
         # Apply border to second cell of merged range
         ws[f'{col_lo}{grid_row}'].border = thin_border
 
-    # Pre-calculate excluded highs
-    weights = [1.0, 3.0, 3.0, 4.0, 4.0, 4.0, 6.0]
+    # Pre-calculate excluded highs (auto-marks OPEN-METEO with "-" when it is
+    # the max of the ensemble; the weighted-avg formula's ISNUMBER skips text)
     excluded_highs = {}
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
@@ -795,24 +795,35 @@ def generate_excel_report(
             col_hi = col(3 + i * 2)
             col_lo = col(4 + i * 2)
 
+            # Write values as Excel numbers (rounded to int) so the
+            # weighted-average formula's ISNUMBER() detects them.
+            # Text markers ("-" excluded, "--" missing) are skipped by the formula.
             cell_hi = ws[f'{col_hi}{grid_row}']
             if is_excluded_high and v1 is not None:
                 cell_hi.value = "-"
+            elif v1:
+                cell_hi.value = int(round(float(v1)))
             else:
-                cell_hi.value = str(v1) if v1 else "--"
+                cell_hi.value = "--"
             cell_hi.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_hi.font = Font(name='Arial', size=9)
             cell_hi.alignment = center_align
             cell_hi.border = thin_border
 
             cell_lo = ws[f'{col_lo}{grid_row}']
-            cell_lo.value = str(v2) if v2 else "--"
+            if v2:
+                cell_lo.value = int(round(float(v2)))
+            else:
+                cell_lo.value = "--"
             cell_lo.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
             cell_lo.font = Font(name='Arial', size=9)
             cell_lo.alignment = center_align
             cell_lo.border = thin_border
 
-    # Weighted Averages row - MERGED col(1)+col(2) for wider label
+    # Weighted Averages row - emit Excel formulas so the user can edit any
+    # source cell (or clear it) and see the average update live in the sheet.
+    # Weights match source row order: OM=1, NOAA=3, Met.no=3, Accu=4, Wcom=4, WU=4, Google=6.
+    WEIGHTED_AVG_ARRAY = "{1;3;3;4;4;4;6}"
     grid_row = 20
     ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
     wtd_cell = ws[f'{col(1)}{grid_row}']
@@ -823,42 +834,30 @@ def generate_excel_report(
     wtd_cell.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
+    def _weighted_avg_formula(col_letter: str) -> str:
+        """SUMPRODUCT formula that ignores text/empty cells via ISNUMBER and
+        rounds to int. Returns '--' when no numeric values exist (avoids #DIV/0)."""
+        rng = f"{col_letter}13:{col_letter}19"
+        return (
+            f"=IFERROR(ROUND("
+            f"SUMPRODUCT(IF(ISNUMBER({rng}),{rng},0)*{WEIGHTED_AVG_ARRAY})/"
+            f"SUMPRODUCT(IF(ISNUMBER({rng}),1,0)*{WEIGHTED_AVG_ARRAY}),"
+            f"0),\"--\")"
+        )
+
     for i, day in enumerate(om_daily):
-        k = day.get('date', '')
-        hi_vals = [
-            day.get('high_f'),
-            noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
-            accu_daily.get(k, {}).get('high_f'),
-            weather_com_daily.get(k, {}).get('high_f'),
-            wunderground_daily.get(k, {}).get('high_f'),
-            google_daily.get(k, {}).get('high_f')
-        ]
-        lo_vals = [
-            day.get('low_f'),
-            noaa_daily.get(k, {}).get('low_f'),
-            met_daily.get(k, {}).get('low_f'),
-            accu_daily.get(k, {}).get('low_f'),
-            weather_com_daily.get(k, {}).get('low_f'),
-            wunderground_daily.get(k, {}).get('low_f'),
-            google_daily.get(k, {}).get('low_f')
-        ]
-
-        avg_hi, _ = calculate_weighted_average_excluding_om_max(hi_vals, weights)
-        avg_lo = calculate_weighted_average(lo_vals, weights)
-
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
         cell_hi = ws[f'{col_hi}{grid_row}']
-        cell_hi.value = str(avg_hi) if avg_hi else "--"
+        cell_hi.value = _weighted_avg_formula(col_hi)
         cell_hi.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_hi.font = Font(name='Arial', size=9, bold=True)
         cell_hi.alignment = center_align
         cell_hi.border = thin_border
 
         cell_lo = ws[f'{col_lo}{grid_row}']
-        cell_lo.value = str(avg_lo) if avg_lo else "--"
+        cell_lo.value = _weighted_avg_formula(col_lo)
         cell_lo.fill = PatternFill(start_color="FFDC64", end_color="FFDC64", fill_type="solid")
         cell_lo.font = Font(name='Arial', size=9, bold=True)
         cell_lo.alignment = center_align

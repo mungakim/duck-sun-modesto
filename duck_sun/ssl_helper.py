@@ -39,6 +39,63 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
+def _patch_truststore_for_py314_recursion() -> bool:
+    """Fix truststore<=0.10.4's verify_mode recursion against Python 3.14.
+
+    Python 3.14 redefined `ssl.SSLContext.verify_mode` as a Python property
+    whose setter calls `super(SSLContext, SSLContext).verify_mode.__set__`.
+    truststore stores `super(SSLContext, SSLContext)` at import time and
+    later calls `.verify_mode.__set__` on it — but `super()` resolves
+    attributes lazily at access time, so on 3.14 the lookup returns the
+    same patched property, producing infinite recursion (RecursionError:
+    Stack overflow on every HTTPS connection).
+
+    Bypass by going straight to the C-level `_ssl._SSLContext.verify_mode`
+    getset descriptor, which has no Python wrapper.
+    """
+    if sys.version_info < (3, 14):
+        return False  # 3.13 and earlier are unaffected
+    if not HAS_TRUSTSTORE:
+        return False
+    try:
+        import _ssl
+        import importlib
+
+        c_verify_mode = _ssl._SSLContext.verify_mode
+
+        def _safe_set_verify_mode(ssl_context, verify_mode):
+            c_verify_mode.__set__(ssl_context, verify_mode)
+
+        # Patch the canonical location first.
+        import truststore._ssl_constants as _tsc
+        _tsc._set_ssl_context_verify_mode = _safe_set_verify_mode
+
+        # Platform shims bind the helper via `from ._ssl_constants import ...`
+        # at import time, so the from-import alias must also be patched
+        # wherever it's actually called.
+        for mod_name in ('_windows', '_macos', '_openssl'):
+            try:
+                mod = importlib.import_module(f'truststore.{mod_name}')
+            except Exception:
+                continue
+            if hasattr(mod, '_set_ssl_context_verify_mode'):
+                mod._set_ssl_context_verify_mode = _safe_set_verify_mode
+
+        logger.info(
+            "[ssl_helper] Patched truststore 0.10.4 to bypass Python "
+            f"{sys.version_info.major}.{sys.version_info.minor} "
+            "SSLContext.verify_mode recursion"
+        )
+        return True
+    except Exception as exc:
+        logger.warning(f"[ssl_helper] truststore Python 3.14 patch failed: {exc}")
+        return False
+
+
+# Apply the patch eagerly so any subsequent truststore.SSLContext() works.
+_TRUSTSTORE_PATCHED_FOR_PY314 = _patch_truststore_for_py314_recursion()
+
 # Cache the exported PEM path for process lifetime
 _cached_windows_pem: str | None = None
 # Cache the SSLContext for process lifetime
@@ -166,16 +223,20 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
     if _cached_ssl_context is not None:
         return _cached_ssl_context
 
-    # Option 1: truststore — uses OS native SSL (SChannel on Windows)
+    # Option 1: truststore — uses OS native SSL (SChannel on Windows).
     # This is the only reliable way to handle firewall certs that lack
     # the Authority Key Identifier extension (OpenSSL 3.x rejects them,
     # but Windows SChannel handles them via subject/issuer name matching).
     #
-    # Skipped on Python 3.14+: truststore 0.10.4's verify_mode monkey-patch
-    # recurses forever against 3.14's new SSLContext.verify_mode setter
-    # (RecursionError: Stack overflow). Until a patched truststore release
-    # ships, fall back to Option 2 which works against 3.14's stdlib ssl.
-    if HAS_TRUSTSTORE and sys.version_info < (3, 14):
+    # Python 3.14+: truststore 0.10.4 has a verify_mode recursion bug.
+    # _patch_truststore_for_py314_recursion() patches it; the resulting
+    # context works correctly. If the patch couldn't apply, fall back to
+    # stdlib SSL + Windows cert loading (Option 2 below).
+    truststore_usable = (
+        HAS_TRUSTSTORE
+        and (sys.version_info < (3, 14) or _TRUSTSTORE_PATCHED_FOR_PY314)
+    )
+    if truststore_usable:
         try:
             ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             logger.info("[ssl_helper] httpx SSLContext: using truststore (OS-native SSL)")
@@ -185,10 +246,9 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
             logger.warning(f"[ssl_helper] truststore init failed: {e}, falling back")
     elif HAS_TRUSTSTORE:
         logger.warning(
-            "[ssl_helper] Python %d.%d detected — skipping truststore "
-            "(known recursion bug in truststore<=0.10.4 against 3.14+); "
-            "using stdlib SSL with Windows cert store",
-            sys.version_info.major, sys.version_info.minor,
+            "[ssl_helper] truststore present but unusable on Python "
+            f"{sys.version_info.major}.{sys.version_info.minor}; "
+            "falling back to stdlib SSL. AKI-less firewall certs may fail."
         )
 
     # Option 2: Manual Windows cert loading (works if no AKI issues)
