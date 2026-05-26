@@ -1,6 +1,6 @@
 {
   "provider": "weather_com",
-  "timestamp": "2026-05-26T08:32:47.716227",
+  "timestamp": "2026-05-26T09:12:59.671724",
   "api_success": true,
   "data": [
     {
@@ -10,7 +10,7 @@
       "low_f": 51.0,
       "high_c": 21.11,
       "low_c": 10.56,
-      "condition": "Partly Cloudy",
+      "condition": "AM Clouds/PM Sun",
       "precip_prob": 18
     },
     {
