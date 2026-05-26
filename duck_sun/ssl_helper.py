@@ -169,8 +169,13 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
     # Option 1: truststore — uses OS native SSL (SChannel on Windows)
     # This is the only reliable way to handle firewall certs that lack
     # the Authority Key Identifier extension (OpenSSL 3.x rejects them,
-    # but Windows SChannel handles them via subject/issuer name matching)
-    if HAS_TRUSTSTORE:
+    # but Windows SChannel handles them via subject/issuer name matching).
+    #
+    # Skipped on Python 3.14+: truststore 0.10.4's verify_mode monkey-patch
+    # recurses forever against 3.14's new SSLContext.verify_mode setter
+    # (RecursionError: Stack overflow). Until a patched truststore release
+    # ships, fall back to Option 2 which works against 3.14's stdlib ssl.
+    if HAS_TRUSTSTORE and sys.version_info < (3, 14):
         try:
             ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             logger.info("[ssl_helper] httpx SSLContext: using truststore (OS-native SSL)")
@@ -178,6 +183,13 @@ def get_httpx_ssl_context() -> ssl.SSLContext:
             return ctx
         except Exception as e:
             logger.warning(f"[ssl_helper] truststore init failed: {e}, falling back")
+    elif HAS_TRUSTSTORE:
+        logger.warning(
+            "[ssl_helper] Python %d.%d detected — skipping truststore "
+            "(known recursion bug in truststore<=0.10.4 against 3.14+); "
+            "using stdlib SSL with Windows cert store",
+            sys.version_info.major, sys.version_info.minor,
+        )
 
     # Option 2: Manual Windows cert loading (works if no AKI issues)
     ctx = ssl.create_default_context()

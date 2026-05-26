@@ -479,6 +479,46 @@ def _day_name_from_date(date_str: str) -> str:
         return ''
 
 
+def _aggregate_hourly_to_daily(
+    hourly_data: List[Dict],
+    source_label: str,
+    time_field: str = 'time',
+) -> List[Dict]:
+    """Aggregate hourly temperature records into per-date high/low dicts.
+
+    Used by synthesis to turn NOAA / Met.no hourly timelines into the
+    same shape that excel_report iterates over (`om_daily`).
+    """
+    from collections import defaultdict
+    daily_temps: Dict[str, List[float]] = defaultdict(list)
+
+    for record in hourly_data:
+        time_str = record.get(time_field) or record.get('valid_time') or record.get('time') or ''
+        temp_c = record.get('temp_c')
+        if time_str and temp_c is not None:
+            daily_temps[time_str[:10]].append(temp_c)
+
+    result: List[Dict] = []
+    for date_key in sorted(daily_temps.keys()):
+        temps = daily_temps[date_key]
+        if not temps:
+            continue
+        hi_c = max(temps)
+        lo_c = min(temps)
+        result.append({
+            'date': date_key,
+            'day_name': _day_name_from_date(date_key),
+            'high_c': hi_c,
+            'low_c': lo_c,
+            'high_f': _c_to_f(hi_c),
+            'low_f': _c_to_f(lo_c),
+            'precip_prob': 0,
+            'condition': 'Unknown',
+            'source': f'{source_label} (fallback)',
+        })
+    return result
+
+
 def _synthesize_baseline_from_alternates(
     google_data: Optional[Dict],
     accu_data: Optional[List],
@@ -488,57 +528,33 @@ def _synthesize_baseline_from_alternates(
     """
     Synthesize baseline data from alternate providers when Open-Meteo fails.
 
-    Creates a minimal data structure compatible with UncannyEngine.normalize_temps().
+    Builds an `om_daily`-compatible structure progressively, preferring the
+    highest-accuracy source per date and extending the timeline with
+    NOAA/Met.no aggregates so the 8-day grid is always filled when any
+    source is healthy.
 
-    Priority: Google > AccuWeather > NOAA > Met.no
-
-    Returns:
-        Dict with 'daily_forecast' and 'hourly' keys, or None if no data available
+    Per-date priority: Google > AccuWeather > NOAA aggregate > Met.no aggregate.
     """
-    daily_forecast = []
-    hourly = []
+    daily_forecast: List[Dict] = []
+    hourly: List[Dict] = []
+    seen_dates: set = set()
 
-    # Try Google Weather first (highest weight, has daily aggregates)
+    def _add_entry(entry: Optional[Dict]) -> None:
+        if not entry:
+            return
+        date_key = entry.get('date')
+        if not date_key or date_key in seen_dates or len(daily_forecast) >= 8:
+            return
+        seen_dates.add(date_key)
+        daily_forecast.append(entry)
+
+    # Phase 1: Google (highest weight; typically ~4 days)
     if google_data and isinstance(google_data, dict):
-        google_daily = google_data.get('daily', [])
-        google_hourly = google_data.get('hourly', [])
-
-        if google_daily:
-            for day in google_daily:
-                date_str = day.get('date') or ''
-                high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
-                low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
-                daily_forecast.append({
-                    'date': date_str,
-                    'day_name': day.get('day_name') or _day_name_from_date(date_str),
-                    'high_c': day.get('high_c'),
-                    'low_c': day.get('low_c'),
-                    'high_f': high_f,
-                    'low_f': low_f,
-                    'precip_prob': day.get('precip_prob', 0),
-                    'condition': day.get('condition', 'Unknown'),
-                    'source': 'Google (fallback)'
-                })
-            logger.info(f"[synthesize] Using Google Weather: {len(daily_forecast)} days")
-
-        if google_hourly:
-            for hour in google_hourly:
-                hourly.append({
-                    'time': hour.get('time'),
-                    'temp_c': hour.get('temp_c'),
-                    'cloud_cover': hour.get('cloud_cover', 0),
-                    'precip_prob': hour.get('precip_prob', 0),
-                    'source': 'Google (fallback)'
-                })
-            logger.info(f"[synthesize] Using Google Weather hourly: {len(hourly)} hours")
-
-    # Fall back to AccuWeather if no Google data
-    if not daily_forecast and accu_data and isinstance(accu_data, list):
-        for day in accu_data:
+        for day in google_data.get('daily', []) or []:
             date_str = day.get('date') or ''
             high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
             low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
-            daily_forecast.append({
+            _add_entry({
                 'date': date_str,
                 'day_name': day.get('day_name') or _day_name_from_date(date_str),
                 'high_c': day.get('high_c'),
@@ -547,79 +563,70 @@ def _synthesize_baseline_from_alternates(
                 'low_f': low_f,
                 'precip_prob': day.get('precip_prob', 0),
                 'condition': day.get('condition', 'Unknown'),
-                'source': 'AccuWeather (fallback)'
+                'source': 'Google (fallback)',
             })
-        logger.info(f"[synthesize] Using AccuWeather: {len(daily_forecast)} days")
+        google_hours = 0
+        for hour in google_data.get('hourly', []) or []:
+            hourly.append({
+                'time': hour.get('time'),
+                'temp_c': hour.get('temp_c'),
+                'cloud_cover': hour.get('cloud_cover', 0),
+                'precip_prob': hour.get('precip_prob', 0),
+                'source': 'Google (fallback)',
+            })
+            google_hours += 1
+        if google_hours:
+            logger.info(f"[synthesize] Pulled {google_hours} hourly records from Google")
 
-    # If still no daily data, try to aggregate from NOAA hourly
-    if not daily_forecast and noaa_data and isinstance(noaa_data, list):
-        from collections import defaultdict
-        daily_temps: Dict[str, List[float]] = defaultdict(list)
+    # Phase 2: AccuWeather (~5 days; native Fahrenheit)
+    if accu_data and isinstance(accu_data, list):
+        for day in accu_data:
+            date_str = day.get('date') or ''
+            high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
+            low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
+            _add_entry({
+                'date': date_str,
+                'day_name': day.get('day_name') or _day_name_from_date(date_str),
+                'high_c': day.get('high_c'),
+                'low_c': day.get('low_c'),
+                'high_f': high_f,
+                'low_f': low_f,
+                'precip_prob': day.get('precip_prob', 0),
+                'condition': day.get('condition', 'Unknown'),
+                'source': 'AccuWeather (fallback)',
+            })
 
-        for record in noaa_data:
-            time_str = record.get('valid_time', record.get('time', ''))
-            temp_c = record.get('temp_c')
-            if time_str and temp_c is not None:
-                date_key = time_str[:10]
-                daily_temps[date_key].append(temp_c)
+    # Phase 3: NOAA hourly aggregate (extends toward 8 days)
+    if len(daily_forecast) < 8 and noaa_data and isinstance(noaa_data, list):
+        for entry in _aggregate_hourly_to_daily(noaa_data, 'NOAA', time_field='valid_time'):
+            if len(daily_forecast) >= 8:
+                break
+            _add_entry(entry)
 
-        for date_key in sorted(daily_temps.keys())[:8]:
-            temps = daily_temps[date_key]
-            if temps:
-                hi_c = max(temps)
-                lo_c = min(temps)
-                daily_forecast.append({
-                    'date': date_key,
-                    'day_name': _day_name_from_date(date_key),
-                    'high_c': hi_c,
-                    'low_c': lo_c,
-                    'high_f': _c_to_f(hi_c),
-                    'low_f': _c_to_f(lo_c),
-                    'precip_prob': 0,
-                    'condition': 'Unknown',
-                    'source': 'NOAA (fallback)'
-                })
-        if daily_forecast:
-            logger.info(f"[synthesize] Aggregated from NOAA: {len(daily_forecast)} days")
-
-    # Last resort: Met.no
-    if not daily_forecast and met_data and isinstance(met_data, list):
-        from collections import defaultdict
-        daily_temps: Dict[str, List[float]] = defaultdict(list)
-
-        for record in met_data:
-            time_str = record.get('time', '')
-            temp_c = record.get('temp_c')
-            if time_str and temp_c is not None:
-                date_key = time_str[:10]
-                daily_temps[date_key].append(temp_c)
-
-        for date_key in sorted(daily_temps.keys())[:8]:
-            temps = daily_temps[date_key]
-            if temps:
-                hi_c = max(temps)
-                lo_c = min(temps)
-                daily_forecast.append({
-                    'date': date_key,
-                    'day_name': _day_name_from_date(date_key),
-                    'high_c': hi_c,
-                    'low_c': lo_c,
-                    'high_f': _c_to_f(hi_c),
-                    'low_f': _c_to_f(lo_c),
-                    'precip_prob': 0,
-                    'condition': 'Unknown',
-                    'source': 'Met.no (fallback)'
-                })
-        if daily_forecast:
-            logger.info(f"[synthesize] Aggregated from Met.no: {len(daily_forecast)} days")
+    # Phase 4: Met.no hourly aggregate (extends further; up to 11 days)
+    if len(daily_forecast) < 8 and met_data and isinstance(met_data, list):
+        for entry in _aggregate_hourly_to_daily(met_data, 'Met.no', time_field='time'):
+            if len(daily_forecast) >= 8:
+                break
+            _add_entry(entry)
 
     if not daily_forecast:
         logger.error("[synthesize] No alternate provider data available for baseline synthesis")
         return None
 
+    # Sort by date so excel_report renders columns left-to-right chronologically
+    daily_forecast.sort(key=lambda d: d.get('date') or '')
+
+    # Log source mix
+    source_counts: Dict[str, int] = {}
+    for entry in daily_forecast:
+        src = entry.get('source', 'Unknown')
+        source_counts[src] = source_counts.get(src, 0) + 1
+    logger.info(f"[synthesize] Composed {len(daily_forecast)}-day baseline from: {source_counts}")
+
     return {
         'daily_forecast': daily_forecast,
-        'hourly': hourly if hourly else [],
+        'hourly': hourly,
         'generated_at': datetime.now().isoformat(),
         'source': 'Synthesized fallback (Open-Meteo unavailable)'
     }

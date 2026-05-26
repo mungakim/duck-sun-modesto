@@ -71,6 +71,26 @@ This script:
 ./venv/Scripts/pip.exe install -r requirements.txt
 ```
 
+### Shipping a New Version (Code Deploy to X:\)
+
+The daily forecast runs on the X:\ network drive via a signed PyInstaller exe. When you change code (not just outputs), rebuild and redeploy:
+
+```powershell
+.\deploy.ps1               # push code to GitHub + build + sign + copy exe to X:\
+```
+
+Equivalent manual sequence:
+```powershell
+git push origin <branch>   # publish code changes
+.\build_exe.ps1            # PyInstaller + Authenticode sign + copy to X:\
+```
+
+The dev machine venv lives in `./venv` (Windows Python). PyInstaller bundles that interpreter, so whatever Python version the venv targets is what the production exe runs.
+
+### Python 3.14 + truststore note
+
+`truststore` 0.10.4 has a known recursion bug against Python 3.14's new `SSLContext.verify_mode` setter (RecursionError on every HTTPS call). `duck_sun/ssl_helper.py` detects Python 3.14+ and automatically falls back to stdlib SSL + manual Windows cert loading, which works fine on the corporate network. No user action needed. Once truststore ships a fixed release, the guard in `ssl_helper.py` can be relaxed.
+
 ### WSL/Windows Python Environment
 
 This project runs on Windows filesystem (`/mnt/c/...`) accessed via WSL. The virtual environment was created with Windows Python, so you MUST use the Windows Python executable directly. **Do NOT try to `source activate`** - it won't work.
