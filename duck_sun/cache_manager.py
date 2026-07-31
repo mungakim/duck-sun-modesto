@@ -118,6 +118,7 @@ class CacheManager:
         "wunderground": 18,     # Same TWC data source
         "accuweather": 18,      # Commercial provider - keep fresh
         "google_weather": 18,   # MetNet-3 updates frequently
+        "google_portland": 18,  # Same API/model, Portland reference row
         "noaa": 24,             # NOAA updates every 12h but 24h is acceptable
         "met_no": 24,           # ECMWF model runs every 6-12h
         "open_meteo": 24,       # Physics models update every 6h
@@ -158,6 +159,14 @@ class CacheManager:
             "yesterday": {"high": "54", "low": "39", "condition": "Default"}
         },
         "google_weather": {
+            "hourly": [],
+            "daily": [],
+            "source": "DEFAULT",
+            "fetched_at": "DEFAULT"
+        },
+        # Portland is a side reference - an empty payload just blanks its row,
+        # it never degrades the Modesto forecast.
+        "google_portland": {
             "hourly": [],
             "daily": [],
             "source": "DEFAULT",

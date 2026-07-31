@@ -2,7 +2,7 @@
 Duck Sun Modesto Scheduler - Full Provider Edition
 
 Orchestrates the daily solar forecasting workflow:
-1. Fetch weather data from ALL 9 providers with retry + fallback
+1. Fetch weather data from every configured provider with retry + fallback
 2. Run physics engine for solar/fog analysis
 3. Generate the Excel Report for Power System Schedulers
 
@@ -35,7 +35,7 @@ from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
 from duck_sun.providers.noaa import NOAAProvider
 from duck_sun.providers.met_no import MetNoProvider
 from duck_sun.providers.accuweather import AccuWeatherProvider
-from duck_sun.providers.google_weather import GoogleWeatherProvider
+from duck_sun.providers.google_weather import GooglePortlandProvider, GoogleWeatherProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.weather_com import WeatherComProvider
@@ -81,7 +81,8 @@ RETRY_DELAY_SECONDS = 23      # Wait between retries
 # Minimum expected days per provider
 EXPECTED_DAYS = {
     "accuweather": 5,      # $2/mo tier
-    "google_weather": 4,   # 96 hours
+    "google_weather": 8,   # 240 hours (API max) -> ~10 calendar days; 8 fills the grid
+    "google_portland": 8,  # Same 240-hour pull for the Portland reference row
     "noaa": 5,             # Usually 7, but 5 minimum acceptable
     "open_meteo": 8,       # Baseline - always needed
     "met_no": 6,           # Usually 8+
@@ -132,7 +133,7 @@ def verify_data_completeness(results: Dict[str, 'FetchResult']) -> ValidationRes
         critical_failures.append("AccuWeather: No data")
         day_counts["AccuWeather"] = 0
 
-    # Google Weather: Expect 4+ days (96 hours)
+    # Google Weather: Expect 8+ days (240 hours = API max, ~10 calendar days)
     google = results.get("google_weather")
     if google and google.data:
         google_daily = google.data.get("daily", []) if isinstance(google.data, dict) else []
@@ -142,6 +143,18 @@ def verify_data_completeness(results: Dict[str, 'FetchResult']) -> ValidationRes
     else:
         critical_failures.append("Google: No data")
         day_counts["Google"] = 0
+
+    # Portland (side reference): tracked, never critical. A missing Portland row
+    # must not trigger a report-level retry or block the Modesto forecast.
+    portland = results.get("google_portland")
+    if portland and portland.data:
+        portland_daily = portland.data.get("daily", []) if isinstance(portland.data, dict) else []
+        day_counts["Portland"] = len(portland_daily)
+        if len(portland_daily) < EXPECTED_DAYS["google_portland"]:
+            warnings.append(f"Portland: {len(portland_daily)}/{EXPECTED_DAYS['google_portland']} days")
+    else:
+        warnings.append("Portland: No data")
+        day_counts["Portland"] = 0
 
     # NOAA: Count unique days from hourly data
     noaa = results.get("noaa")
@@ -289,7 +302,7 @@ async def fetch_with_retry(
 
 async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]:
     """
-    Fetch data from ALL 9 providers with retry + fallback.
+    Fetch data from every configured provider with retry + fallback.
 
     Returns:
         Dict mapping provider name to FetchResult
@@ -297,7 +310,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     """
     results: Dict[str, FetchResult] = {}
 
-    logger.info("[fetch_all_providers] Starting fetch from 11 providers...")
+    logger.info("[fetch_all_providers] Starting fetch from all providers...")
 
     # 1. Open-Meteo (primary source - required)
     logger.info("[fetch_all_providers] Fetching Open-Meteo...")
@@ -344,13 +357,24 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     results["accuweather"] = await fetch_with_retry("accuweather", _fetch_accu, cache_mgr)
 
     # 6. Google Weather (MetNet-3 neural model - weight 6x)
-    logger.info("[fetch_all_providers] Fetching Google Weather (MetNet-3)...")
+    # 240 hours is the documented API max (10 days). Forecast length is not
+    # gated by billing tier - the earlier 4-day grid was purely hours=96.
+    logger.info("[fetch_all_providers] Fetching Google Weather (MetNet-3, 240h)...")
 
     async def _fetch_google():
         google = GoogleWeatherProvider()
-        return await google.fetch_forecast(hours=96)
+        return await google.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
 
     results["google_weather"] = await fetch_with_retry("google_weather", _fetch_google, cache_mgr)
+
+    # 6b. Google Weather - Portland, OR (side reference row, NOT in consensus)
+    logger.info("[fetch_all_providers] Fetching Google Weather - Portland, OR (reference)...")
+
+    async def _fetch_google_portland():
+        portland = GooglePortlandProvider()
+        return await portland.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
+
+    results["google_portland"] = await fetch_with_retry("google_portland", _fetch_google_portland, cache_mgr)
 
     # 7. Weather.com (commercial - weight 4x)
     logger.info("[fetch_all_providers] Fetching Weather.com...")
@@ -430,7 +454,13 @@ async def retry_single_provider(
     elif provider_name == "google_weather":
         async def _fetch():
             provider = GoogleWeatherProvider()
-            return await provider.fetch_forecast(hours=96)
+            return await provider.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "google_portland":
+        async def _fetch():
+            provider = GooglePortlandProvider()
+            return await provider.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
         return await fetch_with_retry(provider_name, _fetch, cache_mgr)
 
     elif provider_name == "noaa":
@@ -651,7 +681,7 @@ async def main():
 
         # --- STEP 1: Fetch ALL Data Sources ---
         logger.info("")
-        logger.info("STEP 1: Fetching weather data from ALL 9 providers...")
+        logger.info("STEP 1: Fetching weather data from all providers...")
         logger.info("-" * 40)
 
         results = await fetch_all_providers(cache_mgr)
@@ -701,6 +731,7 @@ async def main():
         met_data = results["met_no"].data
         accu_data = results["accuweather"].data
         google_data = results["google_weather"].data
+        portland_data = results["google_portland"].data
         weather_com_data = results["weather_com"].data
         wunderground_data = results["wunderground"].data
         mid_data = results["mid_org"].data
@@ -845,6 +876,12 @@ async def main():
 
         # Step 3: Google Weather as secondary fallback (calendar-day aggregation)
         # Only used if Weather.com fails - uses fixed calendar-day logic
+        # NOTE: since Google now returns ~10 days instead of 4, it covers the
+        # full grid, so the documented Google > AccuWeather > Open-Meteo order
+        # applies to the outer days too (it used to stop at day 3). Google's
+        # daily PoP is the max of its hourly probabilities, so outer-day PRECIP %
+        # can read higher than the Open-Meteo value shown previously. The
+        # "PRECIP sources:" log line below reports the per-source day counts.
         if google_data and 'daily' in google_data:
             for d in google_data['daily']:
                 date_key = d.get('date', '')
@@ -886,6 +923,7 @@ async def main():
             met_data=met_data,
             accu_data=accu_data,
             google_data=google_data,
+            portland_data=portland_data,
             weather_com_data=weather_com_data,
             wunderground_data=wunderground_data,
             df_analyzed=df_analyzed,
@@ -940,7 +978,7 @@ async def main():
                 logger.info(f"  Network: {network_excel_path}")
         else:
             logger.warning("  Excel: Generation skipped (openpyxl not installed)")
-        logger.info(f"  Providers: {len(active_sources)}/11 active")
+        logger.info(f"  Providers: {len(active_sources)}/{len(results)} active")
         if degraded:
             logger.warning(f"  Degraded: {', '.join(degraded)}")
         logger.info(f"  Duration: {duration:.2f} seconds")

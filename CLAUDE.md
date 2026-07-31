@@ -33,7 +33,9 @@ The project follows a **Source Replication** approach (not Model Approximation):
 | **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute | 3x |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) | 1x |
 
-**Google Weather (MetNet-3):** The primary source uses Google's neural weather model which fuses satellite imagery and radar data for hyperlocal 0-96 hour predictions. Superior short-term accuracy compared to pure physics models.
+**Google Weather (MetNet-3):** The primary source uses Google's neural weather model which fuses satellite imagery and radar data for hyperlocal predictions. Superior short-term accuracy compared to pure physics models.
+
+The provider pulls the **full 240-hour (10-day) window**, which is the documented ceiling on `forecast/hours:lookup` (`hours` = 1..240, `pageSize` = 1..24, so a full pull is 10 paginated calls). Forecast length is **not** gated by billing tier - the Weather API is a single per-call SKU, so a cheaper plan limits call volume, not horizon. Before Jul 2026 the report only showed 4 days of Google data purely because the provider requested `hours=96`.
 
 **Weather.com & Weather Underground:** Both sources are scraped using curl_cffi with browser impersonation. They share data from The Weather Company (IBM) but may show slight variations. Note: Weather.com has aggressive anti-bot protection and may not work in all environments (cloud/container IPs are often blocked).
 
@@ -127,9 +129,10 @@ Required in `.env`:
 ## PDF Report Structure
 
 The PDF report includes:
-- 8-day temperature grid from 7 sources with weighted consensus
+- 8-day temperature grid from 7 sources with weighted consensus (all 7 sources now cover the full 8 days)
 - MID Weather 48-hour summary with historical records
 - Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
+- Portland, OR side-reference row (single Hi/Lo line, Google Weather, excluded from the Modesto consensus)
 - 3-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
@@ -145,7 +148,7 @@ The PDF report includes:
 - **Open-Meteo:** Independent physics model (provides "second opinion") - Weight: 1x
 
 **Weight Rationale:**
-- Google MetNet-3 uses real-time radar/satellite fusion for superior 0-96 hour accuracy
+- Google MetNet-3 uses real-time radar/satellite fusion for superior short-range accuracy across its 240-hour window
 - Weather.com and Weather Underground (both IBM/TWC) provide additional commercial-grade forecasts
 - Neural model "nowcasts" rather than just physics simulations
 - Best for hyperlocal, short-term predictions (ideal for duck curve forecasting)
@@ -200,3 +203,35 @@ If weather.com temps in the report don't match the website:
 4. If both are old, the API call is failing — check `TWC_API_KEY` and verify `pip-system-certs` is installed
 5. Both weather_com.py and wunderground.py use curl_cffi — if one fails, the other likely does too
 6. If firewall is blocking connections, contact IT Systems (Scott Bays) for domain whitelisting
+
+## Portland, OR Side Reference (Jul 2026)
+
+The Excel one-pager carries a single Portland, OR Hi/Lo line directly beneath the
+Modesto block and above the solar grid. It is a **reference only**:
+
+- Sourced from the same Google Weather (MetNet-3) API, 240-hour pull, at
+  45.5152 / -122.6784 via `GooglePortlandProvider`
+- Portland shares Modesto's Pacific timezone, so its calendar-day highs/lows
+  line up column-for-column with the Modesto grid - no date shifting
+- **Never** enters the weighted average. The consensus formula still spans only
+  source rows 13-19; Portland lives on row 24
+- Uses its own cache key (`google_portland`), so a Portland fetch can never
+  overwrite the Modesto Last Known Good data
+- Non-critical: a missing Portland forecast logs a warning and blanks the row
+  with `--`. It never triggers a report retry or blocks the Modesto forecast
+
+### Excel row map (`duck_sun/excel_report.py`)
+
+| Rows | Content |
+|------|---------|
+| 1-8 | Title, timestamp, PGE CITYGATE / MID GAS NOM, MID 48-hour summary |
+| 10-12 | Condition descriptors, day names, dates |
+| 13-19 | The 7 Modesto sources (weighted-average formula range) |
+| 20-22 | Wtd. Average, PRECIP %, precip source note |
+| **23-24** | **Portland, OR banner + Hi/Lo reference row** |
+| 26-41 | Solar forecast title, header, 7 days x 2 rows |
+| 43 | Solar legend |
+
+Row numbers 20 and 13-19 are asserted by `tests/test_excel_report_formulas.py`;
+the Portland band and the shifted solar block are asserted by
+`tests/test_portland_reference.py`.
