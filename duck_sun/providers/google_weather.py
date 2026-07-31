@@ -2,18 +2,30 @@
 Google Maps Platform Weather API Provider for Duck Sun Modesto
 
 Powered by Google's "WeatherNext" and "MetNet-3" neural models.
-Focus: Hyperlocal precision for Today + Next 3 Days (96 hours).
+Focus: Hyperlocal precision across the full 240-hour (10 day) forecast window.
 
 API DOCS: https://developers.google.com/maps/documentation/weather
 
 WEIGHTING STRATEGY:
-- Days 0-3: Weight 6.0 (Primary Source - MetNet-3 Neural Model)
+- Weight 6.0 (Primary Source - MetNet-3 Neural Model)
 - Superior short-term precision via real-time radar/satellite fusion
 - Best for "nowcasting" rather than physics simulations
 
+FORECAST LENGTH (verified against Google's REST reference, Jul 2026):
+- `forecast/hours:lookup` accepts `hours` = 1..240 (default 240)
+- `pageSize` is 1..24 (default 24), so a full 240-hour pull is 10 pages
+- There is NO pricing-tier cap on forecast length: Weather API billing is a
+  per-call SKU, so a cheaper plan limits call VOLUME, not forecast horizon.
+  The report previously showed only 4 days purely because this provider
+  requested hours=96.
+
+MULTI-LOCATION:
+- The provider is location-parameterized. Modesto (the forecast subject) is
+  the default; Portland, OR is fetched as a separate read-only side reference.
+
 RATE LIMITING:
 - Check Google Cloud Console for quota limits
-- Implements pagination for full 96-hour forecasts
+- Implements pagination for full 240-hour forecasts
 """
 
 import httpx
@@ -29,6 +41,8 @@ logger = logging.getLogger(__name__)
 
 # Cache configuration
 CACHE_DIR = Path("outputs/cache")
+# Default (Modesto) cache path. Each provider instance resolves its own
+# `self.cache_file` from its cache_key so locations never share a file.
 CACHE_FILE = CACHE_DIR / "google_weather_lkg.json"
 
 # Import SSL helper for Windows certificate store support
@@ -73,12 +87,20 @@ class GoogleWeatherProvider:
     satellite imagery and radar fusion for hyperlocal predictions.
 
     WEIGHT: 6.0 (Highest - Neural/Satellite Fusion)
-    - Best accuracy for 0-96 hour forecasts
+    - Best accuracy for 0-240 hour forecasts (strongest in the first 96h)
     - Real-time data fusion vs physics-only models
+
+    Defaults to Modesto, CA. Pass lat/lon/timezone/cache_key to fetch a
+    different location (e.g. the Portland, OR side reference) without
+    clobbering the Modesto cache.
     """
 
     # Google Weather API endpoint (Forecast Hours)
     BASE_URL = "https://weather.googleapis.com/v1/forecast/hours:lookup"
+
+    # API limits per Google's REST reference for forecast.hours.lookup
+    MAX_FORECAST_HOURS = 240   # 10 days - hard API ceiling, not a plan limit
+    MAX_PAGE_SIZE = 24         # Records per page; 240h => 10 pages
 
     # Modesto, CA coordinates
     LAT = 37.6391
@@ -87,42 +109,73 @@ class GoogleWeatherProvider:
     # Timezone for Modesto
     TIMEZONE = "America/Los_Angeles"
 
-    def __init__(self):
-        logger.info("[GoogleWeatherProvider] Initializing provider...")
+    def __init__(
+        self,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        timezone: Optional[str] = None,
+        location_name: str = "Modesto, CA",
+        cache_key: str = "google_weather",
+    ):
+        self.lat = self.LAT if lat is None else lat
+        self.lon = self.LON if lon is None else lon
+        self.timezone = timezone or self.TIMEZONE
+        self.location_name = location_name
+        self.cache_key = cache_key
+        self.cache_file = CACHE_DIR / f"{cache_key}_lkg.json"
+        self.log_prefix = f"[GoogleWeatherProvider:{location_name}]"
+
+        logger.info(f"{self.log_prefix} Initializing provider...")
         self.api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         if not self.api_key:
-            logger.warning("[GoogleWeatherProvider] No API Key found in env!")
+            logger.warning(f"{self.log_prefix} No API Key found in env!")
         else:
-            logger.info("[GoogleWeatherProvider] API key loaded successfully")
+            logger.info(f"{self.log_prefix} API key loaded successfully")
 
         # Ensure cache directory exists
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"[GoogleWeatherProvider] Cache directory: {CACHE_DIR.absolute()}")
+        logger.debug(f"{self.log_prefix} Cache directory: {CACHE_DIR.absolute()}")
+
+    @staticmethod
+    def _unwrap_cache(cache: Dict) -> Dict:
+        """Return the forecast payload from either cache layout.
+
+        This provider writes `{timestamp, hourly, daily}` straight to
+        outputs/cache/<key>_lkg.json, but CacheManager writes its Last Known
+        Good wrapper `{provider, timestamp, data: {...}}` to the SAME path and
+        runs later, so the wrapper is usually what's on disk. Readers must
+        handle both or they silently see "no cached hours".
+        """
+        if isinstance(cache.get('data'), dict) and (
+            'hourly' in cache['data'] or 'daily' in cache['data']
+        ):
+            return cache['data']
+        return cache
 
     def _load_cache(self) -> Optional[Dict]:
         """Load cached data if it exists."""
-        if not CACHE_FILE.exists():
-            logger.info("[GoogleWeatherProvider] No cache file found")
+        if not self.cache_file.exists():
+            logger.info(f"{self.log_prefix} No cache file found")
             return None
 
         try:
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
                 cache = json.load(f)
 
             cached_time_str = cache.get('timestamp')
             if not cached_time_str:
-                logger.warning("[GoogleWeatherProvider] Cache missing timestamp")
+                logger.warning(f"{self.log_prefix} Cache missing timestamp")
                 return None
 
             cached_time = datetime.fromisoformat(cached_time_str)
             age = datetime.now() - cached_time
             age_minutes = age.total_seconds() / 60
 
-            logger.info(f"[GoogleWeatherProvider] Cache age: {age_minutes:.1f} minutes")
-            return cache
+            logger.info(f"{self.log_prefix} Cache age: {age_minutes:.1f} minutes")
+            return self._unwrap_cache(cache)
 
         except Exception as e:
-            logger.warning(f"[GoogleWeatherProvider] Cache load error: {e}")
+            logger.warning(f"{self.log_prefix} Cache load error: {e}")
             return None
 
     def _save_cache(self, hourly_data: List[GoogleHourlyData], daily_data: List[GoogleDailyData]) -> bool:
@@ -130,19 +183,20 @@ class GoogleWeatherProvider:
         try:
             cache = {
                 'timestamp': datetime.now().isoformat(),
-                'location': f"{self.LAT},{self.LON}",
+                'location': f"{self.lat},{self.lon}",
+                'location_name': self.location_name,
                 'hourly': hourly_data,
                 'daily': daily_data
             }
 
-            with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, indent=2)
 
-            logger.info(f"[GoogleWeatherProvider] Cache saved: {len(hourly_data)} hourly, {len(daily_data)} daily records")
+            logger.info(f"{self.log_prefix} Cache saved: {len(hourly_data)} hourly, {len(daily_data)} daily records")
             return True
 
         except Exception as e:
-            logger.error(f"[GoogleWeatherProvider] Cache save failed: {e}")
+            logger.error(f"{self.log_prefix} Cache save failed: {e}")
             return False
 
     def _merge_with_historical(self, new_hourly: List[GoogleHourlyData]) -> List[GoogleHourlyData]:
@@ -152,23 +206,19 @@ class GoogleWeatherProvider:
         This preserves earlier hours of today that are no longer in the API response
         (e.g., morning duck curve hours when fetching in the evening).
         """
-        tz = ZoneInfo(self.TIMEZONE)
+        tz = ZoneInfo(self.timezone)
         today = datetime.now(tz).strftime('%Y-%m-%d')
 
         # Load existing cache
-        if not CACHE_FILE.exists():
+        if not self.cache_file.exists():
             return new_hourly
 
         try:
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
                 old_cache = json.load(f)
-            # Handle both direct format and LKG wrapper format
-            if 'data' in old_cache and 'hourly' in old_cache['data']:
-                existing_hourly = old_cache['data'].get('hourly', [])
-            else:
-                existing_hourly = old_cache.get('hourly', [])
+            existing_hourly = self._unwrap_cache(old_cache).get('hourly', [])
         except Exception as e:
-            logger.debug(f"[GoogleWeatherProvider] Could not load cache for merge: {e}")
+            logger.debug(f"{self.log_prefix} Could not load cache for merge: {e}")
             return new_hourly
 
         if not existing_hourly:
@@ -192,13 +242,13 @@ class GoogleWeatherProvider:
                 # Keep if it's today and not already in new data
                 if hour_date == today and old_hour['time'] not in new_times:
                     preserved.append(old_hour)
-                    logger.debug(f"[GoogleWeatherProvider] Preserving historical hour: {time_str}")
+                    logger.debug(f"{self.log_prefix} Preserving historical hour: {time_str}")
             except Exception as e:
-                logger.debug(f"[GoogleWeatherProvider] Error checking old hour: {e}")
+                logger.debug(f"{self.log_prefix} Error checking old hour: {e}")
                 continue
 
         if preserved:
-            logger.info(f"[GoogleWeatherProvider] Preserved {len(preserved)} historical hours for today")
+            logger.info(f"{self.log_prefix} Preserved {len(preserved)} historical hours for today")
 
         # Merge: preserved old hours + new hours, sorted by time
         merged = preserved + list(new_hourly)
@@ -208,16 +258,17 @@ class GoogleWeatherProvider:
 
     def _get_stale_cache_fallback(self) -> Optional[Dict]:
         """Return stale cache data as fallback when API fails."""
-        if CACHE_FILE.exists():
+        if self.cache_file.exists():
             try:
-                with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                    cache = json.load(f)
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
+                    raw = json.load(f)
+                cache = self._unwrap_cache(raw)
                 if cache.get('hourly') or cache.get('daily'):
-                    age_str = cache.get('timestamp', 'unknown')
-                    logger.warning(f"[GoogleWeatherProvider] Returning STALE cache as fallback (cached at: {age_str})")
+                    age_str = raw.get('timestamp', 'unknown')
+                    logger.warning(f"{self.log_prefix} Returning STALE cache as fallback (cached at: {age_str})")
                     return cache
             except Exception as e:
-                logger.error(f"[GoogleWeatherProvider] Stale cache fallback failed: {e}")
+                logger.error(f"{self.log_prefix} Stale cache fallback failed: {e}")
         return None
 
     def _parse_google_error(self, resp) -> str:
@@ -249,29 +300,39 @@ class GoogleWeatherProvider:
             # Response isn't JSON - fall back to truncated raw text
             return f"raw_response={resp.text[:500]}"
 
-    async def fetch_forecast(self, hours: int = 96) -> Optional[Dict[str, Any]]:
+    async def fetch_forecast(self, hours: int = MAX_FORECAST_HOURS) -> Optional[Dict[str, Any]]:
         """
         Fetch hourly forecast from Google Weather API.
 
         Args:
-            hours: Number of hours to fetch (default 96 = 4 days)
+            hours: Number of hours to fetch (default 240 = 10 days, the API max).
+                   Values above 240 are clamped; Google rejects them outright.
 
         Returns:
             Dict with 'hourly' and 'daily' keys containing forecast data,
             or None on failure
         """
+        if hours > self.MAX_FORECAST_HOURS:
+            logger.warning(
+                f"{self.log_prefix} Requested {hours}h exceeds API max "
+                f"{self.MAX_FORECAST_HOURS}h - clamping"
+            )
+            hours = self.MAX_FORECAST_HOURS
+        hours = max(1, hours)
+
         if not self.api_key:
-            logger.warning("[GoogleWeatherProvider] Cannot fetch - no API key")
+            logger.warning(f"{self.log_prefix} Cannot fetch - no API key")
             cache = self._get_stale_cache_fallback()
             return cache
 
-        logger.info(f"[GoogleWeatherProvider] Fetching {hours} hours from Google Weather API...")
+        logger.info(f"{self.log_prefix} Fetching {hours} hours from Google Weather API...")
 
         params = {
             "key": self.api_key,
-            "location.latitude": self.LAT,
-            "location.longitude": self.LON,
-            "hours": hours,  # Request full duration - API paginates at 24hrs/page
+            "location.latitude": self.lat,
+            "location.longitude": self.lon,
+            "hours": hours,           # Total horizon - API paginates at 24hrs/page
+            "pageSize": self.MAX_PAGE_SIZE,  # Ask for the biggest page allowed (24)
             "languageCode": "en-US",
             "unitsSystem": "METRIC",
         }
@@ -281,7 +342,9 @@ class GoogleWeatherProvider:
                 all_forecasts = []
                 next_page_token = None
                 page_count = 0
-                max_pages = (hours // 24) + 2  # Calculate needed pages with buffer
+                # pageSize caps at 24, so 240h needs 10 pages; +2 is slack in case
+                # Google returns short pages.
+                max_pages = (hours // self.MAX_PAGE_SIZE) + 2
 
                 # Fetch loop for pagination
                 while len(all_forecasts) < hours and page_count < max_pages:
@@ -290,34 +353,34 @@ class GoogleWeatherProvider:
                     elif "pageToken" in params:
                         del params["pageToken"]
 
-                    logger.debug(f"[GoogleWeatherProvider] Fetching page {page_count + 1}...")
+                    logger.debug(f"{self.log_prefix} Fetching page {page_count + 1}...")
                     resp = await client.get(self.BASE_URL, params=params)
 
                     if resp.status_code == 401:
                         error_info = self._parse_google_error(resp)
-                        logger.error(f"[GoogleWeatherProvider] 401 Unauthorized: {error_info}")
-                        logger.error("[GoogleWeatherProvider] ACTION: Verify GOOGLE_MAPS_API_KEY is valid and not expired")
+                        logger.error(f"{self.log_prefix} 401 Unauthorized: {error_info}")
+                        logger.error(f"{self.log_prefix} ACTION: Verify GOOGLE_MAPS_API_KEY is valid and not expired")
                         return self._get_stale_cache_fallback()
 
                     if resp.status_code == 403:
                         error_info = self._parse_google_error(resp)
-                        logger.error(f"[GoogleWeatherProvider] 403 Forbidden: {error_info}")
+                        logger.error(f"{self.log_prefix} 403 Forbidden: {error_info}")
 
                         # Log actionable guidance based on Google error status
                         if "PERMISSION_DENIED" in error_info:
-                            logger.error("[GoogleWeatherProvider] ACTION: Enable 'Weather API' in Google Cloud Console -> APIs & Services")
+                            logger.error(f"{self.log_prefix} ACTION: Enable 'Weather API' in Google Cloud Console -> APIs & Services")
                         elif "RESOURCE_EXHAUSTED" in error_info:
-                            logger.error("[GoogleWeatherProvider] ACTION: Quota exceeded - check Cloud Console quotas or wait for reset")
+                            logger.error(f"{self.log_prefix} ACTION: Quota exceeded - check Cloud Console quotas or wait for reset")
                         elif "billing" in error_info.lower():
-                            logger.error("[GoogleWeatherProvider] ACTION: Enable billing on the Google Cloud project")
+                            logger.error(f"{self.log_prefix} ACTION: Enable billing on the Google Cloud project")
                         else:
-                            logger.error("[GoogleWeatherProvider] ACTION: Check API key restrictions in Cloud Console -> Credentials")
+                            logger.error(f"{self.log_prefix} ACTION: Check API key restrictions in Cloud Console -> Credentials")
 
                         return self._get_stale_cache_fallback()
 
                     if resp.status_code != 200:
                         error_info = self._parse_google_error(resp)
-                        logger.error(f"[GoogleWeatherProvider] API Error {resp.status_code}: {error_info}")
+                        logger.error(f"{self.log_prefix} API Error {resp.status_code}: {error_info}")
                         return self._get_stale_cache_fallback()
 
                     data = resp.json()
@@ -329,7 +392,7 @@ class GoogleWeatherProvider:
                     if not next_page_token:
                         break
 
-                logger.info(f"[GoogleWeatherProvider] Received {len(all_forecasts)} hourly records ({page_count} pages)")
+                logger.info(f"{self.log_prefix} Received {len(all_forecasts)} hourly records ({page_count} pages)")
 
                 # Parse hourly data
                 hourly_results = self._parse_hourly_data(all_forecasts)
@@ -351,13 +414,13 @@ class GoogleWeatherProvider:
                 }
 
         except httpx.TimeoutException:
-            logger.error("[GoogleWeatherProvider] Request timed out")
+            logger.error(f"{self.log_prefix} Request timed out")
             return self._get_stale_cache_fallback()
         except httpx.RequestError as e:
-            logger.error(f"[GoogleWeatherProvider] Request error: {e}")
+            logger.error(f"{self.log_prefix} Request error: {e}")
             return self._get_stale_cache_fallback()
         except Exception as e:
-            logger.error(f"[GoogleWeatherProvider] Fetch failed: {e}", exc_info=True)
+            logger.error(f"{self.log_prefix} Fetch failed: {e}", exc_info=True)
             return self._get_stale_cache_fallback()
 
     def _parse_hourly_data(self, raw_forecasts: List[Dict]) -> List[GoogleHourlyData]:
@@ -406,10 +469,10 @@ class GoogleWeatherProvider:
                 })
 
             except Exception as e:
-                logger.debug(f"[GoogleWeatherProvider] Error parsing hour: {e}")
+                logger.debug(f"{self.log_prefix} Error parsing hour: {e}")
                 continue
 
-        logger.info(f"[GoogleWeatherProvider] Parsed {len(results)} hourly records")
+        logger.info(f"{self.log_prefix} Parsed {len(results)} hourly records")
         return results
 
     def _aggregate_to_daily(self, hourly_data: List[GoogleHourlyData]) -> List[GoogleDailyData]:
@@ -419,12 +482,12 @@ class GoogleWeatherProvider:
         Uses calendar day (midnight-midnight) for all aggregations:
         temperatures, precipitation, and conditions.
         """
-        logger.info(f"[GoogleWeatherProvider] _aggregate_to_daily called with {len(hourly_data)} hourly records")
+        logger.info(f"{self.log_prefix} _aggregate_to_daily called with {len(hourly_data)} hourly records")
 
         try:
-            tz = ZoneInfo(self.TIMEZONE)
+            tz = ZoneInfo(self.timezone)
         except Exception as e:
-            logger.error(f"[GoogleWeatherProvider] Failed to create timezone: {e}")
+            logger.error(f"{self.log_prefix} Failed to create timezone: {e}")
             return []
 
         # All containers use calendar day (midnight-midnight)
@@ -466,10 +529,10 @@ class GoogleWeatherProvider:
 
             except Exception as e:
                 error_count += 1
-                logger.warning(f"[GoogleWeatherProvider] Error aggregating hour: {e}")
+                logger.warning(f"{self.log_prefix} Error aggregating hour: {e}")
                 continue
 
-        logger.info(f"[GoogleWeatherProvider] Aggregation loop: {processed_count} processed, {error_count} errors, {len(daily_temps)} unique days")
+        logger.info(f"{self.log_prefix} Aggregation loop: {processed_count} processed, {error_count} errors, {len(daily_temps)} unique days")
 
         # Build daily results
         results: List[GoogleDailyData] = []
@@ -480,10 +543,10 @@ class GoogleWeatherProvider:
 
             # Skip partial days that lack afternoon data — the "high" would just
             # be a morning temp, not the actual daytime peak. This happens at the
-            # edges of the 96-hour API window (first/last day).
+            # edges of the 240-hour API window (first/last day).
             max_hour = daily_max_hour.get(date_key, 0)
             if max_hour < 14:
-                logger.info(f"[GoogleWeatherProvider] Skipping partial day {date_key} (max local hour={max_hour}, need >=14 for reliable high)")
+                logger.info(f"{self.log_prefix} Skipping partial day {date_key} (max local hour={max_hour}, need >=14 for reliable high)")
                 continue
 
             high_c = max(temps)
@@ -507,7 +570,7 @@ class GoogleWeatherProvider:
                 "condition": condition
             })
 
-        logger.info(f"[GoogleWeatherProvider] Aggregated to {len(results)} daily records")
+        logger.info(f"{self.log_prefix} Aggregated to {len(results)} daily records")
         return results
 
     def _get_nested(self, obj: Dict, path: List[str], default: Any = None) -> Any:
@@ -520,17 +583,48 @@ class GoogleWeatherProvider:
                 return default
         return current if current != {} else default
 
-    async def fetch_daily(self) -> Optional[List[GoogleDailyData]]:
+    async def fetch_daily(self, hours: int = MAX_FORECAST_HOURS) -> Optional[List[GoogleDailyData]]:
         """
         Convenience method to fetch only daily aggregated data.
+
+        Args:
+            hours: Forecast horizon to pull before aggregating (default 240 = 10 days)
 
         Returns:
             List of GoogleDailyData dicts, or None on failure
         """
-        result = await self.fetch_forecast(hours=96)
+        result = await self.fetch_forecast(hours=hours)
         if result and 'daily' in result:
             return result['daily']
         return None
+
+
+# Portland, OR - side reference only. These temps are displayed on their own
+# row and deliberately never enter the Modesto weighted consensus.
+PORTLAND_LAT = 45.5152
+PORTLAND_LON = -122.6784
+PORTLAND_TIMEZONE = "America/Los_Angeles"
+
+
+class GooglePortlandProvider(GoogleWeatherProvider):
+    """Google Weather (MetNet-3) for Portland, OR.
+
+    Portland shares Modesto's Pacific timezone, so calendar-day aggregation
+    lines the Portland row up column-for-column with the Modesto grid without
+    any date shifting.
+
+    Uses its own cache key so a Portland fetch can never overwrite the
+    Modesto Last Known Good data (or vice versa).
+    """
+
+    def __init__(self):
+        super().__init__(
+            lat=PORTLAND_LAT,
+            lon=PORTLAND_LON,
+            timezone=PORTLAND_TIMEZONE,
+            location_name="Portland, OR",
+            cache_key="google_portland",
+        )
 
 
 if __name__ == "__main__":
@@ -540,36 +634,38 @@ if __name__ == "__main__":
     load_dotenv()
     logging.basicConfig(level=logging.DEBUG)
 
-    async def test():
+    async def _show(provider: GoogleWeatherProvider, hours: int):
         print("=" * 60)
-        print("  GOOGLE WEATHER API PROVIDER TEST (MetNet-3)")
+        print(f"  GOOGLE WEATHER API TEST (MetNet-3) - {provider.location_name}")
         print("=" * 60)
 
-        provider = GoogleWeatherProvider()
+        print(f"\n[FETCHING {hours}h FORECAST]")
+        data = await provider.fetch_forecast(hours=hours)
 
-        # Fetch forecast
-        print("\n[FETCHING FORECAST]")
-        data = await provider.fetch_forecast(hours=48)
-
-        if data:
-            print(f"\n[RESULTS] Google Weather Forecast:")
-            print("-" * 50)
-
-            # Show hourly sample
-            hourly = data.get('hourly', [])
-            print(f"\nHourly data: {len(hourly)} records")
-            if hourly:
-                print(f"  First hour: {hourly[0]}")
-
-            # Show daily
-            daily = data.get('daily', [])
-            print(f"\nDaily aggregated: {len(daily)} days")
-            for day in daily[:5]:
-                print(f"  {day['date']}: Hi={day['high_f']}F, Lo={day['low_f']}F, "
-                      f"Precip={day['precip_prob']}%, {day['condition']}")
-        else:
+        if not data:
             print("[FAILED] Could not fetch Google Weather data")
+            return
+
+        print(f"\n[RESULTS] {provider.location_name}:")
+        print("-" * 50)
+
+        hourly = data.get('hourly', [])
+        print(f"\nHourly data: {len(hourly)} records")
+        if hourly:
+            print(f"  First hour: {hourly[0]}")
+
+        daily = data.get('daily', [])
+        print(f"\nDaily aggregated: {len(daily)} days")
+        for day in daily:
+            print(f"  {day['date']}: Hi={day['high_f']}F, Lo={day['low_f']}F, "
+                  f"Precip={day['precip_prob']}%, {day['condition']}")
 
         print("\n" + "=" * 60)
+
+    async def test():
+        # Full 240h pull for both locations - this is what the report now uses.
+        await _show(GoogleWeatherProvider(), GoogleWeatherProvider.MAX_FORECAST_HOURS)
+        print()
+        await _show(GooglePortlandProvider(), GoogleWeatherProvider.MAX_FORECAST_HOURS)
 
     asyncio.run(test())

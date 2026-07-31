@@ -180,7 +180,7 @@ async def fetch_all_sources():
     print(f"{Fore.YELLOW}[6/9]{Style.RESET_ALL} Polling Google Weather (MetNet-3 Neural Model)...")
     logger.info("[fetch_all_sources] Fetching Google Weather data...")
     google_provider = GoogleWeatherProvider()
-    google_data = await google_provider.fetch_forecast(hours=96)
+    google_data = await google_provider.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
     if google_data:
         hourly_count = len(google_data.get('hourly', []))
         daily_count = len(google_data.get('daily', []))
