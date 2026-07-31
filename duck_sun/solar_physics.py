@@ -69,75 +69,89 @@ def calculate_theoretical_max_ghi(hour: int, day_of_year: int, lat: float = MODE
     return min(ghi, MAX_GHI)
 
 
+def calculate_solar_from_cloud_cover(
+    cloud_cover: float,
+    hour: int,
+    day_of_year: int,
+    lat: float = MODESTO_LAT
+) -> float:
+    """
+    Derive irradiance from cloud cover alone against the clear-sky ceiling.
+
+    This is the single irradiance model used across the report - both the
+    Excel solar grid and the physics engine call it, so the grid and the JSON
+    outlook can never disagree.
+
+    Attenuation is linear in cloud fraction down to 30% of clear sky at fully
+    overcast, which is the usual diffuse floor for a Central Valley overcast.
+
+    Args:
+        cloud_cover: Cloud cover percentage 0-100 (from Google MetNet-3)
+        hour: Local hour (0-23)
+        day_of_year: Day of year (1-366)
+        lat: Latitude in degrees
+
+    Returns:
+        Irradiance in W/m2 (0 if the sun is below the horizon)
+    """
+    max_theoretical = calculate_theoretical_max_ghi(hour, day_of_year, lat)
+    if max_theoretical <= 0:
+        return 0.0
+
+    cloud_fraction = max(0.0, min(100.0, float(cloud_cover))) / 100.0
+    attenuation = 1.0 - (0.7 * cloud_fraction)
+    return max_theoretical * attenuation
+
+
 def calculate_hybrid_solar(
     om_radiation: float,
-    google_cloud: int,
+    google_cloud: Optional[int],
     hour: int,
     day_of_year: int
 ) -> float:
     """
-    Calculate solar irradiance using Hybrid Logic.
+    Calculate solar irradiance, GOOGLE-FIRST.
 
-    Combines:
-    - Open-Meteo physics model (radiative transfer calculations)
-    - Google MetNet-3 neural model (precise cloud timing from satellite/radar)
+    Priority (Jul 2026 - Google is the preferred solar source everywhere):
+    1. Google MetNet-3 cloud cover against the clear-sky ceiling. Google's
+       satellite/radar fusion resolves cloud TIMING far better than a physics
+       model's radiative transfer, and timing is what drives the duck curve.
+    2. Open-Meteo shortwave radiation - ONLY when Google has no cloud value for
+       this hour (google_cloud is None). Pass None, not a placeholder: a
+       hardcoded default like 50 is indistinguishable from a real 50% reading
+       and would silently fabricate a half-clouded sky.
+    3. Zero, if neither source has anything.
+
+    The function keeps its historical name because callers and tests reference
+    it, but it is no longer a blend - Open-Meteo is a fallback, not a baseline.
 
     Args:
-        om_radiation: Watts/m2 from Open-Meteo (Physics baseline)
-        google_cloud: Cloud cover percentage from Google (0-100)
+        om_radiation: Watts/m2 from Open-Meteo (fallback only)
+        google_cloud: Cloud cover percentage from Google (0-100), or None if absent
         hour: Local hour (0-23)
         day_of_year: Day of year (1-366)
 
     Returns:
-        Hybrid solar irradiance in W/m2
+        Solar irradiance in W/m2
     """
-    # 1. Theoretical Max (Clear Sky GHI) for Modesto
     max_theoretical = calculate_theoretical_max_ghi(hour, day_of_year)
-
     if max_theoretical <= 0:
         # Sun is down - no solar production
         return 0.0
 
-    # 2. Physics Baseline (Trust Open-Meteo's radiative transfer model first)
-    # If OM is missing/zero, fallback to theoretical with cloud penalty
-    if om_radiation > 0:
-        base_solar = om_radiation
-    else:
-        # Fallback: theoretical max with simple cloud attenuation
-        cloud_fraction = google_cloud / 100.0
-        attenuation = 1.0 - (0.7 * cloud_fraction)
-        base_solar = max_theoretical * attenuation
+    # 1. GOOGLE PRIMARY
+    if google_cloud is not None:
+        return calculate_solar_from_cloud_cover(google_cloud, hour, day_of_year)
 
-    # 3. The "Google Veto" (Timing Correction)
-    # If Google says it's "Heavy Cloud" (>80%) but Physics model says "Sunny" (>200W),
-    # Trust Google's timing and clamp it down.
-    # Google's satellite/radar fusion is better at timing than physics models.
-    if google_cloud > 80 and base_solar > 200:
-        # It's likely a timing mismatch. The cloud IS there (per Google).
-        # Clamp to diffuse-only levels (~30% of base)
-        clamped_solar = base_solar * 0.3
-        logger.debug(f"[solar_physics] GOOGLE VETO: cloud={google_cloud}%, "
-                    f"base={base_solar:.0f}W -> clamped={clamped_solar:.0f}W")
-        return clamped_solar
+    # 2. OPEN-METEO FALLBACK (only when Google has nothing for this hour)
+    if om_radiation and om_radiation > 0:
+        logger.debug(
+            f"[solar_physics] No Google cloud for hour {hour} - "
+            f"falling back to Open-Meteo radiation ({om_radiation:.0f}W)"
+        )
+        return float(om_radiation)
 
-    # 4. The "Clear Sky" Boost
-    # If Google says 0-10% clouds, trust the higher of the two values
-    # (physics model may underestimate on truly clear days)
-    if google_cloud < 10:
-        boosted = max(base_solar, max_theoretical * 0.9)
-        if boosted > base_solar:
-            logger.debug(f"[solar_physics] CLEAR SKY BOOST: {base_solar:.0f}W -> {boosted:.0f}W")
-        return boosted
-
-    # 5. Moderate cloud adjustment (10-80%)
-    # Blend physics and AI-adjusted values
-    if 10 <= google_cloud <= 80:
-        # Apply partial cloud attenuation based on Google's cloud cover
-        cloud_factor = 1.0 - (0.5 * (google_cloud / 100.0))
-        blended = base_solar * cloud_factor
-        return max(blended, base_solar * 0.3)  # Never go below diffuse minimum
-
-    return base_solar
+    return 0.0
 
 
 def calculate_tule_fog_penalty(
@@ -220,22 +234,24 @@ if __name__ == "__main__":
         max_ghi = calculate_theoretical_max_ghi(hour, day_of_year)
         print(f"   {hour:02d}:00 -> {max_ghi:.0f} W/m2")
 
-    # Test hybrid calculation scenarios
-    print("\n2. Hybrid Solar Calculation Scenarios:")
+    # Test Google-first calculation scenarios
+    print("\n2. Solar Calculation Scenarios (Google-first):")
 
     test_cases = [
         # (om_radiation, google_cloud, hour, description)
-        (400, 0, 12, "Clear noon (both agree)"),
-        (400, 90, 12, "Google sees clouds, physics says sunny"),
-        (100, 0, 12, "Google clear, physics low"),
-        (300, 50, 12, "Moderate clouds"),
-        (0, 80, 12, "No physics data, high clouds"),
+        (400, 0, 12, "Google clear - Open-Meteo ignored"),
+        (400, 90, 12, "Google sees clouds, Open-Meteo says sunny - Google wins"),
+        (100, 0, 12, "Google clear, Open-Meteo low - Google wins"),
+        (300, 50, 12, "Moderate clouds per Google"),
+        (0, 80, 12, "No Open-Meteo data, Google has clouds"),
+        (350, None, 12, "Google MISSING - falls back to Open-Meteo"),
+        (0, None, 12, "Neither source - zero"),
     ]
 
     for om_rad, g_cloud, hour, desc in test_cases:
         result = calculate_hybrid_solar(om_rad, g_cloud, hour, day_of_year)
         print(f"   {desc}:")
-        print(f"      OM={om_rad}W, Google={g_cloud}% -> Hybrid={result:.0f}W")
+        print(f"      OM={om_rad}W, Google={g_cloud}% -> {result:.0f}W")
 
     # Test Tule Fog detection
     print("\n3. Tule Fog Detection:")
