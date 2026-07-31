@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
+from duck_sun.solar_physics import (
+    calculate_solar_from_cloud_cover,
+    calculate_theoretical_max_ghi,
+)
+
 try:
     from openpyxl import Workbook
     from openpyxl.styles import (
@@ -123,41 +128,17 @@ def calculate_weighted_average_excluding_om_max(
 
 
 def calculate_clear_sky_ghi(hour: int, day_of_year: int, lat: float = 37.6391) -> float:
-    """Calculate theoretical clear-sky Global Horizontal Irradiance (GHI)."""
-    import math
+    """Theoretical clear-sky Global Horizontal Irradiance (GHI).
 
-    declination = 23.45 * math.sin(math.radians(360 * (284 + day_of_year) / 365))
-    hour_angle = 15 * (hour - 12.5)
-
-    lat_rad = math.radians(lat)
-    decl_rad = math.radians(declination)
-    hour_rad = math.radians(hour_angle)
-
-    sin_elevation = (math.sin(lat_rad) * math.sin(decl_rad) +
-                     math.cos(lat_rad) * math.cos(decl_rad) * math.cos(hour_rad))
-
-    if sin_elevation <= 0:
-        return 0.0
-
-    seasonal_factor = 0.7 + 0.3 * math.cos(math.radians((day_of_year - 172) * 360 / 365))
-    max_ghi = 900 * seasonal_factor
-
-    ghi = max_ghi * sin_elevation
-
-    return min(ghi, 900)
+    Thin wrapper over solar_physics so the Excel grid and the physics engine
+    share one solar-position model instead of two copies that can drift apart.
+    """
+    return calculate_theoretical_max_ghi(hour, day_of_year, lat)
 
 
 def estimate_irradiance_from_cloud_cover(cloud_cover: int, hour: int, day_of_year: int) -> float:
-    """Estimate solar irradiance from cloud cover percentage."""
-    clear_sky_ghi = calculate_clear_sky_ghi(hour, day_of_year)
-
-    if clear_sky_ghi <= 0:
-        return 0.0
-
-    cloud_fraction = cloud_cover / 100.0
-    attenuation = 1.0 - (0.7 * cloud_fraction)
-
-    return round(clear_sky_ghi * attenuation, 1)
+    """Estimate solar irradiance from Google MetNet-3 cloud cover percentage."""
+    return round(calculate_solar_from_cloud_cover(cloud_cover, hour, day_of_year), 1)
 
 
 def get_solar_color_and_desc(risk_level: str, solar_value: float, condition: str = None) -> tuple:
@@ -219,6 +200,58 @@ def get_solar_color_and_desc(risk_level: str, solar_value: float, condition: str
         return "90EE90", "Full Sun"
 
 
+# Wordy provider phrasings -> compact equivalents that fit the narrow day
+# columns. Weather.com's `wxPhraseLong` is by far the most verbose of the
+# sources (AccuWeather's IconPhrase is nearly always <= 13 chars), so once
+# Weather.com became the descriptor primary in Jul 2026 the old hard truncation
+# started cutting mid-word: "Sunshine and patchy clouds" -> "Sunshine And C".
+# Checked in order against the lowercased phrase; first match wins.
+CONDITION_ABBREVIATIONS = [
+    ("sunshine and patchy clouds", "Sun/Clouds"),
+    ("sunshine and clouds", "Sun/Clouds"),
+    ("times of clouds and sun", "Clouds/Sun"),
+    ("clouds and sun", "Clouds/Sun"),
+    ("plenty of sunshine", "Sunny"),
+    ("abundant sunshine", "Sunny"),
+    ("brilliant sunshine", "Sunny"),
+    ("scattered thunderstorms", "Sctd Storms"),
+    ("isolated thunderstorms", "Isol Storms"),
+    ("thunderstorms", "Storms"),
+    ("rain and snow showers", "Rain/Snow"),
+    ("scattered showers", "Sctd Showers"),
+    ("a few showers", "Few Showers"),
+    ("partly cloudy", "Partly Cloudy"),
+    ("mostly cloudy", "Mostly Cloudy"),
+]
+
+CONDITION_MAX_CHARS = 14
+
+
+def fit_condition_text(display: str, max_len: int = CONDITION_MAX_CHARS) -> str:
+    """Shrink a condition phrase to fit a day column without cutting mid-word.
+
+    Order: leave short text alone -> use a known abbreviation -> drop trailing
+    whole words -> only then hard-truncate (single word longer than the column).
+    """
+    display = display.strip()
+    if len(display) <= max_len:
+        return display
+
+    lowered = display.lower()
+    for phrase, short in CONDITION_ABBREVIATIONS:
+        if phrase in lowered:
+            return short
+
+    kept = ""
+    for word in display.split():
+        candidate = f"{kept} {word}".strip()
+        if len(candidate) > max_len:
+            break
+        kept = candidate
+
+    return kept or display[:max_len]
+
+
 def get_daily_condition_display(condition: str, dewpoint_c: float = None, temp_c: float = None,
                                  visibility_low: bool = False) -> tuple:
     """
@@ -236,9 +269,8 @@ def get_daily_condition_display(condition: str, dewpoint_c: float = None, temp_c
 
     # Title-case the display text so "Partly sunny" -> "Partly Sunny"
     display = condition.strip().title()
-    # Excel day columns are narrow - truncate at 14 chars as a safety net
-    if len(display) > 14:
-        display = display[:14]
+    # Excel day columns are narrow - abbreviate/trim on a word boundary
+    display = fit_condition_text(display)
 
     # Tule Fog is a safety-critical override for Central Valley winters
     is_potential_fog = False
@@ -648,10 +680,13 @@ def generate_excel_report(
         "FFF5EE", "F5FFFA", "F8F8FF", "FFFAF0",
     ]
 
-    # Build merged conditions map
-    # Priority: AccuWeather (primary) → Google → Open-Meteo (fills gaps beyond day 5)
-    # AccuWeather is applied LAST so it overwrites all other sources where it has data.
-    # AccuWeather's IconPhrase is the most reliable one-word daily descriptor.
+    # Build merged conditions map.
+    #
+    # WORD DESCRIPTORS ARE THE ONE PLACE GOOGLE IS DELIBERATELY NOT PREFERRED
+    # (Jul 2026 decision). Everything else on this report is Google-first, but
+    # the descriptor row must read like weather.com, so:
+    #   Weather.com (primary) > AccuWeather > Google > Open-Meteo
+    # Applied in reverse order so the highest-priority source overwrites last.
     daily_conditions = {}
 
     # Step 1: Open-Meteo as base (always has 8 days from WMO weather codes)
@@ -661,7 +696,7 @@ def generate_excel_report(
         if condition and condition != 'Unknown':
             daily_conditions[date_key] = {'condition': condition, 'source': 'Open-Meteo'}
 
-    # Step 2: Google fills gaps / improves quality for days 0-4 (4-5 days)
+    # Step 2: Google (last-resort override - only where Weather.com/AccuWeather are silent)
     if google_data:
         for day_record in google_data.get('daily', []):
             date_key = day_record.get('date', '')
@@ -669,13 +704,23 @@ def generate_excel_report(
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'Google'}
 
-    # Step 3: AccuWeather overrides everything (primary source per Apr 2026 calibration)
+    # Step 3: AccuWeather (per Apr 2026 calibration - still beats Google here)
     if accu_data:
         for day_record in accu_data:
             date_key = day_record.get('date', '')
             condition = day_record.get('condition', '')
             if condition and condition != 'Unknown':
                 daily_conditions[date_key] = {'condition': condition, 'source': 'AccuWeather'}
+
+    # Step 4: Weather.com wins outright - the descriptor row should match
+    # weather.com's wording (daypart[0].wxPhraseLong). Typically 10 days, so it
+    # normally covers the whole grid on its own.
+    if weather_com_data:
+        for day_record in weather_com_data:
+            date_key = day_record.get('date', '')
+            condition = day_record.get('condition', '')
+            if condition and condition != 'Unknown':
+                daily_conditions[date_key] = {'condition': condition, 'source': 'Weather.com'}
 
     # Log descriptor source attribution (for verification: AccuWeather should win days 0-4)
     source_counts = {}
@@ -1010,12 +1055,18 @@ def generate_excel_report(
     # SOLAR FORECAST GRID (also centered)
     # =====================
     grid_row = 26
-    ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST - W/m² Irradiance (Hybrid: Google MetNet-3 + Open-Meteo)"
+    ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST - W/m² Irradiance (Google MetNet-3)"
     ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
     tz = ZoneInfo("America/Los_Angeles")
-    # Today + 6 days = 7-day solar forecast window
-    forecast_dates = [(datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 7)]
+    # Today + 7 days = 8-day solar window, matching the temperature grid above
+    # column-for-column. Google's 240-hour pull covers ~10 days, so all 8 days
+    # come from MetNet-3 cloud cover.
+    SOLAR_FORECAST_DAYS = 8
+    forecast_dates = [
+        (datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d')
+        for i in range(0, SOLAR_FORECAST_DAYS)
+    ]
 
     # Build duck curve data
     duck_data = {d: [] for d in forecast_dates}
@@ -1063,12 +1114,16 @@ def generate_excel_report(
             logger.debug(f"[generate_excel_report] Error processing Google hour: {e}")
             continue
 
-    # Pass 2: Fill missing hours from df_analyzed (Open-Meteo shortwave_radiation
-    # via UncannyEngine, with fog/smoke penalties already applied).
-    # This was previously today-only; now covers all 7 forecast dates so the
-    # solar grid renders fully even when Google MetNet-3 is unavailable (403/etc).
+    google_solar_cells = sum(len(v) for v in duck_data.values())
+    total_solar_cells = len(forecast_dates) * 8  # 8 duck-curve hours per day
+
+    # Pass 2: EMERGENCY FALLBACK ONLY. Fill any hour Google didn't cover using
+    # df_analyzed (Open-Meteo shortwave radiation via UncannyEngine, with
+    # fog/smoke penalties applied). With the 240-hour Google pull this should
+    # fill zero cells - if it fills any, Google was degraded for those hours and
+    # the warning below says so.
     if df_analyzed is not None and not df_analyzed.empty:
-        # Index df_analyzed by (date_str, hour) for O(1) lookup instead of 7 full scans
+        # Index df_analyzed by (date_str, hour) for O(1) lookup instead of full scans
         analyzed_by_dh: Dict[Tuple[str, int], Any] = {}
         for _, row in df_analyzed.iterrows():
             try:
@@ -1123,10 +1178,17 @@ def generate_excel_report(
             duck_data[date_str].sort(key=lambda x: x['hour'])
 
         if filled_from_om:
-            logger.info(
-                f"[generate_excel_report] Solar grid: filled {filled_from_om} hour-cells "
-                f"from Open-Meteo (Google MetNet-3 unavailable for those slots)"
+            logger.warning(
+                f"[generate_excel_report] Solar grid: {filled_from_om} hour-cells fell back "
+                f"to Open-Meteo - Google MetNet-3 had no cloud data for those slots"
             )
+
+    google_pct = (google_solar_cells / total_solar_cells * 100) if total_solar_cells else 0.0
+    logger.info(
+        f"[generate_excel_report] Solar grid source mix: {google_solar_cells}/{total_solar_cells} "
+        f"cells from Google MetNet-3 ({google_pct:.0f}%), "
+        f"{total_solar_cells - google_solar_cells} from Open-Meteo/empty"
+    )
 
     # Solar header row (shifted right by 1 so DATE lands in wide col D)
     SOLAR_HEADER_ROW = 27

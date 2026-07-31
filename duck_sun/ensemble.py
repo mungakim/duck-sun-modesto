@@ -87,12 +87,16 @@ class WeightedEnsembleEngine:
         unit: str = "C"
     ) -> ConsensusResult:
         """
-        Compute weighted median consensus with outlier detection and Google Veto.
+        Compute weighted median consensus with outlier detection.
 
-        The Google Veto Guardrail:
-        - If Google deviates >10°F from the peer median, demote weight 6.0 -> 2.0
-        - If Google deviates >6°F from the peer median, demote weight 6.0 -> 3.0
-        - This prevents Google "hallucinations" from crashing the forecast
+        Google is never demoted. It holds weight 6.0 in every hour regardless of
+        how far it sits from the peer median, per the Jul 2026 calibration
+        decision: Google (MetNet-3) has consistently been the most accurate
+        source, so a disagreement with its peers is evidence against the peers,
+        not against Google.
+
+        Deviation is still measured and reported in diagnostics for
+        observability, but it no longer changes any weight.
 
         Args:
             sources: Dict mapping source name to temperature value (or None)
@@ -116,35 +120,26 @@ class WeightedEnsembleEngine:
                 diagnostics={"error": "No valid sources"}
             )
 
-        # === GOOGLE VETO GUARDRAIL ===
-        # Calculate "Peer Median" (everyone EXCEPT Google)
+        # === GOOGLE DEVIATION TRACKING (observability only - NEVER demotes) ===
+        # Google keeps weight 6.0 unconditionally. We still measure how far it
+        # sits from the peer median so the divergence is visible in diagnostics,
+        # but that measurement no longer touches any weight.
         peers = [v for k, v in valid_sources.items() if k != "Google" and v is not None]
         peer_median = np.median(peers) if peers else None
 
-        # Working copy of weights (may be modified by veto)
         current_weights = self.SOURCE_WEIGHTS.copy()
-        google_veto_triggered = False
+        google_veto_triggered = False       # Retained for diagnostics schema; always False
         google_veto_severity = None
 
         google_val = valid_sources.get("Google")
+        google_peer_delta_f = None
         if google_val is not None and peer_median is not None and len(peers) >= 2:
-            # Check deviation (convert to F for intuitive threshold)
-            delta_c = abs(google_val - peer_median)
-            delta_f = delta_c * 1.8  # Convert C to F
-
-            if delta_f > 10.0:
-                logger.warning(f"[WeightedEnsembleEngine] GOOGLE VETO TRIGGERED! "
-                             f"Deviation {delta_f:.1f}F from peer median. "
-                             f"Demoting weight 6.0 -> 2.0")
-                current_weights["Google"] = 2.0
-                google_veto_triggered = True
-                google_veto_severity = "CRITICAL"
-            elif delta_f > 6.0:
-                logger.warning(f"[WeightedEnsembleEngine] Google deviating {delta_f:.1f}F "
-                             f"from peer median. Demoting weight 6.0 -> 3.0")
-                current_weights["Google"] = 3.0
-                google_veto_triggered = True
-                google_veto_severity = "MODERATE"
+            google_peer_delta_f = abs(google_val - peer_median) * 1.8  # C delta -> F
+            if google_peer_delta_f > 10.0:
+                logger.debug(
+                    f"[WeightedEnsembleEngine] Google {google_peer_delta_f:.1f}F from peer "
+                    f"median - keeping full weight 6.0 (peers are the suspect ones)"
+                )
 
         # Convert to arrays for calculation
         source_names = list(valid_sources.keys())
@@ -206,8 +201,9 @@ class WeightedEnsembleEngine:
             "unit": unit,
             "outlier_count": len(outliers),
             "raw_values": dict(valid_sources),
-            "google_veto_triggered": google_veto_triggered,
-            "google_veto_severity": google_veto_severity,
+            "google_veto_triggered": google_veto_triggered,   # Always False - veto removed Jul 2026
+            "google_veto_severity": google_veto_severity,     # Always None - veto removed Jul 2026
+            "google_peer_delta_f": google_peer_delta_f,       # Observability only, never acted on
             "peer_median": peer_median,
             "effective_weights": {name: current_weights.get(name, 1.0) for name in source_names}
         }

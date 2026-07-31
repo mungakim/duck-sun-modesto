@@ -4,7 +4,7 @@ Uncanny Engine for Duck Sun Modesto
 Architecture:
 1. Thermodynamics: WEIGHTED ENSEMBLE
    Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
-2. Energy: Open-Meteo (Physics) + Google Cloud Timing (Hybrid Solar)
+2. Energy: Google MetNet-3 cloud cover (Open-Meteo radiation only as fallback)
 3. Logic Override: NOAA Text Narratives ("Dense Fog") force the model's hand.
 4. Variance Detection: Flags high spread (>10°F) with WARN-ONLY alerts (never blocks)
 
@@ -35,7 +35,7 @@ class UncannyEngine:
     Temperature consensus: 8-source weighted ensemble
       Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) >
       NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
-    Solar physics: Open-Meteo radiation + Google cloud timing (hybrid)
+    Solar physics: Google MetNet-3 cloud cover (Open-Meteo is fallback only)
     Logic override: NOAA text narratives trigger fog probability boosts
     Variance detection: Flags high spread (>10°F) with WARN-ONLY alerts
 
@@ -462,6 +462,8 @@ class UncannyEngine:
         lock_in_hours = 0
         smoke_hours_detected = 0
         hybrid_solar_used = 0
+        google_solar_used = 0      # Hours whose irradiance came from Google clouds
+        om_solar_fallback = 0      # Hours that had to fall back to Open-Meteo
 
         for idx, row in df.iterrows():
             hour = row['time'].hour
@@ -479,11 +481,13 @@ class UncannyEngine:
             if row_time.tzinfo is not None:
                 row_time = row_time.replace(tzinfo=None)
 
-            google_cloud = google_cloud_map.get(row_time, 50)
+            # None (not 50) when Google has no reading for this hour - a
+            # placeholder would be indistinguishable from a real 50% sky and
+            # would stop calculate_hybrid_solar from falling back to Open-Meteo.
+            google_cloud = google_cloud_map.get(row_time)
             om_radiation = row.get('radiation', 0)
 
-            # Calculate hybrid solar using the new physics module
-            if om_radiation > 0 or google_cloud < 100:
+            if google_cloud is not None or om_radiation > 0:
                 hybrid_watts = calculate_hybrid_solar(
                     om_radiation=om_radiation,
                     google_cloud=google_cloud,
@@ -491,10 +495,15 @@ class UncannyEngine:
                     day_of_year=day_of_year
                 )
                 df.at[idx, 'solar_adjusted'] = hybrid_watts
-                df.at[idx, 'hybrid_source'] = "Hybrid (OM+Google)"
+                if google_cloud is not None:
+                    df.at[idx, 'hybrid_source'] = "Google (MetNet-3)"
+                    google_solar_used += 1
+                else:
+                    df.at[idx, 'hybrid_source'] = "Open-Meteo (fallback)"
+                    om_solar_fallback += 1
                 hybrid_solar_used += 1
             else:
-                # No data available - use radiation as-is
+                # No data from either source
                 df.at[idx, 'solar_adjusted'] = om_radiation
 
             # === 2. SMOKE GUARD (Applies 24/7) ===
@@ -578,7 +587,17 @@ class UncannyEngine:
                         df.at[idx, 'risk_level'] = "MODERATE (RISK)"
 
         # Final summary logging
-        logger.info(f"[UncannyEngine] Hybrid solar calculations: {hybrid_solar_used} hours processed")
+        total_solar = google_solar_used + om_solar_fallback
+        google_pct = (google_solar_used / total_solar * 100) if total_solar else 0.0
+        logger.info(
+            f"[UncannyEngine] Solar source mix: {google_solar_used} hours Google (MetNet-3), "
+            f"{om_solar_fallback} hours Open-Meteo fallback ({google_pct:.0f}% Google)"
+        )
+        if om_solar_fallback:
+            logger.warning(
+                f"[UncannyEngine] {om_solar_fallback} solar hours had no Google cloud data "
+                "and fell back to Open-Meteo radiation"
+            )
         if tule_fog_hours > 0:
             logger.warning(f"[UncannyEngine] TULE FOG ALERT: {tule_fog_hours} hours with Central Valley radiation fog")
         if lock_in_hours > 0:

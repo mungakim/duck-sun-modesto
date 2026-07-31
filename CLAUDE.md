@@ -133,7 +133,7 @@ The PDF report includes:
 - MID Weather 48-hour summary with historical records
 - Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
 - Portland, OR side-reference row (single Hi/Lo line, Google Weather, excluded from the Modesto consensus)
-- 3-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions
+- 8-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions, 100% Google MetNet-3
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
 ## Calibration Status (Jan 15, 2026)
@@ -204,6 +204,70 @@ If weather.com temps in the report don't match the website:
 5. Both weather_com.py and wunderground.py use curl_cffi — if one fails, the other likely does too
 6. If firewall is blocking connections, contact IT Systems (Scott Bays) for domain whitelisting
 
+## Google-First Policy (Jul 2026)
+
+Google Weather (MetNet-3) is the preferred source **everywhere on the report
+except the word-descriptor row**. Three rules follow from that:
+
+**1. Google is never demoted.** `ensemble.py` used to run a "Google Veto"
+that dropped Google's weight 6.0 -> 3.0 at >6°F deviation from the peer median,
+and 6.0 -> 2.0 at >10°F. That is gone. Google holds weight 6.0 in every hour,
+unconditionally. The deviation is still measured and reported in
+`diagnostics["google_peer_delta_f"]` for observability, but nothing acts on it.
+Rationale: Google has consistently been the most accurate source, so a
+disagreement with its peers is evidence against the peers.
+`google_veto_triggered` / `google_veto_severity` remain in the diagnostics dict
+(always `False` / `None`) so downstream consumers don't break.
+
+**2. Solar is Google-first, not a hybrid.** `calculate_hybrid_solar()` keeps its
+name but is no longer a blend. Priority is now:
+   1. Google MetNet-3 cloud cover against the clear-sky ceiling
+   2. Open-Meteo shortwave radiation — **only** when Google has no value for
+      that hour (`google_cloud is None`)
+   3. Zero
+
+   Pass `None`, never a placeholder like `50`, when Google has no reading — a
+   default is indistinguishable from a real 50% sky and silently fabricates a
+   half-clouded hour. `uncanniness.py` uses `google_cloud_map.get(row_time)`
+   with no default for exactly this reason.
+
+   The Excel grid and the physics engine now share one irradiance model
+   (`solar_physics.calculate_solar_from_cloud_cover`), so the grid and the JSON
+   outlook can't drift apart. Watch for these log lines:
+   - `Solar grid source mix: 64/64 cells from Google MetNet-3 (100%)`
+   - `Solar source mix: N hours Google (MetNet-3), 0 hours Open-Meteo fallback`
+
+   Any Open-Meteo fallback logs at WARNING level — it means Google was degraded.
+
+**3. Word descriptors come from Weather.com.** This is the deliberate exception.
+Priority is `Weather.com > AccuWeather > Google > Open-Meteo`. Weather.com's
+`daypart[0].wxPhraseLong` is verbose, so `fit_condition_text()` abbreviates
+known long phrases and otherwise drops whole trailing words — never cuts
+mid-word (the old hard truncation produced `"Sunshine And C"`). Add new
+phrasings to `CONDITION_ABBREVIATIONS` in `excel_report.py` as they show up.
+
+**PRECIP % is still Weather.com-primary**, deliberately, per the Feb 2026
+stale-data incident documented below — that row must match the weather.com
+website 1:1. Google remains the first fallback.
+
+## Google Weather API Limits (verified Jul 2026)
+
+There is **no tier system that affects forecast length**. The Weather API is a
+single per-call SKU:
+
+| | |
+|---|---|
+| Free allowance | 10,000 calls/month per SKU |
+| Overage | $0.15 per 1,000 calls |
+| Default rate limit | 6,000 queries/minute per project (adjustable in Cloud Console) |
+| Forecast horizon | `hours` = 1..240 on `forecast/hours:lookup`, independent of spend |
+
+Current usage: 10 paginated calls for Modesto + 10 for Portland = **20 per run**.
+At one run/day that's ~600/month against a 10,000 free allowance — about 6%, at
+no cost. Room for ~16 runs/day before billing starts. A pay-as-you-go project
+needs billing *enabled* (a card on file) even while inside the free allowance;
+that is not a "tier", just Google's activation requirement.
+
 ## Portland, OR Side Reference (Jul 2026)
 
 The Excel one-pager carries a single Portland, OR Hi/Lo line directly beneath the
@@ -229,8 +293,8 @@ Modesto block and above the solar grid. It is a **reference only**:
 | 13-19 | The 7 Modesto sources (weighted-average formula range) |
 | 20-22 | Wtd. Average, PRECIP %, precip source note |
 | **23-24** | **Portland, OR banner + Hi/Lo reference row** |
-| 26-41 | Solar forecast title, header, 7 days x 2 rows |
-| 43 | Solar legend |
+| 26-43 | Solar forecast title, header, 8 days x 2 rows |
+| 45 | Solar legend |
 
 Row numbers 20 and 13-19 are asserted by `tests/test_excel_report_formulas.py`;
 the Portland band and the shifted solar block are asserted by
