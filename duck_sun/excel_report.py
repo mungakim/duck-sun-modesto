@@ -1000,12 +1000,16 @@ def generate_excel_report(
     note_cell.alignment = Alignment(horizontal='right', vertical='center')
 
     # =====================
-    # PORTLAND, OR REFERENCE (rows 23-24)
-    # Deliberately its own two-row band with a teal palette so it reads as a
+    # PORTLAND, OR REFERENCE (rows 23-25)
+    # Deliberately its own three-row band with a teal palette so it reads as a
     # separate location, not another Modesto source. Not in the weighted avg.
+    # The day-name row repeats row 11's labels: by this point the reader is a
+    # dozen rows below the Modesto header and shouldn't have to scroll back up
+    # to work out which column is which day.
     # =====================
     PORTLAND_BANNER_ROW = 23
-    PORTLAND_DATA_ROW = 24
+    PORTLAND_DAYS_ROW = 24
+    PORTLAND_DATA_ROW = 25
     PORTLAND_DARK = "1F6E6E"
     PORTLAND_LIGHT = "DCEDED"
 
@@ -1020,6 +1024,30 @@ def generate_excel_report(
     portland_banner.alignment = center_align
     for c in range(1, 19):
         ws[f'{col(c)}{PORTLAND_BANNER_ROW}'].border = thin_border
+
+    # Day-name row - same labels and column spans as the Modesto header (row 11)
+    ws.merge_cells(f'{col(1)}{PORTLAND_DAYS_ROW}:{col(2)}{PORTLAND_DAYS_ROW}')
+    portland_days_label = ws[f'{col(1)}{PORTLAND_DAYS_ROW}']
+    portland_days_label.value = "Hi / Lo °F"
+    portland_days_label.fill = PatternFill(start_color=PORTLAND_DARK, end_color=PORTLAND_DARK, fill_type="solid")
+    portland_days_label.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
+    portland_days_label.alignment = center_align
+    portland_days_label.border = thin_border
+    ws[f'{col(2)}{PORTLAND_DAYS_ROW}'].border = thin_border
+
+    for i, day in enumerate(om_daily):
+        label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
+        col_hi = col(3 + i * 2)
+        col_lo = col(4 + i * 2)
+
+        ws.merge_cells(f'{col_hi}{PORTLAND_DAYS_ROW}:{col_lo}{PORTLAND_DAYS_ROW}')
+        cell = ws[f'{col_hi}{PORTLAND_DAYS_ROW}']
+        cell.value = label
+        cell.fill = PatternFill(start_color=PORTLAND_DARK, end_color=PORTLAND_DARK, fill_type="solid")
+        cell.font = Font(name='Arial', size=8, bold=True, color='FFFFFF')
+        cell.alignment = center_align
+        cell.border = thin_border
+        ws[f'{col_lo}{PORTLAND_DAYS_ROW}'].border = thin_border
 
     ws.merge_cells(f'{col(1)}{PORTLAND_DATA_ROW}:{col(2)}{PORTLAND_DATA_ROW}')
     portland_label = ws[f'{col(1)}{PORTLAND_DATA_ROW}']
@@ -1054,15 +1082,15 @@ def generate_excel_report(
     # =====================
     # SOLAR FORECAST GRID (also centered)
     # =====================
-    grid_row = 26
+    grid_row = 27
     ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST - W/m² Irradiance (Google MetNet-3)"
     ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
     tz = ZoneInfo("America/Los_Angeles")
-    # Today + 7 days = 8-day solar window, matching the temperature grid above
-    # column-for-column. Google's 240-hour pull covers ~10 days, so all 8 days
-    # come from MetNet-3 cloud cover.
-    SOLAR_FORECAST_DAYS = 8
+    # Today + 6 days = 7-day solar window. Deliberately one day shorter than the
+    # 8-day temperature grid to keep the one-pager compact; Google's 240-hour
+    # pull could cover 10, so this is a layout choice, not a data limit.
+    SOLAR_FORECAST_DAYS = 7
     forecast_dates = [
         (datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d')
         for i in range(0, SOLAR_FORECAST_DAYS)
@@ -1191,7 +1219,7 @@ def generate_excel_report(
     )
 
     # Solar header row (shifted right by 1 so DATE lands in wide col D)
-    SOLAR_HEADER_ROW = 27
+    SOLAR_HEADER_ROW = 28
     grid_row = SOLAR_HEADER_ROW
     header_labels = ['DATE', '9AM', '10', '11', '12PM', '1', '2', '3', '4PM']
     for col_idx, label in enumerate(header_labels):

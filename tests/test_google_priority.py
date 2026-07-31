@@ -197,23 +197,26 @@ def test_descriptors_fall_back_when_weather_com_is_missing(tmp_path: Path):
     assert ws["Q10"].value == "Sunny"                 # Google covers the outer days
 
 
-def test_solar_grid_spans_eight_days_matching_the_temperature_grid(tmp_path: Path):
+def test_solar_grid_spans_seven_days(tmp_path: Path):
+    """7 days, one shorter than the 8-day temperature grid, to stay compact."""
     ws = _report(tmp_path)
-    assert ws["D27"].value == "DATE"
-    # 8 days x 2 rows starting at 28 => last descriptor row is 43
-    for date_idx in range(8):
-        row = 28 + date_idx * 2
+    assert ws["D28"].value == "DATE"
+    # 7 days x 2 rows starting at 29 => last descriptor row is 42
+    for date_idx in range(7):
+        row = 29 + date_idx * 2
         assert ws[f"D{row}"].value, f"Solar day row {row} is empty"
         assert isinstance(ws[f"E{row}"].value, int), f"No irradiance value at E{row}"
-    # Legend sits one blank row below the block
-    assert ws["E45"].value == "Tule Fog"
+
+    # Nothing beyond day 7, and the legend sits one blank row below the block
+    assert ws["D43"].value in (None, ""), "An 8th solar day leaked back in"
+    assert ws["E44"].value == "Tule Fog"
 
 
 def test_solar_grid_is_entirely_google_when_google_hourly_is_complete(tmp_path: Path):
     """No Open-Meteo fill should be needed with the 240-hour pull."""
     ws = _report(tmp_path, df_analyzed=None)
-    for date_idx in range(8):
-        row = 28 + date_idx * 2
+    for date_idx in range(7):
+        row = 29 + date_idx * 2
         for col_letter in "EFGHIJKL":
             assert ws[f"{col_letter}{row}"].value, (
                 f"{col_letter}{row} empty - Google should have covered every cell"

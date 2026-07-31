@@ -11,9 +11,10 @@ from openpyxl import load_workbook
 from duck_sun.excel_report import generate_excel_report
 
 PORTLAND_BANNER_ROW = 23
-PORTLAND_DATA_ROW = 24
-SOLAR_TITLE_ROW = 26
-SOLAR_HEADER_ROW = 27
+PORTLAND_DAYS_ROW = 24
+PORTLAND_DATA_ROW = 25
+SOLAR_TITLE_ROW = 27
+SOLAR_HEADER_ROW = 28
 
 
 def _inputs(days=8):
@@ -77,6 +78,35 @@ def test_portland_row_renders_high_low_for_every_day_column(tmp_path: Path):
     letters = "EFGHIJKLMNOPQRST"
     actual = [ws[f"{c}{PORTLAND_DATA_ROW}"].value for c in letters]
     assert actual == expected, f"Portland row mismatch: {actual}"
+
+
+def test_day_names_repeat_directly_above_the_portland_temps(tmp_path: Path):
+    """The Modesto header is a dozen rows up; Portland needs its own day labels."""
+    _, _, portland_data, _ = _inputs()
+    ws = _render(tmp_path, portland_data)
+
+    # Day 0 is always TODAY; the rest are 3-letter day abbreviations
+    assert ws[f"E{PORTLAND_DAYS_ROW}"].value == "TODAY"
+    for col_letter in ("G", "I", "K", "M", "O", "Q", "S"):
+        label = ws[f"{col_letter}{PORTLAND_DAYS_ROW}"].value
+        assert isinstance(label, str) and len(label) == 3 and label.isupper(), (
+            f"{col_letter}{PORTLAND_DAYS_ROW} = {label!r}; expected a 3-letter day"
+        )
+
+    # Sits between the banner and the temps, not on top of either
+    assert PORTLAND_BANNER_ROW < PORTLAND_DAYS_ROW < PORTLAND_DATA_ROW
+    assert ws[f"C{PORTLAND_DATA_ROW}"].value == "PORTLAND, OR"
+
+
+def test_portland_day_labels_align_with_the_modesto_header(tmp_path: Path):
+    """Same column spans as row 11, so the two rows read as one grid."""
+    _, _, portland_data, _ = _inputs()
+    ws = _render(tmp_path, portland_data)
+
+    for col_letter in ("E", "G", "I", "K", "M", "O", "Q", "S"):
+        assert ws[f"{col_letter}{PORTLAND_DAYS_ROW}"].value == ws[f"{col_letter}11"].value, (
+            f"{col_letter}: Portland day label disagrees with the Modesto header"
+        )
 
 
 def test_portland_is_labelled_and_marked_reference_only(tmp_path: Path):
