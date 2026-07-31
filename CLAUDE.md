@@ -133,7 +133,7 @@ The PDF report includes:
 - MID Weather 48-hour summary with historical records
 - Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
 - Portland, OR side-reference row (single Hi/Lo line, Google Weather, excluded from the Modesto consensus)
-- 8-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions, 100% Google MetNet-3
+- 7-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions, 100% Google MetNet-3
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
 ## Calibration Status (Jan 15, 2026)
@@ -278,7 +278,10 @@ Modesto block and above the solar grid. It is a **reference only**:
 - Portland shares Modesto's Pacific timezone, so its calendar-day highs/lows
   line up column-for-column with the Modesto grid - no date shifting
 - **Never** enters the weighted average. The consensus formula still spans only
-  source rows 13-19; Portland lives on row 24
+  source rows 13-19; Portland lives on row 25
+- Carries its own repeated day-name row (row 24). By that point the reader is a
+  dozen rows below the Modesto header, so the labels are repeated rather than
+  making them scroll back up to map columns to days
 - Uses its own cache key (`google_portland`), so a Portland fetch can never
   overwrite the Modesto Last Known Good data
 - Non-critical: a missing Portland forecast logs a warning and blanks the row
@@ -292,9 +295,9 @@ Modesto block and above the solar grid. It is a **reference only**:
 | 10-12 | Condition descriptors, day names, dates |
 | 13-19 | The 7 Modesto sources (weighted-average formula range) |
 | 20-22 | Wtd. Average, PRECIP %, precip source note |
-| **23-24** | **Portland, OR banner + Hi/Lo reference row** |
-| 26-43 | Solar forecast title, header, 8 days x 2 rows |
-| 45 | Solar legend |
+| **23-25** | **Portland, OR banner + day names + Hi/Lo reference row** |
+| 27-42 | Solar forecast title, header, 7 days x 2 rows |
+| 44 | Solar legend |
 
 Row numbers 20 and 13-19 are asserted by `tests/test_excel_report_formulas.py`;
 the Portland band and the shifted solar block are asserted by
