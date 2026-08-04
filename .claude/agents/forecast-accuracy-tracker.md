@@ -45,7 +45,7 @@ Where accuracy_multiplier rewards sources beating the ensemble average.
 ## Current Base Weights (from CLAUDE.md)
 - NWS: 5x
 - AccuWeather: 3x
-- Met.no/Weather.com: 3x (note: track Weather.com specifically)
+- Weather.com: 4x (note: track Weather.com specifically)
 - Open-Meteo: 1x
 
 ## Data Storage Requirements

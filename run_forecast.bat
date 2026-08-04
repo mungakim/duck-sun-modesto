@@ -7,7 +7,7 @@ ECHO ========================================================
 ECHO    MODESTO SOLAR TRIANGULATION ENGINE
 ECHO    Duck Sun Modesto: Uncanny Edition
 ECHO ========================================================
-ECHO    [SOURCES] Open-Meteo + NWS + Met.no + METAR
+ECHO    [SOURCES] Open-Meteo + NWS + AccuWeather + Google + METAR
 ECHO.
 
 :: Change to script directory

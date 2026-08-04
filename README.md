@@ -22,7 +22,7 @@ run_duck_sun.bat (or GitHub Action at 4:55 AM)
          │
     ┌────┴────┬────────┬────────┬────────┬────────┬────────┬────────┐
     ▼         ▼        ▼        ▼        ▼        ▼        ▼        ▼
- Open-     HRRR      NWS    Met.no   Accu    Weather  MID.org  Smoke
+ Open-     HRRR      NWS     Accu    Weather  MID.org
  Meteo    (3km)    (govt)  (ECMWF)  Weather   .com    (local)   AQI
 (fresh)  (1hr     (fresh) (fresh)  (42/day (6hr    (cached)  (fresh)
          cache)                    limit)   cache)
@@ -47,7 +47,6 @@ run_duck_sun.bat (or GitHub Action at 4:55 AM)
 | Open-Meteo | Unlimited | Fresh every run | Primary model (GFS/ICON/GEM) |
 | HRRR | Unlimited | 1 hour cache | High-res 3km, 15-min updates |
 | NWS | Unlimited | Fresh every run | US govt official forecast |
-| Met.no | Unlimited | Fresh every run | European ECMWF model |
 | AccuWeather | **50/day** | **42 calls/day then locks** | After 42nd call, uses cache until midnight |
 | Weather.com | N/A | 6 hours | JS-rendered, manual cache |
 | MID.org | Unknown | Cached | Local Modesto microclimate |

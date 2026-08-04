@@ -57,7 +57,6 @@ DAY_COLORS = [
 SOURCE_WEIGHT_DISPLAY = {
     'OPEN-METEO': '1.0',
     'NOAA (GOV)': '3.0',
-    'MET.NO (EU)': '3.0',
     'ACCUWEATHER': '4.0',
     'WEATHER.COM': '4.0',
     'WUNDERGRND': '4.0',
@@ -82,7 +81,6 @@ def create_thin_border():
 def generate_xlsx_report(
     om_data: Dict,
     noaa_data: Optional[List],
-    met_data: Optional[List],
     accu_data: Optional[List],
     google_data: Optional[Dict] = None,
     weather_com_data: Optional[List] = None,
@@ -111,7 +109,6 @@ def generate_xlsx_report(
 
     # Process data sources (same as PDF)
     om_daily = om_data.get('daily_forecast', [])[:8]
-    met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
 
     # PRIORITY: Use NOAA Period Data if available (matches website)
     if noaa_daily_periods:
@@ -320,7 +317,6 @@ def generate_xlsx_report(
         hi_vals = [
             day.get('high_f'),
             noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             weather_com_daily.get(k, {}).get('high_f'),
             wunderground_daily.get(k, {}).get('high_f'),
@@ -478,20 +474,16 @@ def generate_xlsx_report(
                     lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')), 1)
     current_row += 1
 
-    write_source_row(current_row, 'MET.NO (EU)',
-                    lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2)
-    current_row += 1
-
     write_source_row(current_row, 'ACCUWEATHER',
-                    lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3)
+                    lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 2)
     current_row += 1
 
     write_source_row(current_row, 'WEATHER.COM',
-                    lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 4)
+                    lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 3)
     current_row += 1
 
     write_source_row(current_row, 'WUNDERGRND',
-                    lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 5)
+                    lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 4)
     current_row += 1
 
     write_source_row(current_row, 'GOOGLE (AI)',
@@ -521,7 +513,6 @@ def generate_xlsx_report(
         hi_vals = [
             day.get('high_f'),
             noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             weather_com_daily.get(k, {}).get('high_f'),
             wunderground_daily.get(k, {}).get('high_f'),
@@ -530,7 +521,6 @@ def generate_xlsx_report(
         lo_vals = [
             day.get('low_f'),
             noaa_daily.get(k, {}).get('low_f'),
-            met_daily.get(k, {}).get('low_f'),
             accu_daily.get(k, {}).get('low_f'),
             weather_com_daily.get(k, {}).get('low_f'),
             wunderground_daily.get(k, {}).get('low_f'),
@@ -804,7 +794,6 @@ if __name__ == "__main__":
     import asyncio
     from duck_sun.providers.open_meteo import fetch_open_meteo
     from duck_sun.providers.noaa import NOAAProvider
-    from duck_sun.providers.met_no import MetNoProvider
     from duck_sun.providers.accuweather import AccuWeatherProvider
     from duck_sun.uncanniness import UncannyEngine
     from dotenv import load_dotenv
@@ -820,14 +809,12 @@ if __name__ == "__main__":
         noaa = NOAAProvider()
         noaa_data = await noaa.fetch_async()
 
-        met = MetNoProvider()
-        met_data = await met.fetch_async()
 
         accu = AccuWeatherProvider()
         accu_data = await accu.fetch_forecast()
 
         engine = UncannyEngine()
-        df = engine.normalize_temps(om_data, noaa_data, met_data)
+        df = engine.normalize_temps(om_data, noaa_data)
         df_analyzed = engine.analyze_duck_curve(df)
 
         critical = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
@@ -835,7 +822,6 @@ if __name__ == "__main__":
         xlsx_path = generate_xlsx_report(
             om_data=om_data,
             noaa_data=noaa_data,
-            met_data=met_data,
             accu_data=accu_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical

@@ -111,7 +111,7 @@ If the task fails:
    - Installs/updates requirements
    - Runs `main.py`
 3. **Python script:**
-   - Fetches Open-Meteo, NWS, Met.no, METAR
+   - Fetches Open-Meteo, NWS, AccuWeather, Google Weather, METAR
    - Builds consensus temperature model
    - Runs Fog Guard analysis with Pre-Dawn Lock-in
    - Detects any critical fog events
@@ -220,7 +220,6 @@ mkdir "c:\Professional Projects\duck-sun-modesto\logs"
 The system calls these endpoints:
 - `api.open-meteo.com` (weather data)
 - `api.weather.gov` (NWS forecast)
-- `api.met.no` (European model)
 - `tgftp.nws.noaa.gov` (METAR observations)
 - `dataservice.accuweather.com` (AccuWeather forecast)
 - `weather.googleapis.com` (Google Weather / MetNet-3)

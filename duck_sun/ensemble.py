@@ -16,7 +16,6 @@ WEIGHTS (Calibrated Jan 2026):
 - Weather.com: 4.0 (The Weather Channel - scraped)
 - WUnderground: 4.0 (Weather Underground/IBM - scraped)
 - NOAA: 3.0 (Government source)
-- Met.no: 3.0 (ECMWF model)
 - MID.org: 2.0 (Local microclimate)
 - Open-Meteo: 1.0 (Fallback)
 
@@ -51,7 +50,7 @@ class WeightedEnsembleEngine:
     Weighted ensemble engine for temperature consensus.
 
     Uses weighted median to compute consensus while respecting
-    source hierarchy (AccuWeather > NOAA > Met.no > Open-Meteo).
+    source hierarchy (Google > AccuWeather > NOAA > Open-Meteo).
 
     Outliers are flagged but NOT excluded from consensus - this
     is a "warn only" system that never blocks operations.
@@ -64,7 +63,6 @@ class WeightedEnsembleEngine:
         "Weather.com": 4.0,   # The Weather Channel (scraped)
         "WUnderground": 4.0,  # Weather Underground/IBM (scraped)
         "NOAA": 3.0,          # Government source
-        "Met.no": 3.0,        # ECMWF model
         "MID.org": 2.0,       # Local microclimate
         "Open-Meteo": 1.0,    # Fallback
     }
@@ -355,7 +353,6 @@ def quick_consensus(
     accuweather: Optional[float] = None,
     weather_com: Optional[float] = None,
     wunderground: Optional[float] = None,
-    met_no: Optional[float] = None,
     mid_org: Optional[float] = None,
     open_meteo: Optional[float] = None,
     unit: str = "C"
@@ -364,7 +361,7 @@ def quick_consensus(
     Quick consensus calculation with named parameters.
 
     Example:
-        result = quick_consensus(google=7.0, noaa=7.2, met_no=8.0)
+        result = quick_consensus(google=7.0, noaa=7.2, accuweather=7.1)
         print(f"Consensus: {result.consensus_value}°C")
     """
     engine = WeightedEnsembleEngine()
@@ -374,7 +371,6 @@ def quick_consensus(
         "AccuWeather": accuweather,
         "Weather.com": weather_com,
         "WUnderground": wunderground,
-        "Met.no": met_no,
         "MID.org": mid_org,
         "Open-Meteo": open_meteo
     }
@@ -395,7 +391,6 @@ if __name__ == "__main__":
     sources_1 = {
         "NOAA": 7.2,
         "AccuWeather": 7.5,
-        "Met.no": 7.0,
         "Open-Meteo": 7.1
     }
     result_1 = engine.compute_consensus(sources_1)
@@ -408,7 +403,6 @@ if __name__ == "__main__":
     sources_2 = {
         "NOAA": 7.0,
         "AccuWeather": 8.5,
-        "Met.no": 7.2,
         "Open-Meteo": 7.5
     }
     result_2 = engine.compute_consensus(sources_2)
@@ -421,7 +415,6 @@ if __name__ == "__main__":
     sources_3 = {
         "NOAA": 2.0,      # Cold bias: -7°F
         "AccuWeather": 7.0,
-        "Met.no": 7.2,
         "Open-Meteo": 7.5
     }
     result_3 = engine.compute_consensus(sources_3)

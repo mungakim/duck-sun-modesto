@@ -33,7 +33,6 @@ load_dotenv()
 # Core providers
 from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
 from duck_sun.providers.noaa import NOAAProvider
-from duck_sun.providers.met_no import MetNoProvider
 from duck_sun.providers.accuweather import AccuWeatherProvider
 from duck_sun.providers.google_weather import GooglePortlandProvider, GoogleWeatherProvider
 from duck_sun.providers.mid_org import MIDOrgProvider
@@ -85,7 +84,6 @@ EXPECTED_DAYS = {
     "google_portland": 8,  # Same 240-hour pull for the Portland reference row
     "noaa": 5,             # Usually 7, but 5 minimum acceptable
     "open_meteo": 8,       # Baseline - always needed
-    "met_no": 6,           # Usually 8+
 }
 
 
@@ -178,17 +176,6 @@ def verify_data_completeness(results: Dict[str, 'FetchResult']) -> ValidationRes
         critical_failures.append("Open-Meteo: No data")
         day_counts["Open-Meteo"] = 0
 
-    # Met.no: Non-critical but tracked
-    met = results.get("met_no")
-    if met and met.data:
-        met_days = _count_unique_days_met(met.data)
-        day_counts["Met.no"] = met_days
-        if met_days < EXPECTED_DAYS["met_no"]:
-            warnings.append(f"Met.no: {met_days}/{EXPECTED_DAYS['met_no']} days")
-    else:
-        warnings.append("Met.no: No data")
-        day_counts["Met.no"] = 0
-
     is_acceptable = len(critical_failures) == 0
 
     return ValidationResult(
@@ -213,19 +200,6 @@ def _count_unique_days_noaa(data: List[Dict]) -> int:
     return len(dates)
 
 
-def _count_unique_days_met(data: List[Dict]) -> int:
-    """Count unique days in Met.no data."""
-    if not data or not isinstance(data, list):
-        return 0
-    dates = set()
-    for record in data:
-        if isinstance(record, dict):
-            time_str = record.get('time', '')
-            if time_str:
-                dates.add(time_str[:10])  # Extract YYYY-MM-DD
-    return len(dates)
-
-
 def get_failed_provider_names(validation: ValidationResult) -> List[str]:
     """
     Extract provider names from validation failures for retry.
@@ -237,7 +211,6 @@ def get_failed_provider_names(validation: ValidationResult) -> List[str]:
         "Google": "google_weather",
         "NOAA": "noaa",
         "Open-Meteo": "open_meteo",
-        "Met.no": "met_no",
     }
 
     failed = []
@@ -337,15 +310,6 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
         return await noaa.fetch_async()
 
     results["noaa"] = await fetch_with_retry("noaa", _fetch_noaa, cache_mgr)
-
-    # 4. Met.no (ECMWF model - weight 3x)
-    logger.info("[fetch_all_providers] Fetching Met.no...")
-
-    async def _fetch_met():
-        met = MetNoProvider()
-        return await met.fetch_async()
-
-    results["met_no"] = await fetch_with_retry("met_no", _fetch_met, cache_mgr)
 
     # 5. AccuWeather (commercial - weight 4x)
     logger.info("[fetch_all_providers] Fetching AccuWeather...")
@@ -469,12 +433,6 @@ async def retry_single_provider(
             return await provider.fetch_async()
         return await fetch_with_retry(provider_name, _fetch, cache_mgr)
 
-    elif provider_name == "met_no":
-        async def _fetch():
-            provider = MetNoProvider()
-            return await provider.fetch_async()
-        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
-
     elif provider_name == "open_meteo":
         return await fetch_with_retry(
             provider_name,
@@ -516,7 +474,7 @@ def _aggregate_hourly_to_daily(
 ) -> List[Dict]:
     """Aggregate hourly temperature records into per-date high/low dicts.
 
-    Used by synthesis to turn NOAA / Met.no hourly timelines into the
+    Used by synthesis to turn NOAA hourly timelines into the
     same shape that excel_report iterates over (`om_daily`).
     """
     from collections import defaultdict
@@ -553,17 +511,16 @@ def _synthesize_baseline_from_alternates(
     google_data: Optional[Dict],
     accu_data: Optional[List],
     noaa_data: Optional[List],
-    met_data: Optional[List]
 ) -> Optional[Dict]:
     """
     Synthesize baseline data from alternate providers when Open-Meteo fails.
 
     Builds an `om_daily`-compatible structure progressively, preferring the
     highest-accuracy source per date and extending the timeline with
-    NOAA/Met.no aggregates so the 8-day grid is always filled when any
+    NOAA aggregates so the 8-day grid is always filled when any
     source is healthy.
 
-    Per-date priority: Google > AccuWeather > NOAA aggregate > Met.no aggregate.
+    Per-date priority: Google > AccuWeather > NOAA aggregate.
     """
     daily_forecast: List[Dict] = []
     hourly: List[Dict] = []
@@ -629,13 +586,6 @@ def _synthesize_baseline_from_alternates(
     # Phase 3: NOAA hourly aggregate (extends toward 8 days)
     if len(daily_forecast) < 8 and noaa_data and isinstance(noaa_data, list):
         for entry in _aggregate_hourly_to_daily(noaa_data, 'NOAA', time_field='valid_time'):
-            if len(daily_forecast) >= 8:
-                break
-            _add_entry(entry)
-
-    # Phase 4: Met.no hourly aggregate (extends further; up to 11 days)
-    if len(daily_forecast) < 8 and met_data and isinstance(met_data, list):
-        for entry in _aggregate_hourly_to_daily(met_data, 'Met.no', time_field='time'):
             if len(daily_forecast) >= 8:
                 break
             _add_entry(entry)
@@ -728,7 +678,6 @@ async def main():
         om_data = results["open_meteo"].data
         hrrr_data = results["hrrr"].data
         noaa_data = results["noaa"].data
-        met_data = results["met_no"].data
         accu_data = results["accuweather"].data
         google_data = results["google_weather"].data
         portland_data = results["google_portland"].data
@@ -744,8 +693,7 @@ async def main():
             om_data = _synthesize_baseline_from_alternates(
                 google_data=google_data,
                 accu_data=accu_data,
-                noaa_data=noaa_data,
-                met_data=met_data
+                noaa_data=noaa_data
             )
             if om_data is None:
                 logger.error("CRITICAL: No baseline data available from any provider - cannot continue")
@@ -777,7 +725,6 @@ async def main():
         df = engine.normalize_temps(
             om_data,
             noaa_data if noaa_data else None,
-            met_data if met_data else None,
             accu_data=accu_data if accu_data else None,
             weather_com_data=weather_com_data if weather_com_data else None,
             wunderground_data=wunderground_data if wunderground_data else None,
@@ -920,7 +867,6 @@ async def main():
         excel_path = generate_excel_report(
             om_data=om_data,
             noaa_data=noaa_data,
-            met_data=met_data,
             accu_data=accu_data,
             google_data=google_data,
             portland_data=portland_data,

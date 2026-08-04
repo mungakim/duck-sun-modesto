@@ -19,7 +19,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 1. **Source Replication:** Each provider fetches from the exact same API endpoint that powers the official website, ensuring organic alignment without hardcoding.
 2. **Deterministic Solar Math:** Solar factor calculation is done in Python for 100% accuracy.
-3. **Weighted Ensemble:** Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > Met.no(3x) > Open-Meteo(1x)
+3. **Weighted Ensemble:** Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > Open-Meteo(1x)
 
 ### Data Sourcing Strategy
 
@@ -30,7 +30,6 @@ The project follows a **Source Replication** approach (not Model Approximation):
 | **Weather.com** | Web scraping (curl_cffi) | weather.com | 4x |
 | **Weather Underground** | Web scraping (curl_cffi) | wunderground.com | 4x |
 | **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website | 3x |
-| **Met.no** | Locationforecast 2.0 API (ECMWF) | Norwegian Met Institute | 3x |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) | 1x |
 
 **Google Weather (MetNet-3):** The primary source uses Google's neural weather model which fuses satellite imagery and radar data for hyperlocal predictions. Superior short-term accuracy compared to pure physics models.
@@ -129,7 +128,7 @@ Required in `.env`:
 ## PDF Report Structure
 
 The PDF report includes:
-- 8-day temperature grid from 7 sources with weighted consensus (all 7 sources now cover the full 8 days)
+- 8-day temperature grid from 6 sources with weighted consensus (all 6 sources now cover the full 8 days)
 - MID Weather 48-hour summary with historical records
 - Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
 - Portland, OR side-reference row (single Hi/Lo line, Google Weather, excluded from the Modesto consensus)
@@ -144,7 +143,6 @@ The PDF report includes:
 - **Weather.com:** Web scraping via curl_cffi - Weight: 4x
 - **Weather Underground:** Web scraping via curl_cffi - Weight: 4x
 - **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov) - Weight: 3x
-- **Met.no:** ECMWF European model via Locationforecast 2.0 API - Weight: 3x
 - **Open-Meteo:** Independent physics model (provides "second opinion") - Weight: 1x
 
 **Weight Rationale:**
@@ -181,7 +179,7 @@ The PDF report includes:
 **CacheManager-level (cache_manager.py):**
 - Per-provider `MAX_CACHE_HOURS` thresholds enforced:
   - 18h: weather_com, wunderground, accuweather, google_weather
-  - 24h: noaa, met_no, open_meteo
+  - 24h: noaa, open_meteo
   - 12h: hrrr
   - 48h: mid_org
 - Cache exceeding max age is **rejected** — falls through to DEFAULT values
@@ -278,8 +276,8 @@ Modesto block and above the solar grid. It is a **reference only**:
 - Portland shares Modesto's Pacific timezone, so its calendar-day highs/lows
   line up column-for-column with the Modesto grid - no date shifting
 - **Never** enters the weighted average. The consensus formula still spans only
-  source rows 13-19; Portland lives on row 25
-- Carries its own repeated day-name row (row 24). By that point the reader is a
+  source rows 13-18; Portland lives on row 24
+- Carries its own repeated day-name row (row 23). By that point the reader is a
   dozen rows below the Modesto header, so the labels are repeated rather than
   making them scroll back up to map columns to days
 - Uses its own cache key (`google_portland`), so a Portland fetch can never
@@ -293,12 +291,39 @@ Modesto block and above the solar grid. It is a **reference only**:
 |------|---------|
 | 1-8 | Title, timestamp, PGE CITYGATE / MID GAS NOM, MID 48-hour summary |
 | 10-12 | Condition descriptors, day names, dates |
-| 13-19 | The 7 Modesto sources (weighted-average formula range) |
-| 20-22 | Wtd. Average, PRECIP %, precip source note |
-| **23-25** | **Portland, OR banner + day names + Hi/Lo reference row** |
-| 27-42 | Solar forecast title, header, 7 days x 2 rows |
-| 44 | Solar legend |
+| 13-18 | The 6 Modesto sources (weighted-average formula range) |
+| 19-21 | Wtd. Average, PRECIP %, precip source note |
+| **22-24** | **Portland, OR banner + day names + Hi/Lo reference row** |
+| 26-41 | Solar forecast title, header, 7 days x 2 rows |
+| 43 | Solar legend |
 
-Row numbers 20 and 13-19 are asserted by `tests/test_excel_report_formulas.py`;
+## Removed Sources
+
+**Met.no (removed Jul 2026).** The Norwegian Met Institute / ECMWF feed was
+dropped as a data source: it was consistently among the worst performers, and
+it was the source most often flagged as an outlier in the hourly variance logs.
+The ensemble is now **6 sources**, not 7:
+
+| Excel row | Source | Weight |
+|-----------|--------|--------|
+| 13 | OPEN-METEO | 1 |
+| 14 | NOAA (GOV) | 3 |
+| 15 | ACCUWEATHER | 4 |
+| 16 | WEATHER.COM | 4 |
+| 17 | WUNDERGRND | 4 |
+| 18 | GOOGLE (AI) | 6 |
+
+The weighted-average formula spans `13:18` with the array `{1;3;4;4;4;6}`.
+`duck_sun/providers/met_no.py` is deleted - recover it from git history if it
+ever needs to come back, and remember to re-add the row, re-widen the formula
+range, and shift every row below it back down by one.
+
+**Smoke / PM2.5 (removed Feb 2026, commit 34460a7).** `providers/smoke.py` was
+deleted because IT Security flagged `air-quality-api.open-meteo.com`. The
+engine's Smoke Guard logic is still present in `uncanniness.py` but receives no
+PM2.5 input, so every hour scores `smoke_factor` 1.0. Do **not** reintroduce
+the provider without a fresh IT review.
+
+Row numbers 19 and 13-18 are asserted by `tests/test_excel_report_formulas.py`;
 the Portland band and the shifted solar block are asserted by
 `tests/test_portland_reference.py`.
