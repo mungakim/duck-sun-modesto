@@ -60,7 +60,7 @@ SOURCE_WEIGHT_DISPLAY = {
     'ACCUWEATHER': '4.0',
     'WEATHER.COM': '4.0',
     'WUNDERGRND': '4.0',
-    'GOOGLE (AI)': '6.0',
+    'GOOGLE (AI)': '8.0',
 }
 
 # URLs for clickable source links
@@ -310,7 +310,7 @@ def generate_xlsx_report(
 
     # Pre-calculate excluded highs (Open-Meteo max outlier exclusion)
     excluded_highs = {}
-    weights = [1.0, 3.0, 3.0, 4.0, 4.0, 4.0, 6.0]
+    weights = [1.0, 3.0, 4.0, 4.0, 4.0, 8.0]
 
     for i, day in enumerate(om_daily):
         k = day.get('date', '')

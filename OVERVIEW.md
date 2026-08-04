@@ -16,7 +16,7 @@ The system fetches weather data from multiple providers and combines them using 
 
 | Provider | Method | Weight | Purpose |
 |----------|--------|--------|---------|
-| **Google Weather** | API (MetNet-3 neural model) | 6x | Primary source - satellite/radar fusion |
+| **Google Weather** | API (MetNet-3 neural model) | 8x | Primary source - satellite/radar fusion |
 | **AccuWeather** | API | 4x | Commercial provider |
 | **Weather.com** | Web scraping (rate limited) | 4x | IBM/TWC data |
 | **Weather Underground** | Web scraping (rate limited) | 4x | IBM/TWC data |

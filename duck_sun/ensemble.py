@@ -11,7 +11,7 @@ Key Features:
 4. Confidence scoring based on source agreement
 
 WEIGHTS (Calibrated Jan 2026):
-- Google: 6.0 (MetNet-3 neural model - satellite/radar fusion)
+- Google: 8.0 (MetNet-3 neural model - satellite/radar fusion)
 - AccuWeather: 4.0 (Commercial provider)
 - Weather.com: 4.0 (The Weather Channel - scraped)
 - WUnderground: 4.0 (Weather Underground/IBM - scraped)
@@ -58,7 +58,7 @@ class WeightedEnsembleEngine:
 
     # Source weights (calibrated Jan 2026)
     SOURCE_WEIGHTS = {
-        "Google": 6.0,        # MetNet-3 neural model - satellite/radar fusion
+        "Google": 8.0,        # MetNet-3 neural model - satellite/radar fusion (raised 6->8, Jul 2026)
         "AccuWeather": 4.0,   # Commercial provider
         "Weather.com": 4.0,   # The Weather Channel (scraped)
         "WUnderground": 4.0,  # Weather Underground/IBM (scraped)
@@ -87,7 +87,7 @@ class WeightedEnsembleEngine:
         """
         Compute weighted median consensus with outlier detection.
 
-        Google is never demoted. It holds weight 6.0 in every hour regardless of
+        Google is never demoted. It holds weight 8.0 in every hour regardless of
         how far it sits from the peer median, per the Jul 2026 calibration
         decision: Google (MetNet-3) has consistently been the most accurate
         source, so a disagreement with its peers is evidence against the peers,
@@ -119,7 +119,7 @@ class WeightedEnsembleEngine:
             )
 
         # === GOOGLE DEVIATION TRACKING (observability only - NEVER demotes) ===
-        # Google keeps weight 6.0 unconditionally. We still measure how far it
+        # Google keeps weight 8.0 unconditionally. We still measure how far it
         # sits from the peer median so the divergence is visible in diagnostics,
         # but that measurement no longer touches any weight.
         peers = [v for k, v in valid_sources.items() if k != "Google" and v is not None]
@@ -136,7 +136,7 @@ class WeightedEnsembleEngine:
             if google_peer_delta_f > 10.0:
                 logger.debug(
                     f"[WeightedEnsembleEngine] Google {google_peer_delta_f:.1f}F from peer "
-                    f"median - keeping full weight 6.0 (peers are the suspect ones)"
+                    f"median - keeping full weight 8.0 (peers are the suspect ones)"
                 )
 
         # Convert to arrays for calculation

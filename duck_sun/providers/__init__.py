@@ -9,7 +9,7 @@ from multiple sources for the Weighted Ensemble Consensus Model:
 3. AccuWeather - Commercial provider (5-day forecast) - Weight: 4x
 4. Weather.com - The Weather Channel (10-day forecast) - Weight: 4x
 5. Weather Underground - IBM/TWC (10-day forecast) - Weight: 4x
-6. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 6x
+6. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 8x
 7. MID.org - Modesto Irrigation District local data - Weight: 2x
 8. METAR - Real-time airport ground truth observations
 RELIABILITY IS KING - Google MetNet-3 neural model leads the weighted ensemble.
@@ -73,7 +73,7 @@ __all__ = [
     # AccuWeather (commercial, weight: 4x)
     "AccuWeatherProvider",
     "AccuWeatherDay",
-    # Google Weather (MetNet-3 neural model, weight: 6x)
+    # Google Weather (MetNet-3 neural model, weight: 8x)
     "GoogleWeatherProvider",
     "GoogleHourlyData",
     "GoogleDailyData",

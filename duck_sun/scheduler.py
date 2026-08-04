@@ -320,7 +320,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["accuweather"] = await fetch_with_retry("accuweather", _fetch_accu, cache_mgr)
 
-    # 6. Google Weather (MetNet-3 neural model - weight 6x)
+    # 6. Google Weather (MetNet-3 neural model - weight 8x)
     # 240 hours is the documented API max (10 days). Forecast length is not
     # gated by billing tier - the earlier 4-day grid was purely hours=96.
     logger.info("[fetch_all_providers] Fetching Google Weather (MetNet-3, 240h)...")

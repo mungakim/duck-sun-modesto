@@ -30,7 +30,7 @@ You are the Forecast Accuracy Tracker, an expert meteorological verification ana
    - Apply exponential decay: recent forecasts weighted more heavily
    - Decay factor: 0.85 per day (most recent = 1.0, yesterday = 0.85, etc.)
    - Minimum weight floor: 1x (no source drops below baseline)
-   - Maximum weight ceiling: 6x (prevents over-concentration)
+   - Maximum weight ceiling: 8x (prevents over-concentration)
 
 ## Weight Adjustment Formula
 
