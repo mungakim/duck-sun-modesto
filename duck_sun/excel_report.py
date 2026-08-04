@@ -2,7 +2,7 @@
 Excel Report Generator for Duck Sun Modesto
 Generates Excel (.xlsx) reports matching the PDF format - CENTERED LAYOUT
 
-Weights: Google(6x), Accu(4x), Weather.com(4x), WUnderground(4x), NOAA(3x), Met.no(3x), OM(1x)
+Weights: Google(6x), Accu(4x), Weather.com(4x), WUnderground(4x), NOAA(3x), OM(1x)
 """
 
 import logging
@@ -358,7 +358,6 @@ def _extract_daily_high_low(daily_records: Optional[List[Dict]]) -> Dict[str, Di
 def generate_excel_report(
     om_data: Dict,
     noaa_data: Optional[List],
-    met_data: Optional[List],
     accu_data: Optional[List],
     google_data: Optional[Dict] = None,
     weather_com_data: Optional[List] = None,
@@ -387,7 +386,6 @@ def generate_excel_report(
 
     # Process data sources
     om_daily = om_data.get('daily_forecast', [])[:8]
-    met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
 
     if noaa_daily_periods:
         noaa_daily = noaa_daily_periods
@@ -660,7 +658,6 @@ def generate_excel_report(
     SOURCE_WEIGHT_DISPLAY = {
         'OPEN-METEO': '1.0',
         'NOAA (GOV)': '3.0',
-        'MET.NO (EU)': '3.0',
         'ACCUWEATHER': '4.0',
         'WEATHER.COM': '4.0',
         'WUNDERGRND': '4.0',
@@ -815,7 +812,6 @@ def generate_excel_report(
         hi_vals = [
             day.get('high_f'),
             noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             weather_com_daily.get(k, {}).get('high_f'),
             wunderground_daily.get(k, {}).get('high_f'),
@@ -836,11 +832,10 @@ def generate_excel_report(
     sources = [
         ('OPEN-METEO', lambda d, k: (d.get('high_f'), d.get('low_f')), 0),
         ('NOAA (GOV)', lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')), 1),
-        ('MET.NO (EU)', lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2),
-        ('ACCUWEATHER', lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3),
-        ('WEATHER.COM', lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 4),
-        ('WUNDERGRND', lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 5),
-        ('GOOGLE (AI)', lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 6),
+        ('ACCUWEATHER', lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 2),
+        ('WEATHER.COM', lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 3),
+        ('WUNDERGRND', lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 4),
+        ('GOOGLE (AI)', lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 5),
     ]
 
     for src_idx, (label, getter, source_index) in enumerate(sources):
@@ -899,9 +894,9 @@ def generate_excel_report(
 
     # Weighted Averages row - emit Excel formulas so the user can edit any
     # source cell (or clear it) and see the average update live in the sheet.
-    # Weights match source row order: OM=1, NOAA=3, Met.no=3, Accu=4, Wcom=4, WU=4, Google=6.
-    WEIGHTED_AVG_ARRAY = "{1;3;3;4;4;4;6}"
-    grid_row = 20
+    # Weights match source row order: OM=1, NOAA=3, Accu=4, Wcom=4, WU=4, Google=6.
+    WEIGHTED_AVG_ARRAY = "{1;3;4;4;4;6}"
+    grid_row = 19
     ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
     wtd_cell = ws[f'{col(1)}{grid_row}']
     wtd_cell.value = "Wtd. Average"
@@ -924,7 +919,7 @@ def generate_excel_report(
         Excel 365 dynamic arrays, the IF collapsed to its first element and
         both sides resolved to 0, producing 0/0 -> IFERROR -> "--".
         """
-        rng = f"{col_letter}13:{col_letter}19"
+        rng = f"{col_letter}13:{col_letter}18"
         return (
             "=IFERROR(ROUND("
             f"SUMPRODUCT({rng},{WEIGHTED_AVG_ARRAY})/"
@@ -951,7 +946,7 @@ def generate_excel_report(
         cell_lo.border = thin_border
 
     # PRECIP % row - MERGED col(1)+col(2) for wider label
-    grid_row = 21
+    grid_row = 20
     ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
     precip_cell = ws[f'{col(1)}{grid_row}']
     precip_cell.value = "PRECIP %"
@@ -992,7 +987,7 @@ def generate_excel_report(
         cell_lo_ref.border = thin_border
 
     # Precip source note
-    grid_row = 22
+    grid_row = 21
     ws.merge_cells(f'{col(12)}{grid_row}:{col(18)}{grid_row}')
     note_cell = ws[f'{col(12)}{grid_row}']
     note_cell.value = "PRECIP = Weather.com (PRIMARY) > Google > AccuWeather > Open-Meteo"
@@ -1000,16 +995,16 @@ def generate_excel_report(
     note_cell.alignment = Alignment(horizontal='right', vertical='center')
 
     # =====================
-    # PORTLAND, OR REFERENCE (rows 23-25)
+    # PORTLAND, OR REFERENCE (rows 22-24)
     # Deliberately its own three-row band with a teal palette so it reads as a
     # separate location, not another Modesto source. Not in the weighted avg.
     # The day-name row repeats row 11's labels: by this point the reader is a
     # dozen rows below the Modesto header and shouldn't have to scroll back up
     # to work out which column is which day.
     # =====================
-    PORTLAND_BANNER_ROW = 23
-    PORTLAND_DAYS_ROW = 24
-    PORTLAND_DATA_ROW = 25
+    PORTLAND_BANNER_ROW = 22
+    PORTLAND_DAYS_ROW = 23
+    PORTLAND_DATA_ROW = 24
     PORTLAND_DARK = "1F6E6E"
     PORTLAND_LIGHT = "DCEDED"
 
@@ -1082,7 +1077,7 @@ def generate_excel_report(
     # =====================
     # SOLAR FORECAST GRID (also centered)
     # =====================
-    grid_row = 27
+    grid_row = 26
     ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST - W/m² Irradiance (Google MetNet-3)"
     ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
@@ -1219,7 +1214,7 @@ def generate_excel_report(
     )
 
     # Solar header row (shifted right by 1 so DATE lands in wide col D)
-    SOLAR_HEADER_ROW = 28
+    SOLAR_HEADER_ROW = 27
     grid_row = SOLAR_HEADER_ROW
     header_labels = ['DATE', '9AM', '10', '11', '12PM', '1', '2', '3', '4PM']
     for col_idx, label in enumerate(header_labels):
@@ -1329,7 +1324,6 @@ if __name__ == "__main__":
         excel_path = generate_excel_report(
             om_data=om_data,
             noaa_data=None,
-            met_data=None,
             accu_data=None
         )
         if excel_path:

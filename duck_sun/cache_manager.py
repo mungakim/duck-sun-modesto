@@ -120,7 +120,6 @@ class CacheManager:
         "google_weather": 18,   # MetNet-3 updates frequently
         "google_portland": 18,  # Same API/model, Portland reference row
         "noaa": 24,             # NOAA updates every 12h but 24h is acceptable
-        "met_no": 24,           # ECMWF model runs every 6-12h
         "open_meteo": 24,       # Physics models update every 6h
         "mid_org": 48,          # Local ground truth - less frequent updates
         "hrrr": 12,             # HRRR updates hourly, stale quickly
@@ -141,7 +140,6 @@ class CacheManager:
             "status": "DEFAULT"
         },
         "noaa": [],  # Empty list, handled gracefully by PDF
-        "met_no": [],  # Empty list, handled gracefully by PDF
         "accuweather": [
             {"date": datetime.now().strftime("%Y-%m-%d"), "high_f": 55, "low_f": 40, "condition": "Default"},
             {"date": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"), "high_f": 56, "low_f": 41, "condition": "Default"},

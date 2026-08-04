@@ -3,7 +3,7 @@ Uncanny Engine for Duck Sun Modesto
 
 Architecture:
 1. Thermodynamics: WEIGHTED ENSEMBLE
-   Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
+   Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > MID.org(2x) > Open-Meteo(1x)
 2. Energy: Google MetNet-3 cloud cover (Open-Meteo radiation only as fallback)
 3. Logic Override: NOAA Text Narratives ("Dense Fog") force the model's hand.
 4. Variance Detection: Flags high spread (>10°F) with WARN-ONLY alerts (never blocks)
@@ -32,9 +32,9 @@ class UncannyEngine:
     """
     The Hybrid Architecture Engine with WEIGHTED ENSEMBLE Consensus.
 
-    Temperature consensus: 8-source weighted ensemble
+    Temperature consensus: 7-source weighted ensemble
       Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) >
-      NOAA(3x) = Met.no(3x) > MID.org(2x) > Open-Meteo(1x)
+      NOAA(3x) > MID.org(2x) > Open-Meteo(1x)
     Solar physics: Google MetNet-3 cloud cover (Open-Meteo is fallback only)
     Logic override: NOAA text narratives trigger fog probability boosts
     Variance detection: Flags high spread (>10°F) with WARN-ONLY alerts
@@ -60,7 +60,6 @@ class UncannyEngine:
         self,
         om_data: Dict[str, Any],
         noaa_data: Optional[List[Dict]],
-        met_no_data: Optional[List[Dict]],
         accu_data: Optional[List[Dict]] = None,
         weather_com_data: Optional[List[Dict]] = None,
         wunderground_data: Optional[List[Dict]] = None,
@@ -69,7 +68,7 @@ class UncannyEngine:
         smoke_data: Optional[List[Dict]] = None
     ) -> pd.DataFrame:
         """
-        Merge temps using WEIGHTED ENSEMBLE strategy with all 8 sources.
+        Merge temps using WEIGHTED ENSEMBLE strategy with all 7 sources.
 
         Sources (weighted per ensemble.py):
         - Google: 6.0 (MetNet-3 neural model)
@@ -77,7 +76,6 @@ class UncannyEngine:
         - Weather.com: 4.0
         - WUnderground: 4.0
         - NOAA: 3.0
-        - Met.no: 3.0
         - MID.org: 2.0 (local microclimate)
         - Open-Meteo: 1.0 (fallback)
 
@@ -112,8 +110,8 @@ class UncannyEngine:
                         except Exception:
                             continue
 
-            # Also include NOAA and Met.no timelines
-            for source_data in (noaa_data, met_no_data):
+            # Also include the NOAA timeline
+            for source_data in (noaa_data,):
                 if source_data:
                     for row in source_data:
                         time_str = row.get('time')
@@ -129,7 +127,7 @@ class UncannyEngine:
 
             sorted_times = sorted(fallback_times)
             df = pd.DataFrame({"time": sorted_times, "temp_om": np.nan})
-            logger.info(f"[UncannyEngine] Fallback base data: {len(df)} hours from Google/NOAA/Met.no timelines")
+            logger.info(f"[UncannyEngine] Fallback base data: {len(df)} hours from Google/NOAA timelines")
 
         # Ensure all Open-Meteo physics columns exist even in fallback mode
         # so downstream duck-curve analysis can run with safe defaults.
@@ -165,24 +163,6 @@ class UncannyEngine:
             logger.info(f"[UncannyEngine] Merged {noaa_merged} NOAA temperature records")
         else:
             logger.warning("[UncannyEngine] No NOAA data available")
-
-        # Met.no temperatures
-        df['temp_met'] = np.nan
-        if met_no_data:
-            met_df = pd.DataFrame(met_no_data)
-            met_df['time'] = pd.to_datetime(met_df['time'], utc=True).dt.tz_convert(self.timezone).dt.tz_localize(None)
-
-            met_merged = 0
-            for idx, row in df.iterrows():
-                matches = met_df[(met_df['time'] >= row['time'] - timedelta(minutes=30)) &
-                                 (met_df['time'] <= row['time'] + timedelta(minutes=30))]
-                if not matches.empty:
-                    df.at[idx, 'temp_met'] = matches.iloc[0]['temp_c']
-                    met_merged += 1
-
-            logger.info(f"[UncannyEngine] Merged {met_merged} Met.no temperature records")
-        else:
-            logger.warning("[UncannyEngine] No Met.no data available")
 
         # AccuWeather daily temps (interpolate to hourly by day)
         df['temp_accu'] = np.nan
@@ -338,7 +318,6 @@ class UncannyEngine:
                 "Google": row['temp_google'] if pd.notna(row.get('temp_google')) else None,
                 "NOAA": row['temp_noaa'] if pd.notna(row['temp_noaa']) else None,
                 "AccuWeather": row['temp_accu'] if pd.notna(row.get('temp_accu')) else None,
-                "Met.no": row['temp_met'] if pd.notna(row['temp_met']) else None,
                 "Weather.com": row['temp_weathercom'] if pd.notna(row.get('temp_weathercom')) else None,
                 "WUnderground": row['temp_wunderground'] if pd.notna(row.get('temp_wunderground')) else None,
                 "MID.org": row['temp_mid'] if pd.notna(row.get('temp_mid')) else None,
@@ -668,7 +647,6 @@ if __name__ == "__main__":
     import asyncio
     from duck_sun.providers.open_meteo import fetch_open_meteo
     from duck_sun.providers.noaa import NOAAProvider
-    from duck_sun.providers.met_no import MetNoProvider
     from duck_sun.providers.accuweather import AccuWeatherProvider
     from duck_sun.providers.mid_org import MIDOrgProvider
 
@@ -685,10 +663,6 @@ if __name__ == "__main__":
         noaa_data = await noaa.fetch_async()
         noaa_text = await noaa.fetch_text_forecast()
 
-        print("Fetching Met.no...")
-        met = MetNoProvider()
-        met_data = await met.fetch_async()
-
         print("Fetching AccuWeather...")
         accu = AccuWeatherProvider()
         accu_data = await accu.fetch_forecast()
@@ -701,7 +675,7 @@ if __name__ == "__main__":
 
         print("\nBuilding WEIGHTED ENSEMBLE consensus model...")
         df = engine.normalize_temps(
-            om_data, noaa_data, met_data,
+            om_data, noaa_data,
             accu_data=accu_data,
             mid_data=mid_data
         )

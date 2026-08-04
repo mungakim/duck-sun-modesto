@@ -15,7 +15,6 @@ Architecture:
     providers/     - Multi-source data fetching:
                      * open_meteo.py - GFS/ICON/GEM ensemble
                      * nws.py        - National Weather Service (US official)
-                     * met_no.py     - ECMWF via Norwegian Met Institute
                      * metar.py      - KMOD airport ground truth
     uncanniness.py - Consensus model & Tule Fog detection engine
     agent.py       - Claude SDK integration for briefing generation

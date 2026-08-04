@@ -62,7 +62,6 @@ def test_source_row_values_are_integers_not_floats(tmp_path: Path):
     generate_excel_report(
         om_data=om_data,
         noaa_data=[],
-        met_data=[],
         accu_data=accu_data,
         google_data=google_data,
         output_path=out,
@@ -71,9 +70,9 @@ def test_source_row_values_are_integers_not_floats(tmp_path: Path):
     wb = load_workbook(out)
     ws = wb.active
 
-    # Source rows are 13-19; per-day columns start at E (col(3) with COL_OFFSET=2)
+    # Source rows are 13-18; per-day columns start at E (col(3) with COL_OFFSET=2)
     found_numeric = 0
-    for row in range(13, 20):
+    for row in range(13, 19):
         for col_letter in "EFGHIJKLMNOPQRSTU":
             v = ws[f"{col_letter}{row}"].value
             if v is None:
@@ -97,7 +96,6 @@ def test_weighted_avg_row_emits_excel_formula(tmp_path: Path):
     generate_excel_report(
         om_data=om_data,
         noaa_data=[],
-        met_data=[],
         accu_data=accu_data,
         google_data=google_data,
         output_path=out,
@@ -106,16 +104,16 @@ def test_weighted_avg_row_emits_excel_formula(tmp_path: Path):
     wb = load_workbook(out)
     ws = wb.active
 
-    # Row 20 = weighted average row. Column E = day 0 high.
-    formula = ws["E20"].value
+    # Row 19 = weighted average row. Column E = day 0 high.
+    formula = ws["E19"].value
     assert isinstance(formula, str) and formula.startswith("="), f"Expected formula, got {formula!r}"
     # Must reference the source range E13:E19 so cell edits propagate
-    assert "E13:E19" in formula, f"Formula doesn't reference source range: {formula}"
-    # Weights array literal matches the 7-source order: OM=1, NOAA=3, Met.no=3, Accu=4, Wcom=4, WU=4, Google=6
-    assert "{1;3;3;4;4;4;6}" in formula, f"Weights array literal missing/wrong: {formula}"
+    assert "E13:E18" in formula, f"Formula doesn't reference source range: {formula}"
+    # Weights array literal matches the 6-source order: OM=1, NOAA=3, Accu=4, Wcom=4, WU=4, Google=6
+    assert "{1;3;4;4;4;6}" in formula, f"Weights array literal missing/wrong: {formula}"
     # Must use 2-arg SUMPRODUCT in the numerator (handles text-as-zero natively
     # without needing CSE array entry, unlike SUMPRODUCT(IF(ISNUMBER(...))...))
-    assert "SUMPRODUCT(E13:E19,{1;3;3;4;4;4;6})" in formula, (
+    assert "SUMPRODUCT(E13:E18,{1;3;4;4;4;6})" in formula, (
         f"Numerator must use 2-arg SUMPRODUCT(range, weights) form: {formula}"
     )
     # Denominator must exclude blanks, '-' (OM-max marker), and '--' (missing)
@@ -145,41 +143,40 @@ def test_weighted_avg_formula_actually_evaluates_correctly(tmp_path: Path):
     ws = wb.active
 
     # Plant a realistic data scenario in column E (day 0 high)
-    # OM=70, NOAA=70, Met.no=70, Accu=71, Wcom=71, WU=71, Google=72
-    # weighted = (70*1+70*3+70*3+71*4+71*4+71*4+72*6)/(1+3+3+4+4+4+6) = 1774/25 = 70.96 -> 71
+    # OM=70, NOAA=70, Accu=71, Wcom=71, WU=71, Google=72
+    # weighted = (70*1+70*3+71*4+71*4+71*4+72*6)/(1+3+4+4+4+6) = 1564/22 = 71.09 -> 71
     ws["E13"] = 70
     ws["E14"] = 70
-    ws["E15"] = 70
+    ws["E15"] = 71
     ws["E16"] = 71
     ws["E17"] = 71
-    ws["E18"] = 71
-    ws["E19"] = 72
+    ws["E18"] = 72
 
     # Column G: only one numeric (NOAA=80), rest "--". Expected: 80
-    for cell, val in [("G13", "--"), ("G14", 80), ("G15", "--"), ("G16", "--"),
-                      ("G17", "--"), ("G18", "--"), ("G19", "--")]:
+    for cell, val in [("G13", "--"), ("G14", 80), ("G15", "--"),
+                      ("G16", "--"), ("G17", "--"), ("G18", "--")]:
         ws[cell] = val
 
     # Column H: OM excluded via "-", others all 75 except Google 78
-    # expected: (75*3+75*3+75*4+75*4+75*4+78*6)/(3+3+4+4+4+6) = 1818/24 = 75.75 -> 76
+    # expected: (75*3+75*4+75*4+75*4+78*6)/(3+4+4+4+6) = 1593/21 = 75.86 -> 76
     ws["H13"] = "-"
-    for cell in ("H14", "H15", "H16", "H17", "H18"):
+    for cell in ("H14", "H15", "H16", "H17"):
         ws[cell] = 75
-    ws["H19"] = 78
+    ws["H18"] = 78
 
     # Use the same formula generator the real code uses
-    weights_array = "{1;3;3;4;4;4;6}"
+    weights_array = "{1;3;4;4;4;6}"
 
     def _fmla(c):
-        rng = f"{c}13:{c}19"
+        rng = f"{c}13:{c}18"
         return (
             f'=IFERROR(ROUND(SUMPRODUCT({rng},{weights_array})/'
             f'SUMPRODUCT(({rng}<>"")*({rng}<>"-")*({rng}<>"--")*{weights_array}),0),"--")'
         )
 
-    ws["E20"] = _fmla("E")
-    ws["G20"] = _fmla("G")
-    ws["H20"] = _fmla("H")
+    ws["E19"] = _fmla("E")
+    ws["G19"] = _fmla("G")
+    ws["H19"] = _fmla("H")
 
     out = tmp_path / "eval.xlsx"
     wb.save(out)
@@ -199,9 +196,9 @@ def test_weighted_avg_formula_actually_evaluates_correctly(tmp_path: Path):
                 return raw
         return None
 
-    assert _val("E20") == 71, f"Expected E20=71, got {_val('E20')}"
-    assert _val("G20") == 80, f"Expected G20=80, got {_val('G20')}"
-    assert _val("H20") == 76, f"Expected H20=76, got {_val('H20')}"
+    assert _val("E19") == 71, f"Expected E19=71, got {_val('E19')}"
+    assert _val("G19") == 80, f"Expected G19=80, got {_val('G19')}"
+    assert _val("H19") == 76, f"Expected H19=76, got {_val('H19')}"
 
 
 def test_weighted_avg_formula_has_both_high_and_low_columns(tmp_path: Path):
@@ -212,7 +209,6 @@ def test_weighted_avg_formula_has_both_high_and_low_columns(tmp_path: Path):
     generate_excel_report(
         om_data=om_data,
         noaa_data=[],
-        met_data=[],
         accu_data=accu_data,
         google_data=google_data,
         output_path=out,
@@ -223,10 +219,10 @@ def test_weighted_avg_formula_has_both_high_and_low_columns(tmp_path: Path):
 
     # Day 0: E (high) + F (low). Day 1: G (high) + H (low).
     for col_letter in ("E", "F", "G", "H"):
-        v = ws[f"{col_letter}20"].value
+        v = ws[f"{col_letter}19"].value
         assert isinstance(v, str) and v.startswith("="), (
-            f"Cell {col_letter}20 should be a formula; got {v!r}"
+            f"Cell {col_letter}19 should be a formula; got {v!r}"
         )
-        assert f"{col_letter}13:{col_letter}19" in v, (
-            f"Formula at {col_letter}20 should reference its own column 13-19, got: {v}"
+        assert f"{col_letter}13:{col_letter}18" in v, (
+            f"Formula at {col_letter}19 should reference its own column 13-18, got: {v}"
         )

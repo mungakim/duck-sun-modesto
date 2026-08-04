@@ -59,7 +59,6 @@ def test_synthesis_extends_5_day_accuweather_with_noaa_to_reach_8_days():
         google_data={'hourly': [], 'daily': []},  # DEFAULT empty
         accu_data=accu_data,
         noaa_data=noaa_data,
-        met_data=None,
     )
 
     assert result is not None
@@ -83,7 +82,7 @@ def test_synthesis_extends_5_day_accuweather_with_noaa_to_reach_8_days():
         assert d.get('day_name')
 
 
-def test_synthesis_prefers_google_then_extends_with_noaa_then_metno():
+def test_synthesis_prefers_google_then_extends_with_noaa():
     google_data = {
         'daily': [
             {'date': f'2026-05-{26 + i}', 'high_f': 72 + i, 'low_f': 52 + i, 'high_c': 22.0, 'low_c': 11.0, 'precip_prob': 10, 'condition': 'Partly sunny'}
@@ -94,13 +93,11 @@ def test_synthesis_prefers_google_then_extends_with_noaa_then_metno():
         ],
     }
     noaa_data = _gen_hourly('2026-05-26', num_days=8, base_temp_c=22.0)
-    met_data = _gen_hourly('2026-05-26', num_days=11, base_temp_c=21.0)
 
     result = _synthesize_baseline_from_alternates(
         google_data=google_data,
         accu_data=None,
         noaa_data=noaa_data,
-        met_data=met_data,
     )
 
     assert result is not None
@@ -117,25 +114,25 @@ def test_synthesis_prefers_google_then_extends_with_noaa_then_metno():
     assert result['hourly'][0]['source'].startswith('Google')
 
 
-def test_synthesis_uses_metno_when_only_metno_available():
-    met_data = _gen_hourly('2026-05-26', num_days=11, base_temp_c=21.0)
+def test_synthesis_uses_noaa_when_only_noaa_available():
+    """NOAA is the last-resort extender now that Met.no is gone."""
+    noaa_data = _gen_hourly('2026-05-26', num_days=11, base_temp_c=21.0)
 
     result = _synthesize_baseline_from_alternates(
         google_data=None,
         accu_data=None,
-        noaa_data=None,
-        met_data=met_data,
+        noaa_data=noaa_data,
     )
 
     assert result is not None
     daily = result['daily_forecast']
-    assert len(daily) == 8  # capped at 8 even though met_data has 11
-    assert all('Met.no' in d.get('source', '') for d in daily)
+    assert len(daily) == 8  # capped at 8 even though noaa_data has 11
+    assert all('NOAA' in d.get('source', '') for d in daily)
 
 
 def test_synthesis_returns_none_when_no_data():
-    assert _synthesize_baseline_from_alternates(None, None, None, None) is None
-    assert _synthesize_baseline_from_alternates({'daily': [], 'hourly': []}, [], [], []) is None
+    assert _synthesize_baseline_from_alternates(None, None, None) is None
+    assert _synthesize_baseline_from_alternates({'daily': [], 'hourly': []}, [], []) is None
 
 
 def test_synthesis_caps_at_8_days_even_with_abundant_sources():
@@ -143,6 +140,6 @@ def test_synthesis_caps_at_8_days_even_with_abundant_sources():
         'daily': [{'date': f'2026-05-{20 + i}', 'high_f': 70, 'low_f': 50, 'high_c': 21, 'low_c': 10, 'precip_prob': 0, 'condition': 'Sunny'} for i in range(10)],
         'hourly': [],
     }
-    result = _synthesize_baseline_from_alternates(google_data, None, None, None)
+    result = _synthesize_baseline_from_alternates(google_data, None, None)
     assert result is not None
     assert len(result['daily_forecast']) == 8

@@ -10,11 +10,11 @@ from openpyxl import load_workbook
 
 from duck_sun.excel_report import generate_excel_report
 
-PORTLAND_BANNER_ROW = 23
-PORTLAND_DAYS_ROW = 24
-PORTLAND_DATA_ROW = 25
-SOLAR_TITLE_ROW = 27
-SOLAR_HEADER_ROW = 28
+PORTLAND_BANNER_ROW = 22
+PORTLAND_DAYS_ROW = 23
+PORTLAND_DATA_ROW = 24
+SOLAR_TITLE_ROW = 26
+SOLAR_HEADER_ROW = 27
 
 
 def _inputs(days=8):
@@ -57,7 +57,6 @@ def _render(tmp_path: Path, portland_data, days=8):
     generate_excel_report(
         om_data=om_data,
         noaa_data=[],
-        met_data=[],
         accu_data=[],
         google_data=google_data,
         portland_data=portland_data,
@@ -127,10 +126,10 @@ def test_portland_values_are_excluded_from_the_modesto_weighted_average(tmp_path
     ws = _render(tmp_path, portland_data)
 
     for col_letter in ("E", "F", "G", "H"):
-        formula = ws[f"{col_letter}20"].value
+        formula = ws[f"{col_letter}19"].value
         assert isinstance(formula, str) and formula.startswith("=")
-        assert f"{col_letter}13:{col_letter}19" in formula
-        assert str(PORTLAND_DATA_ROW) not in formula.replace(f"{col_letter}13:{col_letter}19", "")
+        assert f"{col_letter}13:{col_letter}18" in formula
+        assert str(PORTLAND_DATA_ROW) not in formula.replace(f"{col_letter}13:{col_letter}18", "")
 
 
 def test_missing_portland_data_blanks_the_row_without_crashing(tmp_path: Path):

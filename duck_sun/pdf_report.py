@@ -1,6 +1,6 @@
 """
 PDF Report Generator for Duck Sun Modesto
-Weights: Google(6x), Accu(4x), NOAA(3x), Met.no(3x), OM(1x)
+Weights: Google(6x), Accu(4x), NOAA(3x), OM(1x)
 
 WEIGHTED ENSEMBLE ARCHITECTURE - Google MetNet-3 Neural Model is Primary
 """
@@ -17,7 +17,10 @@ try:
     HAS_FPDF = True
 except ImportError:
     HAS_FPDF = False
-    FPDF = None
+    # `object`, not None: DuckSunPDF subclasses FPDF at module scope, so a None
+    # base blew up on import and made this whole guard unreachable. The real
+    # bail-out is the `if not HAS_FPDF` check inside generate_pdf_report().
+    FPDF = object
 
 logger = logging.getLogger(__name__)
 
@@ -394,7 +397,6 @@ def get_daily_condition_display(condition: str, dewpoint_c: float = None, temp_c
 def generate_pdf_report(
     om_data: Dict,
     noaa_data: Optional[List],
-    met_data: Optional[List],
     accu_data: Optional[List],
     google_data: Optional[Dict] = None,
     weather_com_data: Optional[List] = None,
@@ -415,7 +417,6 @@ def generate_pdf_report(
     Args:
         om_data: Open-Meteo forecast data
         noaa_data: NOAA hourly data (fallback if period data unavailable)
-        met_data: Met.no hourly data (ECMWF European model)
         accu_data: AccuWeather daily data (5-day forecast)
         google_data: Google Weather API data (MetNet-3 neural model) - HIGHEST WEIGHT
         weather_com_data: Weather.com scraped data (10-day forecast) - Weight: 4x
@@ -440,7 +441,6 @@ def generate_pdf_report(
     
     # Process data sources
     om_daily = om_data.get('daily_forecast', [])[:8]
-    met_daily = calculate_daily_stats_from_hourly(met_data) if met_data else {}
 
     # PRIORITY: Use NOAA Period Data if available (matches website)
     if noaa_daily_periods:
@@ -451,7 +451,6 @@ def generate_pdf_report(
         logger.info("[generate_pdf_report] Falling back to NOAA hourly aggregation")
         noaa_daily = calculate_daily_stats_from_hourly(noaa_data) if noaa_data else {}
 
-    logger.info(f"[generate_pdf_report] Met.no processed: {len(met_daily)} days")
 
     # Process AccuWeather data
     # Now uses native Fahrenheit values (no conversion rounding)
@@ -706,7 +705,6 @@ def generate_pdf_report(
     SOURCE_WEIGHT_DISPLAY = {
         'OPEN-METEO': '1.0',
         'NOAA (GOV)': '3.0',
-        'MET.NO (EU)': '3.0',
         'ACCUWEATHER': '4.0',
         'WEATHER.COM': '4.0',
         'WUNDERGRND': '4.0',
@@ -833,14 +831,13 @@ def generate_pdf_report(
     # Pre-calculate which high value is excluded for each day
     # Only exclude if Open-Meteo (index 0) has the max high value
     # excluded_highs[day_index] = {0} if Open-Meteo is max, else empty set
-    # Order: OM(0), NOAA(1), Met.no(2), Accu(3), Weather.com(4), WUnderground(5), Google(6)
+    # Order: OM(0), NOAA(1), Accu(2), Weather.com(3), WUnderground(4), Google(5)
     excluded_highs = {}
     for i, day in enumerate(om_daily):
         k = day.get('date', '')
         hi_vals = [
             day.get('high_f'),  # index 0 = Open-Meteo
             noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             weather_com_daily.get(k, {}).get('high_f'),
             wunderground_daily.get(k, {}).get('high_f'),
@@ -915,24 +912,21 @@ def generate_pdf_report(
     draw_row_colored('NOAA (GOV)',
              lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')), 1)
 
-    draw_row_colored('MET.NO (EU)',
-             lambda d, k: (met_daily.get(k, {}).get('high_f'), met_daily.get(k, {}).get('low_f')), 2)
-
     draw_row_colored('ACCUWEATHER',
-             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 3)
+             lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 2)
 
     draw_row_colored('WEATHER.COM',
-             lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 4)
+             lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 3)
 
     draw_row_colored('WUNDERGRND',
-             lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 5)
+             lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 4)
 
     draw_row_colored('GOOGLE (AI)',
-             lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 6)
+             lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 5)
 
     # ===================
     # WEIGHTED AVERAGES ROW
-    # Weights: OM(1), NOAA(3), Met.no(3), Accu(4), Weather.com(4), WUnderground(4), Google(6) - Jan 2026
+    # Weights: OM(1), NOAA(3), Accu(4), Weather.com(4), WUnderground(4), Google(6)
     # Excludes Open-Meteo high only if it's the max (OM often runs hot)
     # ===================
     logger.info("[generate_pdf_report] Calculating weighted averages (excluding OM max highs)...")
@@ -943,8 +937,8 @@ def generate_pdf_report(
     pdf.cell(weight_col, row_h, '', 1, 0, 'C', 1)  # Blank weight cell for averages row
     pdf.cell(source_col, row_h, 'Wtd. Averages', 1, 0, 'C', 1)
 
-    # Weights: OM, NOAA, Met.no, Accu, Weather.com, WUnderground, Google (calibrated Jan 2026)
-    weights = [1.0, 3.0, 3.0, 4.0, 4.0, 4.0, 6.0]
+    # Weights: OM, NOAA, Accu, Weather.com, WUnderground, Google
+    weights = [1.0, 3.0, 4.0, 4.0, 4.0, 6.0]
 
     pdf.set_font('Helvetica', 'B', 8)  # 15% larger for weighted average values
     for i, day in enumerate(om_daily):
@@ -957,7 +951,6 @@ def generate_pdf_report(
         hi_vals = [
             day.get('high_f'),
             noaa_daily.get(k, {}).get('high_f'),
-            met_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             weather_com_daily.get(k, {}).get('high_f'),
             wunderground_daily.get(k, {}).get('high_f'),
@@ -966,7 +959,6 @@ def generate_pdf_report(
         lo_vals = [
             day.get('low_f'),
             noaa_daily.get(k, {}).get('low_f'),
-            met_daily.get(k, {}).get('low_f'),
             accu_daily.get(k, {}).get('low_f'),
             weather_com_daily.get(k, {}).get('low_f'),
             wunderground_daily.get(k, {}).get('low_f'),
@@ -1309,7 +1301,6 @@ if __name__ == "__main__":
     import asyncio
     from duck_sun.providers.open_meteo import fetch_open_meteo
     from duck_sun.providers.noaa import NOAAProvider
-    from duck_sun.providers.met_no import MetNoProvider
     from duck_sun.providers.accuweather import AccuWeatherProvider
     from duck_sun.uncanniness import UncannyEngine
     from dotenv import load_dotenv
@@ -1325,14 +1316,12 @@ if __name__ == "__main__":
         noaa = NOAAProvider()
         noaa_data = await noaa.fetch_async()
 
-        met = MetNoProvider()
-        met_data = await met.fetch_async()
 
         accu = AccuWeatherProvider()
         accu_data = await accu.fetch_forecast()
 
         engine = UncannyEngine()
-        df = engine.normalize_temps(om_data, noaa_data, met_data)
+        df = engine.normalize_temps(om_data, noaa_data)
         df_analyzed = engine.analyze_duck_curve(df)
 
         critical = len(df_analyzed[df_analyzed['risk_level'].str.contains('CRITICAL', na=False)])
@@ -1340,7 +1329,6 @@ if __name__ == "__main__":
         pdf_path = generate_pdf_report(
             om_data=om_data,
             noaa_data=noaa_data,
-            met_data=met_data,
             accu_data=accu_data,
             df_analyzed=df_analyzed,
             fog_critical_hours=critical

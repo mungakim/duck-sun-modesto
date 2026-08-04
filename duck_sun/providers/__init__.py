@@ -6,13 +6,12 @@ from multiple sources for the Weighted Ensemble Consensus Model:
 
 1. Open-Meteo - Global ensemble (GFS, ICON, GEM models) - Weight: 1x
 2. NOAA - National Oceanic and Atmospheric Administration (official US forecast) - Weight: 3x
-3. Met.no - Norwegian Met Institute (ECMWF European model) - Weight: 3x
-4. AccuWeather - Commercial provider (5-day forecast) - Weight: 4x
-5. Weather.com - The Weather Channel (10-day forecast) - Weight: 4x
-6. Weather Underground - IBM/TWC (10-day forecast) - Weight: 4x
-7. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 6x
-8. MID.org - Modesto Irrigation District local data - Weight: 2x
-9. METAR - Real-time airport ground truth observations
+3. AccuWeather - Commercial provider (5-day forecast) - Weight: 4x
+4. Weather.com - The Weather Channel (10-day forecast) - Weight: 4x
+5. Weather Underground - IBM/TWC (10-day forecast) - Weight: 4x
+6. Google Weather - Google Maps Platform (MetNet-3 neural model) - Weight: 6x
+7. MID.org - Modesto Irrigation District local data - Weight: 2x
+8. METAR - Real-time airport ground truth observations
 RELIABILITY IS KING - Google MetNet-3 neural model leads the weighted ensemble.
 """
 
@@ -28,11 +27,6 @@ from duck_sun.providers.open_meteo import (
 from duck_sun.providers.noaa import (
     NOAAProvider,
     NOAATemperature,
-)
-
-from duck_sun.providers.met_no import (
-    MetNoProvider,
-    MetNoTemperature,
 )
 
 from duck_sun.providers.accuweather import (
@@ -76,9 +70,6 @@ __all__ = [
     # NOAA (US official, weight: 3x)
     "NOAAProvider",
     "NOAATemperature",
-    # Met.no (European ECMWF, weight: 3x)
-    "MetNoProvider",
-    "MetNoTemperature",
     # AccuWeather (commercial, weight: 4x)
     "AccuWeatherProvider",
     "AccuWeatherDay",

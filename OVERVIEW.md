@@ -21,7 +21,6 @@ The system fetches weather data from multiple providers and combines them using 
 | **Weather.com** | Web scraping (rate limited) | 4x | IBM/TWC data |
 | **Weather Underground** | Web scraping (rate limited) | 4x | IBM/TWC data |
 | **NOAA** | API (weather.gov) | 3x | US government source |
-| **Met.no** | API (ECMWF model) | 3x | European physics model |
 | **Open-Meteo** | API (GFS/ICON/GEM) | 1x | Baseline/fallback |
 | **MID.org** | API | 2x | Local Modesto microclimate |
 | **HRRR** | API | - | High-resolution precipitation |
@@ -56,7 +55,7 @@ The system fetches weather data from multiple providers and combines them using 
    - Returns cached data when limit reached
 
 4. **Fallback Synthesis**
-   - If Open-Meteo (baseline) fails, synthesizes data from Google → AccuWeather → NOAA → Met.no
+   - If Open-Meteo (baseline) fails, synthesizes data from Google → AccuWeather → NOAA
 
 ---
 
@@ -71,7 +70,6 @@ duck_sun/
 │   ├── weather_com.py    # Web scraping, 3/day limit
 │   ├── wunderground.py   # Web scraping, 3/day limit
 │   ├── noaa.py
-│   ├── met_no.py
 │   ├── open_meteo.py
 │   ├── mid_org.py
 │   └── metar.py
