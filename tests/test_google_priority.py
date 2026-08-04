@@ -25,7 +25,7 @@ SUMMER_DAY = 212  # ~Jul 31
 # ---------------------------------------------------------------- ensemble --
 
 def test_google_keeps_full_weight_when_wildly_off_peer_median():
-    """The old veto demoted Google 6.0 -> 2.0 at >10F deviation. It must not."""
+    """The old veto demoted Google 8.0 -> 2.0 at >10F deviation. It must not."""
     engine = WeightedEnsembleEngine()
 
     # Google 20C vs peers all clustered near 32C => ~21F deviation
@@ -42,7 +42,7 @@ def test_google_keeps_full_weight_when_wildly_off_peer_median():
     )
 
     # source_contributions holds normalized shares; effective_weights holds the raw weight
-    assert result.diagnostics["effective_weights"]["Google"] == 6.0, (
+    assert result.diagnostics["effective_weights"]["Google"] == 8.0, (
         f"Google was demoted to {result.diagnostics['effective_weights']['Google']}; "
         "the veto must be gone"
     )
@@ -75,8 +75,10 @@ def test_google_full_weight_pulls_consensus_toward_it():
 
 def test_google_weight_is_highest_in_the_table():
     weights = WeightedEnsembleEngine.SOURCE_WEIGHTS
+    assert weights["Google"] == 8.0, "Google was raised 6 -> 8 in Jul 2026"
     assert weights["Google"] == max(weights.values())
-    assert weights["Google"] > weights["AccuWeather"]
+    # Google alone should outvote any single peer by 2x
+    assert weights["Google"] >= 2 * weights["AccuWeather"]
 
 
 # ------------------------------------------------------------ solar source --

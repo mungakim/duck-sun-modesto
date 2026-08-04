@@ -109,11 +109,11 @@ def test_weighted_avg_row_emits_excel_formula(tmp_path: Path):
     assert isinstance(formula, str) and formula.startswith("="), f"Expected formula, got {formula!r}"
     # Must reference the source range E13:E19 so cell edits propagate
     assert "E13:E18" in formula, f"Formula doesn't reference source range: {formula}"
-    # Weights array literal matches the 6-source order: OM=1, NOAA=3, Accu=4, Wcom=4, WU=4, Google=6
-    assert "{1;3;4;4;4;6}" in formula, f"Weights array literal missing/wrong: {formula}"
+    # Weights array literal matches the 6-source order: OM=1, NOAA=3, Accu=4, Wcom=4, WU=4, Google=8
+    assert "{1;3;4;4;4;8}" in formula, f"Weights array literal missing/wrong: {formula}"
     # Must use 2-arg SUMPRODUCT in the numerator (handles text-as-zero natively
     # without needing CSE array entry, unlike SUMPRODUCT(IF(ISNUMBER(...))...))
-    assert "SUMPRODUCT(E13:E18,{1;3;4;4;4;6})" in formula, (
+    assert "SUMPRODUCT(E13:E18,{1;3;4;4;4;8})" in formula, (
         f"Numerator must use 2-arg SUMPRODUCT(range, weights) form: {formula}"
     )
     # Denominator must exclude blanks, '-' (OM-max marker), and '--' (missing)
@@ -143,14 +143,16 @@ def test_weighted_avg_formula_actually_evaluates_correctly(tmp_path: Path):
     ws = wb.active
 
     # Plant a realistic data scenario in column E (day 0 high)
-    # OM=70, NOAA=70, Accu=71, Wcom=71, WU=71, Google=72
-    # weighted = (70*1+70*3+71*4+71*4+71*4+72*6)/(1+3+4+4+4+6) = 1564/22 = 71.09 -> 71
+    # OM=70, NOAA=70, Accu=71, Wcom=71, WU=71, Google=80
+    # weighted = (70*1+70*3+71*4+71*4+71*4+80*8)/(1+3+4+4+4+8) = 1772/24 = 73.83 -> 74
+    # Google is deliberately far from its peers here: at the old weight of 6
+    # this evaluates to 73, so the test fails loudly if the weight regresses.
     ws["E13"] = 70
     ws["E14"] = 70
     ws["E15"] = 71
     ws["E16"] = 71
     ws["E17"] = 71
-    ws["E18"] = 72
+    ws["E18"] = 80
 
     # Column G: only one numeric (NOAA=80), rest "--". Expected: 80
     for cell, val in [("G13", "--"), ("G14", 80), ("G15", "--"),
@@ -158,14 +160,14 @@ def test_weighted_avg_formula_actually_evaluates_correctly(tmp_path: Path):
         ws[cell] = val
 
     # Column H: OM excluded via "-", others all 75 except Google 78
-    # expected: (75*3+75*4+75*4+75*4+78*6)/(3+4+4+4+6) = 1593/21 = 75.86 -> 76
+    # expected: (75*3+75*4+75*4+75*4+78*8)/(3+4+4+4+8) = 1749/23 = 76.04 -> 76
     ws["H13"] = "-"
     for cell in ("H14", "H15", "H16", "H17"):
         ws[cell] = 75
     ws["H18"] = 78
 
     # Use the same formula generator the real code uses
-    weights_array = "{1;3;4;4;4;6}"
+    weights_array = "{1;3;4;4;4;8}"
 
     def _fmla(c):
         rng = f"{c}13:{c}18"
@@ -196,7 +198,7 @@ def test_weighted_avg_formula_actually_evaluates_correctly(tmp_path: Path):
                 return raw
         return None
 
-    assert _val("E19") == 71, f"Expected E19=71, got {_val('E19')}"
+    assert _val("E19") == 74, f"Expected E19=74, got {_val('E19')}"
     assert _val("G19") == 80, f"Expected G19=80, got {_val('G19')}"
     assert _val("H19") == 76, f"Expected H19=76, got {_val('H19')}"
 

@@ -3,7 +3,7 @@ Uncanny Engine for Duck Sun Modesto
 
 Architecture:
 1. Thermodynamics: WEIGHTED ENSEMBLE
-   Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > MID.org(2x) > Open-Meteo(1x)
+   Google(8x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > MID.org(2x) > Open-Meteo(1x)
 2. Energy: Google MetNet-3 cloud cover (Open-Meteo radiation only as fallback)
 3. Logic Override: NOAA Text Narratives ("Dense Fog") force the model's hand.
 4. Variance Detection: Flags high spread (>10°F) with WARN-ONLY alerts (never blocks)
@@ -33,7 +33,7 @@ class UncannyEngine:
     The Hybrid Architecture Engine with WEIGHTED ENSEMBLE Consensus.
 
     Temperature consensus: 7-source weighted ensemble
-      Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) >
+      Google(8x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) >
       NOAA(3x) > MID.org(2x) > Open-Meteo(1x)
     Solar physics: Google MetNet-3 cloud cover (Open-Meteo is fallback only)
     Logic override: NOAA text narratives trigger fog probability boosts
@@ -71,7 +71,7 @@ class UncannyEngine:
         Merge temps using WEIGHTED ENSEMBLE strategy with all 7 sources.
 
         Sources (weighted per ensemble.py):
-        - Google: 6.0 (MetNet-3 neural model)
+        - Google: 8.0 (MetNet-3 neural model)
         - AccuWeather: 4.0
         - Weather.com: 4.0
         - WUnderground: 4.0

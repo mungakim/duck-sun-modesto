@@ -2,7 +2,7 @@
 Excel Report Generator for Duck Sun Modesto
 Generates Excel (.xlsx) reports matching the PDF format - CENTERED LAYOUT
 
-Weights: Google(6x), Accu(4x), Weather.com(4x), WUnderground(4x), NOAA(3x), OM(1x)
+Weights: Google(8x), Accu(4x), Weather.com(4x), WUnderground(4x), NOAA(3x), OM(1x)
 """
 
 import logging
@@ -661,7 +661,7 @@ def generate_excel_report(
         'ACCUWEATHER': '4.0',
         'WEATHER.COM': '4.0',
         'WUNDERGRND': '4.0',
-        'GOOGLE (AI)': '6.0',
+        'GOOGLE (AI)': '8.0',
     }
 
     # URLs for clickable source links
@@ -894,8 +894,8 @@ def generate_excel_report(
 
     # Weighted Averages row - emit Excel formulas so the user can edit any
     # source cell (or clear it) and see the average update live in the sheet.
-    # Weights match source row order: OM=1, NOAA=3, Accu=4, Wcom=4, WU=4, Google=6.
-    WEIGHTED_AVG_ARRAY = "{1;3;4;4;4;6}"
+    # Weights match source row order: OM=1, NOAA=3, Accu=4, Wcom=4, WU=4, Google=8.
+    WEIGHTED_AVG_ARRAY = "{1;3;4;4;4;8}"
     grid_row = 19
     ws.merge_cells(f'{col(1)}{grid_row}:{col(2)}{grid_row}')
     wtd_cell = ws[f'{col(1)}{grid_row}']

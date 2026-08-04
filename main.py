@@ -6,7 +6,7 @@ runs physics model with narrative override, logs verification stats,
 and outputs the PDF report with variance alerts.
 
 Sources: Open-Meteo + NOAA + AccuWeather + Google + MID.org + METAR + HRRR
-Weights: Google(6x) > AccuWeather(4x) > NOAA(3x) > Open-Meteo(1x)
+Weights: Google(8x) > AccuWeather(4x) > NOAA(3x) > Open-Meteo(1x)
 Physics: Fog Guard + Smoke Guard + NOAA Narrative Override
 Variance: Warn-only alerts for >10°F spread (never blocks)
 
@@ -86,7 +86,7 @@ def print_banner():
     print(f"{Fore.CYAN}   + Fog Guard + Smoke Guard + Narrative Override{Style.RESET_ALL}")
     print(f"{Fore.CYAN}{'=' * 60}{Style.RESET_ALL}")
     print(f"{Fore.WHITE}   [SOURCES] Open-Meteo + HRRR + NOAA + AccuWeather + Google + MID.org{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}   [WEIGHTS] Google(6x) > Accu(4x) > NOAA(3x) > OM(1x){Style.RESET_ALL}")
+    print(f"{Fore.WHITE}   [WEIGHTS] Google(8x) > Accu(4x) > NOAA(3x) > OM(1x){Style.RESET_ALL}")
     print(f"{Fore.WHITE}   [VARIANCE] Warn-only alerts for >10°F spread (never blocks){Style.RESET_ALL}")
     print()
 
@@ -231,7 +231,7 @@ def run_consensus_model(om_data, noaa_data, accu_data, mid_data, smoke_data, noa
     engine = UncannyEngine()
 
     # Normalize and merge temperatures from ALL sources
-    logger.info("[run_consensus_model] Building weighted ensemble (Google 6x > Accu 4x > NOAA 3x > MID 2x > OM 1x)...")
+    logger.info("[run_consensus_model] Building weighted ensemble (Google 8x > Accu 4x > NOAA 3x > MID 2x > OM 1x)...")
     df = engine.normalize_temps(
         om_data, noaa_data,
         accu_data=accu_data,

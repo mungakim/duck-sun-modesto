@@ -19,13 +19,13 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 1. **Source Replication:** Each provider fetches from the exact same API endpoint that powers the official website, ensuring organic alignment without hardcoding.
 2. **Deterministic Solar Math:** Solar factor calculation is done in Python for 100% accuracy.
-3. **Weighted Ensemble:** Google(6x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > Open-Meteo(1x)
+3. **Weighted Ensemble:** Google(8x) > AccuWeather(4x) = Weather.com(4x) = WUnderground(4x) > NOAA(3x) > Open-Meteo(1x)
 
 ### Data Sourcing Strategy
 
 | Provider | API Endpoint | Alignment Target | Weight |
 |----------|-------------|------------------|--------|
-| **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **6x** |
+| **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **8x** |
 | **AccuWeather** | Official 5-day API | accuweather.com | 4x |
 | **Weather.com** | Web scraping (curl_cffi) | weather.com | 4x |
 | **Weather Underground** | Web scraping (curl_cffi) | wunderground.com | 4x |
@@ -138,7 +138,7 @@ The PDF report includes:
 ## Calibration Status (Jan 15, 2026)
 
 **11-Source Weighted Ensemble:**
-- **Google Weather:** MetNet-3 neural model via Maps Platform Weather API - Weight: 6x
+- **Google Weather:** MetNet-3 neural model via Maps Platform Weather API - Weight: 8x
 - **AccuWeather:** Direct API sourcing (matches accuweather.com) - Weight: 4x
 - **Weather.com:** Web scraping via curl_cffi - Weight: 4x
 - **Weather Underground:** Web scraping via curl_cffi - Weight: 4x
@@ -208,8 +208,8 @@ Google Weather (MetNet-3) is the preferred source **everywhere on the report
 except the word-descriptor row**. Three rules follow from that:
 
 **1. Google is never demoted.** `ensemble.py` used to run a "Google Veto"
-that dropped Google's weight 6.0 -> 3.0 at >6°F deviation from the peer median,
-and 6.0 -> 2.0 at >10°F. That is gone. Google holds weight 6.0 in every hour,
+that dropped Google's weight at >6°F deviation from the peer median, and again
+at >10°F. That is gone. Google holds weight 8.0 in every hour,
 unconditionally. The deviation is still measured and reported in
 `diagnostics["google_peer_delta_f"]` for observability, but nothing acts on it.
 Rationale: Google has consistently been the most accurate source, so a
@@ -311,9 +311,9 @@ The ensemble is now **6 sources**, not 7:
 | 15 | ACCUWEATHER | 4 |
 | 16 | WEATHER.COM | 4 |
 | 17 | WUNDERGRND | 4 |
-| 18 | GOOGLE (AI) | 6 |
+| 18 | GOOGLE (AI) | 8 |
 
-The weighted-average formula spans `13:18` with the array `{1;3;4;4;4;6}`.
+The weighted-average formula spans `13:18` with the array `{1;3;4;4;4;8}`.
 `duck_sun/providers/met_no.py` is deleted - recover it from git history if it
 ever needs to come back, and remember to re-add the row, re-widen the formula
 range, and shift every row below it back down by one.
