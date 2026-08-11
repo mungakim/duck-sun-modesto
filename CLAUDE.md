@@ -193,7 +193,9 @@ The PDF report includes:
     that agree on length (≤ `MAX_FORECAST_DAYS`), compared across every script
     blob. First-match-wins is why the row reported 6 days against the 8-column
     grid and dashed the last two columns on every run — the short strip sits in
-    its own script tag ahead of the full forecast
+    its own script tag ahead of the full forecast. Confirmed live Aug 2026:
+    `Daily array lengths available: [11, 6, 4] (taking 11)` — the page had the
+    full window the whole time, the parser was reading the 6-day strip
   - Daypart arrays (`precipChance`, `wxPhraseLong`): chosen by length, 2 entries
     per day, so an hourly array can't shift values against the wrong days
   - Dates: `validTimeLocal` of matching length **only if its dates are unique** —
@@ -246,7 +248,7 @@ First separate the two shapes, because they have different causes:
   8-column grid for months because its parser took the first `temperatureMax`
   array it matched (the page's short summary strip) instead of the longest.
   `<SOURCE>: 6/8 grid days` in the log, and on the provider side
-  `Daily array lengths available: [10, 6] (taking 10)`
+  `Daily array lengths available: [11, 6, 4] (taking 11)`
 - **All dashes** — the provider returned nothing, or returned a forecast whose
   **dates don't overlap the grid**. Both look identical in the spreadsheet
 
