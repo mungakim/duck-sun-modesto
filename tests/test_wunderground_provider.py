@@ -145,14 +145,19 @@ def test_short_scrape_is_extended_via_api(monkeypatch):
     provider = WUndergroundProvider()
     six = [{"date": d, "day_name": "Tue", "high_f": 94.0, "low_f": 61.0, "high_c": 34.4,
             "low_c": 16.1, "condition": "Sunny", "precip_prob": 3} for d in _dates(6)]
-    ten = [{**six[0], "date": d} for d in _dates(10)]
+    # The API disagrees by a degree on the overlap - the page must win there
+    ten = [{**six[0], "date": d, "high_f": 95.0} for d in _dates(10)]
     html = '<script>var c={"apiKey":"6532d6454b8aa370768e63d6ba5a832e"};</script>'
 
     monkeypatch.setattr(provider, "_fetch_page", lambda: html)
     monkeypatch.setattr(provider, "_parse_embedded_json", lambda _: list(six))
     monkeypatch.setattr(provider, "_fetch_via_api", lambda key, geo: list(ten))
 
-    assert len(provider.fetch_sync()) == 10
+    days = provider.fetch_sync()
+
+    assert [d["date"] for d in days] == _dates(10)
+    assert [d["high_f"] for d in days[:6]] == [94.0] * 6   # page values kept
+    assert [d["high_f"] for d in days[6:]] == [95.0] * 4   # API fills the gap
 
 
 def test_failed_top_up_keeps_the_scraped_days(monkeypatch):

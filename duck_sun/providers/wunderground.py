@@ -672,8 +672,11 @@ class WUndergroundProvider:
         The page blob has been yielding 6 days against an 8-column grid, so the
         WUNDERGRND row's last two columns dash out on every run. The v3 API the
         page itself renders from returns 10, using the geocode harvested from
-        that same page. If the call fails or returns no more days than the
-        scrape did, the scrape result stands - this only ever adds coverage.
+        that same page.
+
+        Only the missing dates are taken. Days the page covered keep the page's
+        own numbers, so the visible row stays 1:1 with wunderground.com even if
+        the harvested geocode rounds differently than the page's.
         """
         if len(days) >= GRID_DAYS:
             return days
@@ -691,14 +694,19 @@ class WUndergroundProvider:
         )
         extended = self._fetch_via_api(api_key, self._geocode(self._extract_geocode(html)))
 
-        if extended and len(extended) > len(days):
-            logger.info(
-                f"[WUndergroundProvider] Extended {len(days)} -> {len(extended)} days from the API"
-            )
-            return extended
+        if extended:
+            have = {d['date'] for d in days}
+            added = [d for d in extended if d['date'] not in have]
+            if added:
+                merged = sorted(days + added, key=lambda d: d['date'])
+                logger.info(
+                    f"[WUndergroundProvider] Extended {len(days)} -> {len(merged)} days "
+                    f"(page values kept for the days it covered)"
+                )
+                return merged
 
         logger.warning(
-            f"[WUndergroundProvider] API did not extend coverage - keeping {len(days)} scraped days"
+            f"[WUndergroundProvider] API added no days - keeping {len(days)} scraped days"
         )
         return days
 
