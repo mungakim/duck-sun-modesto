@@ -112,6 +112,81 @@ def test_phrases_with_commas_do_not_shift_alignment():
     assert [d["precip_prob"] for d in days] == [12, 18, 17]
 
 
+def test_page_hourly_arrays_do_not_hijack_dates_or_dayparts():
+    """The page carries several forecast contexts and a regex takes the first
+    match. An hourly validTimeLocal would date every row to the same day and
+    collapse the row to one column; hourly precipChance would shift values
+    against the wrong days. Both must be ignored in favour of index dating."""
+    payload = _twc_payload()
+    today = _dates(1)[0]
+    hourly_first = {
+        # 24 hourly stamps, all today - what the old regex would have grabbed
+        "validTimeLocal": [f"{today}T{h:02d}:00:00-0700" for h in range(24)],
+        "precipChance": list(range(24)),
+        "wxPhraseLong": ["Sunny"] * 24,
+    }
+    html = (
+        f"<script>window.__hourly={json.dumps(hourly_first)};</script>"
+        + _page_html(payload, escaped=False)
+    )
+
+    days = WUndergroundProvider()._parse_embedded_json(html)
+
+    assert [d["date"] for d in days] == _dates(3)
+    assert len({d["date"] for d in days}) == 3
+    # The hourly precipChance (0,1,2,…) is skipped for the real daypart array
+    assert [d["precip_prob"] for d in days] == [12, 18, 17]
+    assert [d["condition"] for d in days] == ["Sunny", "Partly Cloudy", "Sunny"]
+
+
+def test_short_scrape_is_extended_via_api(monkeypatch):
+    """6 scraped days against an 8-column grid dashes the last two columns on
+    every run. The API the page renders from returns the full window."""
+    provider = WUndergroundProvider()
+    six = [{"date": d, "day_name": "Tue", "high_f": 94.0, "low_f": 61.0, "high_c": 34.4,
+            "low_c": 16.1, "condition": "Sunny", "precip_prob": 3} for d in _dates(6)]
+    ten = [{**six[0], "date": d} for d in _dates(10)]
+    html = '<script>var c={"apiKey":"6532d6454b8aa370768e63d6ba5a832e"};</script>'
+
+    monkeypatch.setattr(provider, "_fetch_page", lambda: html)
+    monkeypatch.setattr(provider, "_parse_embedded_json", lambda _: list(six))
+    monkeypatch.setattr(provider, "_fetch_via_api", lambda key, geo: list(ten))
+
+    assert len(provider.fetch_sync()) == 10
+
+
+def test_failed_top_up_keeps_the_scraped_days(monkeypatch):
+    """Extending is strictly additive - a failed API call must never cost us
+    the days the scrape already produced."""
+    provider = WUndergroundProvider()
+    six = [{"date": d, "day_name": "Tue", "high_f": 94.0, "low_f": 61.0, "high_c": 34.4,
+            "low_c": 16.1, "condition": "Sunny", "precip_prob": 3} for d in _dates(6)]
+    html = '<script>var c={"apiKey":"6532d6454b8aa370768e63d6ba5a832e"};</script>'
+
+    monkeypatch.setattr(provider, "_fetch_page", lambda: html)
+    monkeypatch.setattr(provider, "_parse_embedded_json", lambda _: list(six))
+    monkeypatch.setattr(provider, "_fetch_via_api", lambda key, geo: None)
+
+    assert len(provider.fetch_sync()) == 6
+
+
+def test_full_scrape_makes_no_api_call(monkeypatch):
+    """A scrape that already covers the grid must not touch the API."""
+    provider = WUndergroundProvider()
+    full = [{"date": d, "day_name": "Tue", "high_f": 94.0, "low_f": 61.0, "high_c": 34.4,
+             "low_c": 16.1, "condition": "Sunny", "precip_prob": 3} for d in _dates(8)]
+
+    monkeypatch.setattr(provider, "_fetch_page", lambda: "<html></html>")
+    monkeypatch.setattr(provider, "_parse_embedded_json", lambda _: list(full))
+
+    def explode(*_args, **_kwargs):
+        raise AssertionError("API must not be called when the scrape covers the grid")
+
+    monkeypatch.setattr(provider, "_fetch_via_api", explode)
+
+    assert len(provider.fetch_sync()) == 8
+
+
 def test_client_rendered_page_returns_none():
     """No forecast arrays in the page - the provider must report failure so the
     API fallback runs, rather than inventing days."""

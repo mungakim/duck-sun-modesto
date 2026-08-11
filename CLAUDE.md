@@ -191,6 +191,18 @@ The PDF report includes:
   (`"temperatureMax":[…]`) and JS-escaped (`JSON.parse("{\"temperatureMax\":…")`),
   minified or pretty-printed. A regex written for only one form reads exactly
   like a dead provider
+- The page carries several forecast contexts and **hourly arrays reuse the daily
+  field names**, so a first-match regex can land on the wrong one. Daypart
+  arrays are chosen by length (2 entries per day); dates on the scrape path stay
+  **index-based** — a `validTimeLocal` pulled blind out of the page can be 24
+  hourly stamps sharing one date, which collapses the whole row into one column.
+  Only the API path, whose response shape is unambiguous, dates rows from
+  `validTimeLocal`
+- The page blob yields only **6 days** against the 8-column grid, which dashes
+  the last two columns on every run. When the scrape covers fewer than
+  `GRID_DAYS`, the provider extends it through the v3 API using the key/geocode
+  harvested from that same page. Strictly additive: a failed call keeps the
+  scraped days
 - Impersonation fingerprints are tried in order (`firefox135`, `chrome136`,
   `chrome120`, `chrome110`) rather than hardcoding one: curl_cffi **raises** on a
   target its build doesn't know, and `curl-cffi>=0.7.0` is unpinned
@@ -228,9 +240,16 @@ If weather.com temps in the report don't match the website:
 
 ### How To Diagnose a Blank (All-Dash) Source Row
 
-A source row of `--` across every column means the provider handed the report
-either nothing or a forecast whose **dates don't overlap the grid**. Both look
-identical in the spreadsheet, so the run log is the source of truth:
+First separate the two shapes, because they have different causes:
+
+- **Trailing dashes** (row populated, last N columns `--`) — the provider
+  returned fewer days than the grid is wide. WUnderground's page scrape returns
+  6 against an 8-column grid, which is why its last two columns were empty on
+  every run before the API top-up landed. `<SOURCE>: 6/8 grid days` in the log
+- **All dashes** — the provider returned nothing, or returned a forecast whose
+  **dates don't overlap the grid**. Both look identical in the spreadsheet
+
+The run log is the source of truth:
 
 1. `logs/duck_sun.log` — `[generate_excel_report] <SOURCE>: 0/8 grid days - row
    will be ALL DASHES` is written before the sheet is drawn, and

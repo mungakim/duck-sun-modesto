@@ -66,6 +66,11 @@ CACHE_MAX_AGE_HOURS = 6    # Cache is only usable while this fresh
 # any time, so every target is tried in turn instead of hardcoding just one.
 IMPERSONATE_TARGETS = ("firefox135", "chrome136", "chrome120", "chrome110")
 
+# Width of the report's temperature grid. The page blob has been handing back
+# only 6 days, which dashes out the last two columns of the WUNDERGRND row on
+# every run; short coverage is what triggers the API top-up below.
+GRID_DAYS = 8
+
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
@@ -257,28 +262,62 @@ class WUndergroundProvider:
         return [d for d in days if isinstance(d, dict) and d.get('date', '') >= today]
 
     def _extract_array(self, pattern: str, data: str, is_numeric: bool = True) -> List:
+        """Extract the first matching array. See _extract_arrays."""
+        for arr in self._extract_arrays(pattern, data, is_numeric):
+            return arr
+        return []
+
+    def _extract_arrays(self, pattern: str, data: str, is_numeric: bool = True) -> List[List]:
         """
-        Extract array values from JavaScript data using regex.
+        Extract every matching array from JavaScript data, in page order.
 
         The captured text is decoded as JSON first, which keeps nulls in place
         and survives commas inside phrases ("Cloudy, then clear"). A naive
         comma split would silently shift every later entry by one position.
+
+        More than one match is normal: the page embeds several forecast
+        contexts and hourly arrays reuse the daily field names.
         """
-        match = re.search(pattern, data)
-        if not match:
-            return []
+        results: List[List] = []
 
-        arr_str = match.group(1)
+        for match in re.finditer(pattern, data):
+            arr_str = match.group(1)
 
-        try:
-            raw = json.loads(f'[{arr_str}]')
-        except Exception:
-            raw = [None if x.strip() in ('null', '') else x.strip().strip('"')
-                   for x in arr_str.split(',')]
+            try:
+                raw = json.loads(f'[{arr_str}]')
+            except Exception:
+                raw = [None if x.strip() in ('null', '') else x.strip().strip('"')
+                       for x in arr_str.split(',')]
 
-        if is_numeric:
-            return [_to_int(v) for v in raw]
-        return ["" if v is None else str(v) for v in raw]
+            if is_numeric:
+                results.append([_to_int(v) for v in raw])
+            else:
+                results.append(["" if v is None else str(v) for v in raw])
+
+        return results
+
+    def _select_daypart_array(
+        self, key: str, data: str, num_days: int, is_numeric: bool = True
+    ) -> List:
+        """
+        Pick the array for `key` that is actually a daypart array for num_days.
+
+        A daypart array holds 2 entries per day. Taking the first match blindly
+        can land on an hourly array carrying the same field name, which shifts
+        every value against the wrong day, so scan the candidates and take the
+        first one whose length fits.
+        """
+        candidates = self._extract_arrays(_array_pattern(key), data, is_numeric)
+        for arr in candidates:
+            if num_days <= len(arr) <= 2 * num_days + 2:
+                return arr
+
+        if candidates:
+            logger.warning(
+                f"[WUndergroundProvider] No usable {key} array for {num_days} days "
+                f"(found lengths {[len(a) for a in candidates]}) - wrong context"
+            )
+        return []
 
     def _get_date_for_day(self, day_index: int) -> str:
         """Get YYYY-MM-DD date string for day index (0 = today)."""
@@ -310,6 +349,13 @@ class WUndergroundProvider:
         """
         results: List[WUndergroundDay] = []
         num_days = min(10, len(days_of_week) or 10, len(max_temps), len(min_temps))
+
+        # An array pulled from the wrong context (hourly rather than daily)
+        # is long and would silently misalign every row, so drop anything that
+        # can't be a daily/daypart array for this many days.
+        precip_chances = self._sane_aux(precip_chances, num_days, "precipChance")
+        wx_phrases = self._sane_aux(wx_phrases, num_days, "wxPhraseLong")
+        valid_times = self._sane_dates(valid_times, num_days)
 
         for i in range(num_days):
             high_f = max_temps[i]
@@ -366,6 +412,44 @@ class WUndergroundProvider:
             logger.debug(f"[WUndergroundProvider] {date_str}: Hi={high_f}F, Lo={low_f}F, Precip={precip}%")
 
         return results
+
+    @staticmethod
+    def _sane_aux(arr: Optional[List], num_days: int, label: str) -> List:
+        """
+        Keep a daily/daypart array only if its length is plausible.
+
+        A daypart array holds 2 entries per day. Anything much longer came from
+        another context (hourly arrays carry the same field names), and using it
+        would shift every value against the wrong day.
+        """
+        if not arr:
+            return []
+        if len(arr) > 2 * num_days + 2:
+            logger.warning(
+                f"[WUndergroundProvider] Ignoring {label}: {len(arr)} entries for {num_days} days "
+                f"- wrong context, not a daypart array"
+            )
+            return []
+        return arr
+
+    @staticmethod
+    def _sane_dates(valid_times: Optional[List], num_days: int) -> List:
+        """
+        Keep validTimeLocal only if it can actually date one row per day.
+
+        Hourly stamps repeat the same calendar day, and rows keyed on a repeated
+        date overwrite each other - the row would lose every duplicate column.
+        """
+        if not valid_times or len(valid_times) < num_days:
+            return []
+        dates = [str(v)[:10] for v in valid_times[:num_days]]
+        if len(set(dates)) != num_days:
+            logger.warning(
+                "[WUndergroundProvider] Ignoring validTimeLocal: dates repeat "
+                "- falling back to index-based dating"
+            )
+            return []
+        return valid_times
 
     @staticmethod
     def _daypart_value(arr: List, day_idx: int, night_idx: int):
@@ -453,16 +537,24 @@ class WUndergroundProvider:
                 if not max_temps or not min_temps:
                     continue
 
-                precip_chances = self._extract_array(_array_pattern('precipChance'), candidate)
-                valid_times = self._extract_array(_array_pattern('validTimeLocal'), candidate, is_numeric=False)
-                wx_phrases = self._extract_array(_array_pattern('wxPhraseLong'), candidate, is_numeric=False)
+                num_days = min(10, len(days_of_week) or 10, len(max_temps), len(min_temps))
+                precip_chances = self._select_daypart_array('precipChance', candidate, num_days)
+                wx_phrases = self._select_daypart_array(
+                    'wxPhraseLong', candidate, num_days, is_numeric=False
+                )
 
+                # Dates stay index-based here, deliberately. The page carries
+                # several forecast contexts (hourly among them) and a regex
+                # takes the first match it finds, so a "validTimeLocal" pulled
+                # out of the page could be 24 hourly stamps that all share one
+                # date - which would collapse the whole row into one column.
+                # Only the API path, whose response shape is unambiguous, dates
+                # rows from validTimeLocal.
                 days = self._build_days(
                     days_of_week=days_of_week,
                     max_temps=max_temps,
                     min_temps=min_temps,
                     precip_chances=precip_chances,
-                    valid_times=valid_times,
                     wx_phrases=wx_phrases,
                 )
                 if days:
@@ -571,6 +663,45 @@ class WUndergroundProvider:
             logger.error(f"[WUndergroundProvider] API fetch failed: {e}", exc_info=True)
             return None
 
+    def _top_up_short_forecast(
+        self, days: List[WUndergroundDay], html: str
+    ) -> List[WUndergroundDay]:
+        """
+        Extend a scrape that covers fewer days than the report grid.
+
+        The page blob has been yielding 6 days against an 8-column grid, so the
+        WUNDERGRND row's last two columns dash out on every run. The v3 API the
+        page itself renders from returns 10, using the geocode harvested from
+        that same page. If the call fails or returns no more days than the
+        scrape did, the scrape result stands - this only ever adds coverage.
+        """
+        if len(days) >= GRID_DAYS:
+            return days
+
+        api_key = self._extract_api_key(html) or self._configured_api_key()
+        if not api_key:
+            logger.warning(
+                f"[WUndergroundProvider] Page gave {len(days)} days for a {GRID_DAYS}-day grid "
+                f"and carries no apiKey - trailing columns will be blank"
+            )
+            return days
+
+        logger.info(
+            f"[WUndergroundProvider] Page gave {len(days)}/{GRID_DAYS} days - extending via API"
+        )
+        extended = self._fetch_via_api(api_key, self._geocode(self._extract_geocode(html)))
+
+        if extended and len(extended) > len(days):
+            logger.info(
+                f"[WUndergroundProvider] Extended {len(days)} -> {len(extended)} days from the API"
+            )
+            return extended
+
+        logger.warning(
+            f"[WUndergroundProvider] API did not extend coverage - keeping {len(days)} scraped days"
+        )
+        return days
+
     def fetch_sync(self) -> Optional[List[WUndergroundDay]]:
         """
         Synchronously fetch the 10-day forecast from Weather Underground.
@@ -596,6 +727,7 @@ class WUndergroundProvider:
         if html:
             days = self._parse_embedded_json(html)
             if days:
+                days = self._top_up_short_forecast(days, html)
                 self._save_cache(days)
                 return days
 
