@@ -176,6 +176,30 @@ The PDF report includes:
 - `precip_prob` extracted from `daypart[0].precipChance` daytime value (matches weather.com website display; was previously hardcoded to 0, then briefly used max(day,night) which inflated values)
 - `condition` extracted from `daypart[0].wxPhraseLong` (was previously truncated narrative)
 
+**Provider-level (wunderground.py):**
+- Fetch chain: page scrape → TWC API (apiKey harvested from that page) → TWC API
+  (env key) → fresh cache (< 6h **and** still covering today) → None. The page
+  leads because it is the alignment target; the env-key call is last because its
+  geocode is configured rather than harvested and can drift from the 95350 page
+- The harvest step is the one that survives wunderground.com going fully
+  client-rendered: the page returns 200 with no forecast arrays in it, so the
+  provider pulls the `apiKey`/`geocode` out of the page's own JS and calls the
+  same v3 endpoint the site's front end calls. Key precedence:
+  `WUNDERGROUND_API_KEY` → `TWC_API_KEY` → harvested. Geocode precedence:
+  `WUNDERGROUND_GEOCODE` → harvested → the `37.66,-121.00` default
+- Embedded JSON is parsed in **both** forms the site has shipped: raw
+  (`"temperatureMax":[…]`) and JS-escaped (`JSON.parse("{\"temperatureMax\":…")`),
+  minified or pretty-printed. A regex written for only one form reads exactly
+  like a dead provider
+- Impersonation fingerprints are tried in order (`firefox135`, `chrome136`,
+  `chrome120`, `chrome110`) rather than hardcoding one: curl_cffi **raises** on a
+  target its build doesn't know, and `curl-cffi>=0.7.0` is unpinned
+- Cached days dated before today are dropped, and a cache that no longer covers
+  today is rejected outright — serving it produces an all-dash row, not an error
+- Same daytime-daypart rule as weather_com for `precip_prob` / `condition`
+- `temperatureMax[0]` goes null after today's high passes; `calendarDayTemperatureMax`
+  fills that cell instead of dropping today's column
+
 **CacheManager-level (cache_manager.py):**
 - Per-provider `MAX_CACHE_HOURS` thresholds enforced:
   - 18h: weather_com, wunderground, accuweather, google_weather
@@ -201,6 +225,28 @@ If weather.com temps in the report don't match the website:
 4. If both are old, the API call is failing — check `TWC_API_KEY` and verify `pip-system-certs` is installed
 5. Both weather_com.py and wunderground.py use curl_cffi — if one fails, the other likely does too
 6. If firewall is blocking connections, contact IT Systems (Scott Bays) for domain whitelisting
+
+### How To Diagnose a Blank (All-Dash) Source Row
+
+A source row of `--` across every column means the provider handed the report
+either nothing or a forecast whose **dates don't overlap the grid**. Both look
+identical in the spreadsheet, so the run log is the source of truth:
+
+1. `logs/duck_sun.log` — `[generate_excel_report] <SOURCE>: 0/8 grid days - row
+   will be ALL DASHES` is written before the sheet is drawn, and
+   `[main] Data validation` lists a day count per provider (0 = blank row).
+   Weather.com and WUnderground are warn-only there: a blocked scraper reports
+   loudly but never stalls the report
+2. `outputs/cache/<provider>_lkg.json` — its `timestamp` is the last time that
+   provider actually succeeded. A months-old timestamp means the live fetch has
+   been failing since then and nobody noticed
+3. The row goes blank rather than stale because `CacheManager` rejects cache
+   past `MAX_CACHE_HOURS` and `DEFAULT_VALUES` has **no** `wunderground` entry
+   (`{}` → falsy → blank row). That is deliberate: blank is honest, a fabricated
+   55/40 is not. Note `weather_com` **does** still carry placeholder defaults,
+   which would enter the weighted average if it ever fell that far
+4. Run the provider standalone to see which link in the chain broke:
+   `./venv/Scripts/python.exe -m duck_sun.providers.wunderground`
 
 ## Google-First Policy (Jul 2026)
 
