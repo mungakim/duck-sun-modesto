@@ -177,32 +177,31 @@ The PDF report includes:
 - `condition` extracted from `daypart[0].wxPhraseLong` (was previously truncated narrative)
 
 **Provider-level (wunderground.py):**
-- Fetch chain: page scrape → TWC API (apiKey harvested from that page) → TWC API
-  (env key) → fresh cache (< 6h **and** still covering today) → None. The page
-  leads because it is the alignment target; the env-key call is last because its
-  geocode is configured rather than harvested and can drift from the 95350 page
-- The harvest step is the one that survives wunderground.com going fully
-  client-rendered: the page returns 200 with no forecast arrays in it, so the
-  provider pulls the `apiKey`/`geocode` out of the page's own JS and calls the
-  same v3 endpoint the site's front end calls. Key precedence:
-  `WUNDERGROUND_API_KEY` → `TWC_API_KEY` → harvested. Geocode precedence:
-  `WUNDERGROUND_GEOCODE` → harvested → the `37.66,-121.00` default
+- **There is no Weather Underground API key.** This provider is pure curl_cffi
+  page scraping, start to finish. Fetch chain: page scrape → fresh cache (< 6h
+  **and** still covering today) → None. Do not reintroduce an api.weather.com
+  call here — weather_com.py owns that endpoint, and routing WUnderground
+  through it would collapse two independent 4x sources into one
 - Embedded JSON is parsed in **both** forms the site has shipped: raw
   (`"temperatureMax":[…]`) and JS-escaped (`JSON.parse("{\"temperatureMax\":…")`),
   minified or pretty-printed. A regex written for only one form reads exactly
   like a dead provider
-- The page carries several forecast contexts and **hourly arrays reuse the daily
-  field names**, so a first-match regex can land on the wrong one. Daypart
-  arrays are chosen by length (2 entries per day); dates on the scrape path stay
-  **index-based** — a `validTimeLocal` pulled blind out of the page can be 24
-  hourly stamps sharing one date, which collapses the whole row into one column.
-  Only the API path, whose response shape is unambiguous, dates rows from
-  `validTimeLocal`
-- The page blob yields only **6 days** against the 8-column grid, which dashes
-  the last two columns on every run. When the scrape covers fewer than
-  `GRID_DAYS`, the provider extends it through the v3 API using the key/geocode
-  harvested from that same page. Strictly additive: a failed call keeps the
-  scraped days
+- The page carries several forecast windows under the **same field names** — a
+  short summary strip, the full 10-day forecast, and hourly arrays. Selection
+  rules follow from that:
+  - Daily arrays: take the **longest** `temperatureMax`/`temperatureMin` pair
+    that agree on length (≤ `MAX_FORECAST_DAYS`), compared across every script
+    blob. First-match-wins is why the row reported 6 days against the 8-column
+    grid and dashed the last two columns on every run — the short strip sits in
+    its own script tag ahead of the full forecast
+  - Daypart arrays (`precipChance`, `wxPhraseLong`): chosen by length, 2 entries
+    per day, so an hourly array can't shift values against the wrong days
+  - Dates: `validTimeLocal` of matching length **only if its dates are unique** —
+    an hourly stamp array is 24 entries sharing one date, and rows keyed on a
+    repeated date overwrite each other, collapsing the row to one column.
+    Otherwise index-based from the first `dayOfWeek` entry, which is matched
+    against today/tomorrow so an evening page that leads with tomorrow gets
+    dated forward instead of filing tomorrow's high under today
 - Impersonation fingerprints are tried in order (`firefox135`, `chrome136`,
   `chrome120`, `chrome110`) rather than hardcoding one: curl_cffi **raises** on a
   target its build doesn't know, and `curl-cffi>=0.7.0` is unpinned
@@ -243,9 +242,11 @@ If weather.com temps in the report don't match the website:
 First separate the two shapes, because they have different causes:
 
 - **Trailing dashes** (row populated, last N columns `--`) — the provider
-  returned fewer days than the grid is wide. WUnderground's page scrape returns
-  6 against an 8-column grid, which is why its last two columns were empty on
-  every run before the API top-up landed. `<SOURCE>: 6/8 grid days` in the log
+  returned fewer days than the grid is wide. WUnderground read 6 against an
+  8-column grid for months because its parser took the first `temperatureMax`
+  array it matched (the page's short summary strip) instead of the longest.
+  `<SOURCE>: 6/8 grid days` in the log, and on the provider side
+  `Daily array lengths available: [10, 6] (taking 10)`
 - **All dashes** — the provider returned nothing, or returned a forecast whose
   **dates don't overlap the grid**. Both look identical in the spreadsheet
 
