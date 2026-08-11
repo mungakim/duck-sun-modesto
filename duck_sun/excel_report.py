@@ -838,6 +838,22 @@ def generate_excel_report(
         ('GOOGLE (AI)', lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 5),
     ]
 
+    # Coverage check before anything is drawn. A source row renders "--" both
+    # when the provider returned nothing AND when it returned a forecast whose
+    # dates no longer line up with the grid (stale cache, timezone drift), and
+    # the two are indistinguishable in the finished spreadsheet. Say which
+    # happened here, in the run log, while the inputs are still in hand.
+    for label, getter, _ in sources:
+        covered = sum(1 for day in om_daily if getter(day, day.get('date', ''))[0] is not None)
+        if covered == 0:
+            logger.error(
+                f"[generate_excel_report] {label}: 0/{len(om_daily)} grid days - "
+                f"row will be ALL DASHES (no data, or its dates miss the grid window "
+                f"{om_daily[0].get('date') if om_daily else '?'}..)"
+            )
+        elif covered < len(om_daily):
+            logger.warning(f"[generate_excel_report] {label}: {covered}/{len(om_daily)} grid days")
+
     for src_idx, (label, getter, source_index) in enumerate(sources):
         grid_row = 13 + src_idx
 

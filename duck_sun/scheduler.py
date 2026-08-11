@@ -84,6 +84,8 @@ EXPECTED_DAYS = {
     "google_portland": 8,  # Same 240-hour pull for the Portland reference row
     "noaa": 5,             # Usually 7, but 5 minimum acceptable
     "open_meteo": 8,       # Baseline - always needed
+    "weather_com": 5,      # Scraped/TWC API - warn only, never blocks a report
+    "wunderground": 5,     # Scraped/TWC API - warn only, never blocks a report
 }
 
 
@@ -164,6 +166,20 @@ def verify_data_completeness(results: Dict[str, 'FetchResult']) -> ValidationRes
     else:
         warnings.append("NOAA: No data")
         day_counts["NOAA"] = 0
+
+    # Weather.com and Weather Underground: both carry weight 4x, and both are
+    # scrape-backed, so they fail in ways the API providers do not. They are
+    # warn-only (a blocked scraper must never stall the whole report), but they
+    # are counted here so a silently empty source row shows up in the run log
+    # instead of only in the spreadsheet.
+    for provider_key, display in (("weather_com", "Weather.com"), ("wunderground", "WUnderground")):
+        result = results.get(provider_key)
+        days = len(result.data) if result and isinstance(result.data, list) else 0
+        day_counts[display] = days
+        if days == 0:
+            warnings.append(f"{display}: No data - source row will be BLANK")
+        elif days < EXPECTED_DAYS[provider_key]:
+            warnings.append(f"{display}: {days}/{EXPECTED_DAYS[provider_key]} days")
 
     # Open-Meteo: Expect 8 days (baseline - always needed)
     om = results.get("open_meteo")
