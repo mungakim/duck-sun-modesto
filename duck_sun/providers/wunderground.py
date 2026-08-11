@@ -1,19 +1,14 @@
 """
 Weather Underground Provider for Duck Sun Modesto
 
-Fetches the 10-day forecast for Modesto, CA (95350) from Weather Underground.
+Scrapes the 10-day forecast for Modesto, CA (95350) from Weather Underground
+using curl_cffi with browser impersonation. There is no Weather Underground
+API key - the page is the only source, and everything below is built around
+parsing what it embeds.
 
 Fetch chain (first path that yields data wins):
-  1. wunderground.com page (curl_cffi, browser impersonation), parsing the
-     forecast JSON embedded in its script tags. The page leads because it is
-     the alignment target
-  2. TWC v3 API using the apiKey/geocode harvested from that same page - this
-     is the path that survives wunderground.com switching to client-side
-     rendering, where the page loads fine but carries no forecast arrays
-  3. TWC v3 API with WUNDERGROUND_API_KEY / TWC_API_KEY, if the page itself is
-     unreachable. The geocode is configured rather than harvested here, so it
-     can drift slightly from the 95350 page
-  4. Local cache, but only when it is fresh (< 6h) AND still covers today
+  1. wunderground.com page, parsing the forecast JSON embedded in its scripts
+  2. Local cache, but only when it is fresh (< 6h) AND still covers today
 
 Never returns stale data. A forecast whose dates no longer cover today would
 render as an all-dash row in the report (the grid is keyed by date), so it is
@@ -66,10 +61,13 @@ CACHE_MAX_AGE_HOURS = 6    # Cache is only usable while this fresh
 # any time, so every target is tried in turn instead of hardcoding just one.
 IMPERSONATE_TARGETS = ("firefox135", "chrome136", "chrome120", "chrome110")
 
-# Width of the report's temperature grid. The page blob has been handing back
-# only 6 days, which dashes out the last two columns of the WUNDERGRND row on
-# every run; short coverage is what triggers the API top-up below.
+# Width of the report's temperature grid. Only used to flag short coverage in
+# the log - the row is drawn from whatever the page gives us.
 GRID_DAYS = 8
+
+# TWC daily forecasts run 15 days at the outside; anything longer is not a
+# daily array and must not be treated as one.
+MAX_FORECAST_DAYS = 15
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
@@ -91,7 +89,8 @@ def _array_pattern(key: str) -> str:
     Regex for a JSON array field, tolerant of pretty-printed whitespace.
 
     The leading quote is load-bearing: it is what stops "temperatureMax" from
-    also matching inside "calendarDayTemperatureMax", which is offset by a day.
+    also matching inside "calendarDayTemperatureMax", which is a different
+    array with different semantics.
     """
     return r'"%s"\s*:\s*\[([^\]]+)\]' % re.escape(key)
 
@@ -110,11 +109,11 @@ class WUndergroundDay(TypedDict):
 
 class WUndergroundProvider:
     """
-    Provider for Weather Underground data.
+    Provider for Weather Underground data via web scraping.
 
-    Prefers the TWC v3 API that wunderground.com's own front end calls, and
-    falls back to parsing the forecast JSON embedded in the page. Both paths
-    go through curl_cffi with browser impersonation.
+    Uses curl_cffi with browser impersonation to bypass anti-bot protection and
+    extracts the forecast arrays embedded in the page's script tags. No API key
+    is involved anywhere in this provider.
 
     Weight: 4.0 (commercial provider tier)
     """
@@ -122,24 +121,19 @@ class WUndergroundProvider:
     # Modesto, CA ZIP code URL
     URL = "https://www.wunderground.com/forecast/us/ca/modesto/95350"
 
-    # Same v3 endpoint family Weather.com uses. wunderground.com renders from
-    # this API, so it is a source-replication path, not an approximation.
-    API_URL = "https://api.weather.com/v3/wx/forecast/daily/10day"
-
-    # Fallback geocode for the 95350 page when one cannot be harvested from the
-    # page itself. Override with WUNDERGROUND_GEOCODE if the API path ever
-    # drifts from what wunderground.com shows.
-    GEOCODE = "37.66,-121.00"
-
     def __init__(self):
         logger.info("[WUndergroundProvider] Initializing provider...")
         if not HAS_CURL_CFFI:
             logger.warning("[WUndergroundProvider] curl_cffi not installed - provider disabled")
         if not HAS_BS4:
-            logger.warning("[WUndergroundProvider] beautifulsoup4 not installed - page scraping disabled")
+            logger.warning("[WUndergroundProvider] beautifulsoup4 not installed - page scraping degraded")
 
         # Ensure cache directory exists
         CACHE_DIR.mkdir(exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Cache
+    # ------------------------------------------------------------------
 
     def _load_cache(self) -> Optional[dict]:
         """Load cached data if it exists."""
@@ -261,6 +255,10 @@ class WUndergroundProvider:
         today = self._get_date_for_day(0)
         return [d for d in days if isinstance(d, dict) and d.get('date', '') >= today]
 
+    # ------------------------------------------------------------------
+    # Array extraction
+    # ------------------------------------------------------------------
+
     def _extract_array(self, pattern: str, data: str, is_numeric: bool = True) -> List:
         """Extract the first matching array. See _extract_arrays."""
         for arr in self._extract_arrays(pattern, data, is_numeric):
@@ -296,6 +294,13 @@ class WUndergroundProvider:
 
         return results
 
+    def _first_of_length(self, arrays: List[List], length: int) -> Optional[List]:
+        """First array of exactly `length` entries, or None."""
+        for arr in arrays:
+            if len(arr) == length:
+                return arr
+        return None
+
     def _select_daypart_array(
         self, key: str, data: str, num_days: int, is_numeric: bool = True
     ) -> List:
@@ -319,15 +324,43 @@ class WUndergroundProvider:
             )
         return []
 
+    # ------------------------------------------------------------------
+    # Row building
+    # ------------------------------------------------------------------
+
     def _get_date_for_day(self, day_index: int) -> str:
         """Get YYYY-MM-DD date string for day index (0 = today)."""
         today = datetime.now(PACIFIC)
         target = today + timedelta(days=day_index)
         return target.strftime('%Y-%m-%d')
 
-    # ------------------------------------------------------------------
-    # Shared builder
-    # ------------------------------------------------------------------
+    def _start_offset(self, day_names: List) -> int:
+        """
+        Day index the forecast starts on, read from its first day name.
+
+        Late in the day wunderground.com drops today and leads with tomorrow.
+        Dating that row from index 0 would file tomorrow's high under today and
+        shift the entire row by a day - visibly wrong numbers, no error.
+        """
+        if not day_names or not day_names[0]:
+            return 0
+
+        first = str(day_names[0])[:3].lower()
+        today = datetime.now(PACIFIC)
+        for offset in (0, 1):
+            if (today + timedelta(days=offset)).strftime('%a').lower() == first:
+                if offset:
+                    logger.info(
+                        f"[WUndergroundProvider] Page starts at '{day_names[0]}' (tomorrow) "
+                        f"- dating rows from +1 day"
+                    )
+                return offset
+
+        logger.warning(
+            f"[WUndergroundProvider] First day name '{day_names[0]}' is neither today nor "
+            f"tomorrow - dating from today anyway"
+        )
+        return 0
 
     def _build_days(
         self,
@@ -341,14 +374,14 @@ class WUndergroundProvider:
         calendar_min: Optional[List] = None,
     ) -> List[WUndergroundDay]:
         """
-        Build WUndergroundDay rows from TWC daily arrays.
+        Build WUndergroundDay rows from the page's daily arrays.
 
-        Shared by the API and the page-scrape paths so both produce identical
-        shapes. precip_chances / wx_phrases are daypart arrays: two entries per
-        day (daytime, then night).
+        precip_chances / wx_phrases are daypart arrays: two entries per day
+        (daytime, then night).
         """
         results: List[WUndergroundDay] = []
-        num_days = min(10, len(days_of_week) or 10, len(max_temps), len(min_temps))
+        num_days = min(MAX_FORECAST_DAYS, len(days_of_week) or MAX_FORECAST_DAYS,
+                       len(max_temps), len(min_temps))
 
         # An array pulled from the wrong context (hourly rather than daily)
         # is long and would silently misalign every row, so drop anything that
@@ -356,6 +389,7 @@ class WUndergroundProvider:
         precip_chances = self._sane_aux(precip_chances, num_days, "precipChance")
         wx_phrases = self._sane_aux(wx_phrases, num_days, "wxPhraseLong")
         valid_times = self._sane_dates(valid_times, num_days)
+        offset = 0 if valid_times else self._start_offset(days_of_week)
 
         for i in range(num_days):
             high_f = max_temps[i]
@@ -383,14 +417,14 @@ class WUndergroundProvider:
             else:
                 day_abbrev = f"D{i}"
 
-            # Prefer the date the API stamped on the row; fall back to offset
+            # Prefer the date the page stamped on the row; fall back to offset
             date_str = None
             if valid_times and i < len(valid_times) and valid_times[i]:
                 date_str = str(valid_times[i])[:10]
                 if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', date_str):
                     date_str = None
             if date_str is None:
-                date_str = self._get_date_for_day(i)
+                date_str = self._get_date_for_day(i + offset)
 
             # Daytime daypart entry, falling back to night. Matching the
             # Weather.com rule: the daytime value is what the site displays.
@@ -461,7 +495,7 @@ class WUndergroundProvider:
         return None
 
     # ------------------------------------------------------------------
-    # Fetch paths
+    # Page fetch + parse
     # ------------------------------------------------------------------
 
     def _fetch_page(self) -> Optional[str]:
@@ -526,198 +560,93 @@ class WUndergroundProvider:
                 logger.warning(f"[WUndergroundProvider] HTML parse error: {e}")
         blobs.append(html)
 
+        # Compare across every blob rather than returning the first hit: the
+        # short summary strip sits in its own script tag ahead of the full
+        # forecast, and first-hit-wins is how a 10-day page produced 6 days.
+        best: Optional[List[WUndergroundDay]] = None
         for blob in blobs:
             for candidate in self._candidate_blobs(blob):
-                days_of_week = self._extract_array(_array_pattern('dayOfWeek'), candidate, is_numeric=False)
-                # temperatureMax/Min, not the calendarDay variants - those are
-                # offset by a day relative to the grid. The leading quote in the
-                # pattern is what keeps "calendarDayTemperatureMax" from matching.
-                max_temps = self._extract_array(_array_pattern('temperatureMax'), candidate)
-                min_temps = self._extract_array(_array_pattern('temperatureMin'), candidate)
-                if not max_temps or not min_temps:
-                    continue
+                days = self._parse_daily_arrays(candidate)
+                if days and (best is None or len(days) > len(best)):
+                    best = days
 
-                num_days = min(10, len(days_of_week) or 10, len(max_temps), len(min_temps))
-                precip_chances = self._select_daypart_array('precipChance', candidate, num_days)
-                wx_phrases = self._select_daypart_array(
-                    'wxPhraseLong', candidate, num_days, is_numeric=False
-                )
-
-                # Dates stay index-based here, deliberately. The page carries
-                # several forecast contexts (hourly among them) and a regex
-                # takes the first match it finds, so a "validTimeLocal" pulled
-                # out of the page could be 24 hourly stamps that all share one
-                # date - which would collapse the whole row into one column.
-                # Only the API path, whose response shape is unambiguous, dates
-                # rows from validTimeLocal.
-                days = self._build_days(
-                    days_of_week=days_of_week,
-                    max_temps=max_temps,
-                    min_temps=min_temps,
-                    precip_chances=precip_chances,
-                    wx_phrases=wx_phrases,
-                )
-                if days:
-                    logger.info(f"[WUndergroundProvider] Parsed {len(days)} days from embedded page JSON")
-                    return days
-
-        logger.warning("[WUndergroundProvider] No forecast arrays in page (client-rendered or layout changed)")
-        return None
-
-    @staticmethod
-    def _extract_api_key(html: str) -> Optional[str]:
-        """Harvest the TWC apiKey wunderground.com's own front end uses."""
-        for pattern in (r'apiKey["\']?\s*[:=]\s*["\']([0-9a-f]{32})["\']', r'apiKey=([0-9a-f]{32})'):
-            match = re.search(pattern, html)
-            if match:
-                return match.group(1)
-        return None
-
-    @staticmethod
-    def _extract_geocode(html: str) -> Optional[str]:
-        """Harvest the geocode the page requests its forecast for."""
-        match = re.search(r'geocode=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)', html)
-        if match:
-            return f"{match.group(1)},{match.group(2)}"
-
-        lat = re.search(r'\\?"latitude\\?":\s*(-?\d+\.\d+)', html)
-        lon = re.search(r'\\?"longitude\\?":\s*(-?\d+\.\d+)', html)
-        if lat and lon:
-            return f"{lat.group(1)},{lon.group(1)}"
-        return None
-
-    def _configured_api_key(self) -> Optional[str]:
-        """API key from the environment, if the operator supplied one."""
-        return os.getenv("WUNDERGROUND_API_KEY") or os.getenv("TWC_API_KEY")
-
-    def _geocode(self, harvested: Optional[str] = None) -> str:
-        """Geocode to request: env override > harvested from page > default."""
-        return os.getenv("WUNDERGROUND_GEOCODE") or harvested or self.GEOCODE
-
-    def _fetch_via_api(self, api_key: str, geocode: str) -> Optional[List[WUndergroundDay]]:
-        """Fetch the 10-day forecast from the TWC v3 API."""
-        if not HAS_CURL_CFFI:
+        if best is None:
+            logger.warning(
+                "[WUndergroundProvider] No forecast arrays in page (client-rendered or layout changed)"
+            )
             return None
 
-        params = {
-            "geocode": geocode,
-            "format": "json",
-            "units": "e",  # Imperial (Fahrenheit)
-            "language": "en-US",
-            "apiKey": api_key,
-        }
-        url = f"{self.API_URL}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
-
-        logger.info(f"[WUndergroundProvider] Fetching TWC API for geocode {geocode}")
-
-        try:
-            from curl_cffi.requests import Session
-
-            headers = {
-                "Accept": "application/json",
-                "Referer": "https://www.wunderground.com/",
-                "Origin": "https://www.wunderground.com",
-            }
-
-            response = None
-            for target in IMPERSONATE_TARGETS:
-                try:
-                    with Session(impersonate=target) as session:
-                        response = session.get(
-                            url, headers=headers, timeout=30, verify=get_ca_bundle_for_curl()
-                        )
-                    break
-                except Exception as e:
-                    logger.warning(f"[WUndergroundProvider] API call with {target} failed: {e}")
-
-            if response is None:
-                return None
-
-            if response.status_code != 200:
-                logger.error(f"[WUndergroundProvider] API HTTP {response.status_code}")
-                return None
-
-            data = response.json()
-            daypart = data.get('daypart', [{}])
-            dp = daypart[0] if daypart else {}
-
-            days = self._build_days(
-                days_of_week=data.get('dayOfWeek', []),
-                max_temps=data.get('temperatureMax', []),
-                min_temps=data.get('temperatureMin', []),
-                precip_chances=dp.get('precipChance', []),
-                valid_times=data.get('validTimeLocal', []),
-                wx_phrases=dp.get('wxPhraseLong', []),
-                calendar_max=data.get('calendarDayTemperatureMax', []),
-                calendar_min=data.get('calendarDayTemperatureMin', []),
+        logger.info(f"[WUndergroundProvider] Parsed {len(best)} days from embedded page JSON")
+        if len(best) < GRID_DAYS:
+            logger.warning(
+                f"[WUndergroundProvider] Page carries only {len(best)} days for a "
+                f"{GRID_DAYS}-day grid - trailing columns will be blank"
             )
+        return best
 
+    def _parse_daily_arrays(self, text: str) -> Optional[List[WUndergroundDay]]:
+        """
+        Build rows from the fullest daily forecast the text carries.
+
+        The page embeds the same field names for several windows (a short
+        summary strip alongside the full 10-day forecast, plus hourly arrays),
+        so take the LONGEST set of daily arrays that agree on length rather than
+        the first one matched. Taking the first is how the provider ended up
+        reporting 6 days against an 8-column grid, dashing the last two columns
+        on every run.
+        """
+        # temperatureMax/Min, not the calendarDay variants - those are the
+        # calendar-day aggregates, kept only as a fallback for a null high.
+        highs = self._extract_arrays(_array_pattern('temperatureMax'), text)
+        lows = self._extract_arrays(_array_pattern('temperatureMin'), text)
+        if not highs or not lows:
+            return None
+
+        names = self._extract_arrays(_array_pattern('dayOfWeek'), text, is_numeric=False)
+        cal_highs = self._extract_arrays(_array_pattern('calendarDayTemperatureMax'), text)
+        cal_lows = self._extract_arrays(_array_pattern('calendarDayTemperatureMin'), text)
+        times = self._extract_arrays(_array_pattern('validTimeLocal'), text, is_numeric=False)
+
+        lengths = sorted(
+            {len(a) for a in highs if 1 <= len(a) <= MAX_FORECAST_DAYS} &
+            {len(a) for a in lows if 1 <= len(a) <= MAX_FORECAST_DAYS},
+            reverse=True,
+        )
+        if not lengths:
+            logger.warning(
+                f"[WUndergroundProvider] No daily temperature arrays of plausible length "
+                f"(highs {[len(a) for a in highs]}, lows {[len(a) for a in lows]})"
+            )
+            return None
+
+        logger.info(f"[WUndergroundProvider] Daily array lengths available: {lengths} (taking {lengths[0]})")
+
+        for length in lengths:
+            days = self._build_days(
+                days_of_week=self._first_of_length(names, length) or [],
+                max_temps=self._first_of_length(highs, length),
+                min_temps=self._first_of_length(lows, length),
+                precip_chances=self._select_daypart_array('precipChance', text, length),
+                valid_times=self._first_of_length(times, length) or [],
+                wx_phrases=self._select_daypart_array(
+                    'wxPhraseLong', text, length, is_numeric=False
+                ),
+                calendar_max=self._first_of_length(cal_highs, length) or [],
+                calendar_min=self._first_of_length(cal_lows, length) or [],
+            )
             if days:
-                logger.info(f"[WUndergroundProvider] Retrieved {len(days)} days from TWC API")
                 return days
 
-            logger.error("[WUndergroundProvider] API response carried no usable temperatures")
-            return None
-
-        except Exception as e:
-            logger.error(f"[WUndergroundProvider] API fetch failed: {e}", exc_info=True)
-            return None
-
-    def _top_up_short_forecast(
-        self, days: List[WUndergroundDay], html: str
-    ) -> List[WUndergroundDay]:
-        """
-        Extend a scrape that covers fewer days than the report grid.
-
-        The page blob has been yielding 6 days against an 8-column grid, so the
-        WUNDERGRND row's last two columns dash out on every run. The v3 API the
-        page itself renders from returns 10, using the geocode harvested from
-        that same page.
-
-        Only the missing dates are taken. Days the page covered keep the page's
-        own numbers, so the visible row stays 1:1 with wunderground.com even if
-        the harvested geocode rounds differently than the page's.
-        """
-        if len(days) >= GRID_DAYS:
-            return days
-
-        api_key = self._extract_api_key(html) or self._configured_api_key()
-        if not api_key:
-            logger.warning(
-                f"[WUndergroundProvider] Page gave {len(days)} days for a {GRID_DAYS}-day grid "
-                f"and carries no apiKey - trailing columns will be blank"
-            )
-            return days
-
-        logger.info(
-            f"[WUndergroundProvider] Page gave {len(days)}/{GRID_DAYS} days - extending via API"
-        )
-        extended = self._fetch_via_api(api_key, self._geocode(self._extract_geocode(html)))
-
-        if extended:
-            have = {d['date'] for d in days}
-            added = [d for d in extended if d['date'] not in have]
-            if added:
-                merged = sorted(days + added, key=lambda d: d['date'])
-                logger.info(
-                    f"[WUndergroundProvider] Extended {len(days)} -> {len(merged)} days "
-                    f"(page values kept for the days it covered)"
-                )
-                return merged
-
-        logger.warning(
-            f"[WUndergroundProvider] API added no days - keeping {len(days)} scraped days"
-        )
-        return days
+        return None
 
     def fetch_sync(self) -> Optional[List[WUndergroundDay]]:
         """
         Synchronously fetch the 10-day forecast from Weather Underground.
 
-        Walks the fetch chain documented at the top of this module and returns
-        the first result that covers today. Returns None (never stale data) if
-        every path fails - the caller renders that as an empty row rather than
-        showing yesterday's forecast under today's dates.
+        Returns the scraped forecast, or fresh cache if the page is unreachable.
+        Returns None (never stale data) if both fail - the caller renders that
+        as an empty row rather than showing yesterday's forecast under today's
+        dates.
         """
         if not HAS_CURL_CFFI:
             logger.error("[WUndergroundProvider] Missing dependency: curl_cffi")
@@ -729,45 +658,19 @@ class WUndergroundProvider:
             if cached:
                 return cached
 
-        # 1. The page itself. It is the alignment target, and it also carries
-        #    the exact apiKey and geocode the site renders from, so it leads.
         html = self._fetch_page()
         if html:
             days = self._parse_embedded_json(html)
             if days:
-                days = self._top_up_short_forecast(days, html)
                 self._save_cache(days)
                 return days
 
-            # 2. The API, using the credentials the page just handed us
-            harvested_key = self._extract_api_key(html)
-            if harvested_key:
-                logger.info("[WUndergroundProvider] Harvested apiKey from page - retrying via API")
-                days = self._fetch_via_api(harvested_key, self._geocode(self._extract_geocode(html)))
-                if days:
-                    self._save_cache(days)
-                    return days
-            else:
-                logger.error("[WUndergroundProvider] No apiKey found in page")
-
-        # 3. The API with an operator-supplied key. Last network resort: the
-        #    geocode here is configured rather than harvested, so it can drift
-        #    from what wunderground.com shows for the 95350 page.
-        api_key = self._configured_api_key()
-        if api_key:
-            logger.warning("[WUndergroundProvider] Page unreachable - falling back to configured API key")
-            days = self._fetch_via_api(api_key, self._geocode())
-            if days:
-                self._save_cache(days)
-                return days
-
-        # 4. Fresh cache as the last resort
         cached = self._get_fresh_cache()
         if cached:
             return cached
 
         logger.error(
-            "[WUndergroundProvider] ALL fetch paths failed and no fresh cache - "
+            "[WUndergroundProvider] Scrape failed and no fresh cache - "
             "the WUNDERGRND row will be blank in this report"
         )
         return None
