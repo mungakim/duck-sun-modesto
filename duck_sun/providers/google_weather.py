@@ -21,7 +21,8 @@ FORECAST LENGTH (verified against Google's REST reference, Jul 2026):
 
 MULTI-LOCATION:
 - The provider is location-parameterized. Modesto (the forecast subject) is
-  the default; Portland, OR is fetched as a separate read-only side reference.
+  the default; Portland, OR and Phoenix, AZ are fetched as separate read-only
+  side references (one Hi/Lo row each, never in the Modesto consensus).
 
 RATE LIMITING:
 - Check Google Cloud Console for quota limits
@@ -91,8 +92,8 @@ class GoogleWeatherProvider:
     - Real-time data fusion vs physics-only models
 
     Defaults to Modesto, CA. Pass lat/lon/timezone/cache_key to fetch a
-    different location (e.g. the Portland, OR side reference) without
-    clobbering the Modesto cache.
+    different location (e.g. the Portland, OR / Phoenix, AZ side references)
+    without clobbering the Modesto cache.
     """
 
     # Google Weather API endpoint (Forecast Hours)
@@ -627,6 +628,36 @@ class GooglePortlandProvider(GoogleWeatherProvider):
         )
 
 
+# Phoenix, AZ - second side reference row, same rules as Portland: displayed
+# on its own row, never part of the Modesto weighted consensus.
+PHOENIX_LAT = 33.4484
+PHOENIX_LON = -112.0740
+PHOENIX_TIMEZONE = "America/Phoenix"
+
+
+class GooglePhoenixProvider(GoogleWeatherProvider):
+    """Google Weather (MetNet-3) for Phoenix, AZ.
+
+    Arizona stays on Mountain Standard Time all year (no DST), so Phoenix is
+    level with Modesto in summer (both UTC-7) and one hour ahead in winter.
+    Highs and lows are aggregated on Phoenix's own calendar day: a one-hour
+    offset never moves an afternoon high or a pre-dawn low across midnight,
+    so the row still lines up column-for-column with the Modesto grid dates.
+
+    Uses its own cache key so a Phoenix fetch can never overwrite the Modesto
+    or Portland Last Known Good data.
+    """
+
+    def __init__(self):
+        super().__init__(
+            lat=PHOENIX_LAT,
+            lon=PHOENIX_LON,
+            timezone=PHOENIX_TIMEZONE,
+            location_name="Phoenix, AZ",
+            cache_key="google_phoenix",
+        )
+
+
 if __name__ == "__main__":
     import asyncio
     from dotenv import load_dotenv
@@ -667,5 +698,7 @@ if __name__ == "__main__":
         await _show(GoogleWeatherProvider(), GoogleWeatherProvider.MAX_FORECAST_HOURS)
         print()
         await _show(GooglePortlandProvider(), GoogleWeatherProvider.MAX_FORECAST_HOURS)
+        print()
+        await _show(GooglePhoenixProvider(), GoogleWeatherProvider.MAX_FORECAST_HOURS)
 
     asyncio.run(test())

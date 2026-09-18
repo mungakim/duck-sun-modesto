@@ -44,8 +44,9 @@ venv.bak/
 # Excel temporary/lock files
 ~$*
 
-# Logs
+# Logs (also holds the last empty wunderground page for post-mortem)
 *.log
+logs/
 duck_sun_scheduler.log
 
 # OS

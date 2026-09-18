@@ -119,6 +119,7 @@ class CacheManager:
         "accuweather": 18,      # Commercial provider - keep fresh
         "google_weather": 18,   # MetNet-3 updates frequently
         "google_portland": 18,  # Same API/model, Portland reference row
+        "google_phoenix": 18,   # Same API/model, Phoenix reference row
         "noaa": 24,             # NOAA updates every 12h but 24h is acceptable
         "open_meteo": 24,       # Physics models update every 6h
         "mid_org": 48,          # Local ground truth - less frequent updates
@@ -162,9 +163,15 @@ class CacheManager:
             "source": "DEFAULT",
             "fetched_at": "DEFAULT"
         },
-        # Portland is a side reference - an empty payload just blanks its row,
-        # it never degrades the Modesto forecast.
+        # Portland and Phoenix are side references - an empty payload just
+        # blanks that row, it never degrades the Modesto forecast.
         "google_portland": {
+            "hourly": [],
+            "daily": [],
+            "source": "DEFAULT",
+            "fetched_at": "DEFAULT"
+        },
+        "google_phoenix": {
             "hourly": [],
             "daily": [],
             "source": "DEFAULT",

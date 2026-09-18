@@ -34,7 +34,11 @@ load_dotenv()
 from duck_sun.providers.open_meteo import fetch_open_meteo, fetch_hrrr_forecast
 from duck_sun.providers.noaa import NOAAProvider
 from duck_sun.providers.accuweather import AccuWeatherProvider
-from duck_sun.providers.google_weather import GooglePortlandProvider, GoogleWeatherProvider
+from duck_sun.providers.google_weather import (
+    GooglePhoenixProvider,
+    GooglePortlandProvider,
+    GoogleWeatherProvider,
+)
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.weather_com import WeatherComProvider
@@ -82,6 +86,7 @@ EXPECTED_DAYS = {
     "accuweather": 5,      # $2/mo tier
     "google_weather": 8,   # 240 hours (API max) -> ~10 calendar days; 8 fills the grid
     "google_portland": 8,  # Same 240-hour pull for the Portland reference row
+    "google_phoenix": 8,   # Same 240-hour pull for the Phoenix reference row
     "noaa": 5,             # Usually 7, but 5 minimum acceptable
     "open_meteo": 8,       # Baseline - always needed
     "weather_com": 5,      # Scraped/TWC API - warn only, never blocks a report
@@ -144,17 +149,19 @@ def verify_data_completeness(results: Dict[str, 'FetchResult']) -> ValidationRes
         critical_failures.append("Google: No data")
         day_counts["Google"] = 0
 
-    # Portland (side reference): tracked, never critical. A missing Portland row
-    # must not trigger a report-level retry or block the Modesto forecast.
-    portland = results.get("google_portland")
-    if portland and portland.data:
-        portland_daily = portland.data.get("daily", []) if isinstance(portland.data, dict) else []
-        day_counts["Portland"] = len(portland_daily)
-        if len(portland_daily) < EXPECTED_DAYS["google_portland"]:
-            warnings.append(f"Portland: {len(portland_daily)}/{EXPECTED_DAYS['google_portland']} days")
-    else:
-        warnings.append("Portland: No data")
-        day_counts["Portland"] = 0
+    # Side references (Portland, Phoenix): tracked, never critical. A missing
+    # reference row must not trigger a report-level retry or block the
+    # Modesto forecast.
+    for provider_key, display in (("google_portland", "Portland"), ("google_phoenix", "Phoenix")):
+        ref = results.get(provider_key)
+        if ref and ref.data:
+            ref_daily = ref.data.get("daily", []) if isinstance(ref.data, dict) else []
+            day_counts[display] = len(ref_daily)
+            if len(ref_daily) < EXPECTED_DAYS[provider_key]:
+                warnings.append(f"{display}: {len(ref_daily)}/{EXPECTED_DAYS[provider_key]} days")
+        else:
+            warnings.append(f"{display}: No data")
+            day_counts[display] = 0
 
     # NOAA: Count unique days from hourly data
     noaa = results.get("noaa")
@@ -356,6 +363,15 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
 
     results["google_portland"] = await fetch_with_retry("google_portland", _fetch_google_portland, cache_mgr)
 
+    # 6c. Google Weather - Phoenix, AZ (side reference row, NOT in consensus)
+    logger.info("[fetch_all_providers] Fetching Google Weather - Phoenix, AZ (reference)...")
+
+    async def _fetch_google_phoenix():
+        phoenix = GooglePhoenixProvider()
+        return await phoenix.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
+
+    results["google_phoenix"] = await fetch_with_retry("google_phoenix", _fetch_google_phoenix, cache_mgr)
+
     # 7. Weather.com (commercial - weight 4x)
     logger.info("[fetch_all_providers] Fetching Weather.com...")
 
@@ -441,6 +457,22 @@ async def retry_single_provider(
         async def _fetch():
             provider = GooglePortlandProvider()
             return await provider.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "google_phoenix":
+        async def _fetch():
+            provider = GooglePhoenixProvider()
+            return await provider.fetch_forecast(hours=GoogleWeatherProvider.MAX_FORECAST_HOURS)
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "weather_com":
+        async def _fetch():
+            return WeatherComProvider().fetch_sync()
+        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+
+    elif provider_name == "wunderground":
+        async def _fetch():
+            return WUndergroundProvider().fetch_sync()
         return await fetch_with_retry(provider_name, _fetch, cache_mgr)
 
     elif provider_name == "noaa":
@@ -697,6 +729,7 @@ async def main():
         accu_data = results["accuweather"].data
         google_data = results["google_weather"].data
         portland_data = results["google_portland"].data
+        phoenix_data = results["google_phoenix"].data
         weather_com_data = results["weather_com"].data
         wunderground_data = results["wunderground"].data
         mid_data = results["mid_org"].data
@@ -886,6 +919,7 @@ async def main():
             accu_data=accu_data,
             google_data=google_data,
             portland_data=portland_data,
+            phoenix_data=phoenix_data,
             weather_com_data=weather_com_data,
             wunderground_data=wunderground_data,
             df_analyzed=df_analyzed,

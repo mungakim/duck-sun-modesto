@@ -9,6 +9,7 @@ import inspect
 from datetime import datetime, timedelta, timezone
 
 from duck_sun.providers.google_weather import (
+    GooglePhoenixProvider,
     GooglePortlandProvider,
     GoogleWeatherProvider,
 )
@@ -90,3 +91,20 @@ def test_unwrap_cache_handles_both_on_disk_layouts():
 
     assert GoogleWeatherProvider._unwrap_cache(direct) is direct
     assert GoogleWeatherProvider._unwrap_cache(wrapped) == direct
+
+
+def test_phoenix_provider_is_a_distinct_location_with_its_own_cache():
+    modesto = GoogleWeatherProvider()
+    portland = GooglePortlandProvider()
+    phoenix = GooglePhoenixProvider()
+
+    assert (phoenix.lat, phoenix.lon) not in {(modesto.lat, modesto.lon), (portland.lat, portland.lon)}
+    assert round(phoenix.lat) == 33 and round(phoenix.lon) == -112
+    assert phoenix.location_name == "Phoenix, AZ"
+
+    # Separate cache file: a Phoenix fetch must never clobber Modesto's or Portland's LKG
+    assert phoenix.cache_file not in {modesto.cache_file, portland.cache_file}
+    assert phoenix.cache_file.name == "google_phoenix_lkg.json"
+
+    # Arizona has no DST - aggregate on Phoenix's own calendar day, not Pacific
+    assert phoenix.timezone == "America/Phoenix"

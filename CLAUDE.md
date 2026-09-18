@@ -131,7 +131,7 @@ The PDF report includes:
 - 8-day temperature grid from 6 sources with weighted consensus (all 6 sources now cover the full 8 days)
 - MID Weather 48-hour summary with historical records
 - Precipitation % from ensemble (NOAA HRRR, Open-Meteo, AccuWeather, Google)
-- Portland, OR side-reference row (single Hi/Lo line, Google Weather, excluded from the Modesto consensus)
+- Side reference temps: Portland, OR and Phoenix, AZ (one Hi/Lo line each, Google Weather, excluded from the Modesto consensus)
 - 7-day solar forecast (HE09-HE16) with hourly W/m² and condition descriptions, 100% Google MetNet-3
 - Solar irradiance legend: <50 Minimal, 50-150 Low-Moderate, 150-400 Good, >400 Peak Production
 
@@ -182,10 +182,12 @@ The PDF report includes:
   **and** still covering today) → None. Do not reintroduce an api.weather.com
   call here — weather_com.py owns that endpoint, and routing WUnderground
   through it would collapse two independent 4x sources into one
-- Embedded JSON is parsed in **both** forms the site has shipped: raw
-  (`"temperatureMax":[…]`) and JS-escaped (`JSON.parse("{\"temperatureMax\":…")`),
-  minified or pretty-printed. A regex written for only one form reads exactly
-  like a dead provider
+- Embedded JSON is parsed in **every** form the site has shipped or could ship:
+  raw (`"temperatureMax":[…]`), JS-escaped (`JSON.parse("{\"temperatureMax\":…")`),
+  Angular TransferState (`&q;temperatureMax&q;:[…]` inside
+  `<script id="app-root-state">`, the framework's own serialisation), HTML
+  entities (`&quot;`) and `\u0022`, minified or pretty-printed. A regex
+  written for only one form reads exactly like a dead provider
 - The page carries several forecast windows under the **same field names** — a
   short summary strip, the full 10-day forecast, and hourly arrays. Selection
   rules follow from that:
@@ -204,9 +206,27 @@ The PDF report includes:
     Otherwise index-based from the first `dayOfWeek` entry, which is matched
     against today/tomorrow so an evening page that leads with tomorrow gets
     dated forward instead of filing tomorrow's high under today
-- Impersonation fingerprints are tried in order (`firefox135`, `chrome136`,
-  `chrome120`, `chrome110`) rather than hardcoding one: curl_cffi **raises** on a
-  target its build doesn't know, and `curl-cffi>=0.7.0` is unpinned
+- **A 200 OK page with no forecast arrays is retried, not treated as final.**
+  That is the intermittent blank-row failure (Sep 2026): the site answers
+  normally but its server-rendered state is missing the forecast (their
+  forecast API timed out mid-render, or the page came from a cold edge cache /
+  bot interstitial), and the next render usually carries it. `_scrape()` makes
+  up to `MAX_FETCH_ATTEMPTS` (6) attempts with `RETRY_DELAYS_SECONDS`
+  (2/4/6/8/10s) between them - ~30s worst case, only on a bad day. Every
+  attempt rotates **both** the page variant (`URL` on even attempts, the
+  `ALTERNATE_URLS` city page / today page on odd ones) and the browser
+  fingerprint. A short result (fewer days than the grid) is kept as a fallback
+  while later attempts try for the full window. Watch for
+  `Recovered on attempt N` in the log - that line is the fix working
+- Impersonation fingerprints (`firefox135`, `chrome136`, `chrome120`,
+  `chrome110`) rotate across attempts rather than hardcoding one: curl_cffi
+  **raises** on a target its build doesn't know (dropped from the rotation
+  without spending an attempt), and `curl-cffi>=0.7.0` is unpinned
+- When a page carries no arrays the log now says what the site sent (HTTP
+  status, size, `<title>`, and markers such as `app-root-state`,
+  `access-denied`, `captcha`, `cf-challenge`) instead of one generic line, and
+  the page itself is written to `logs/wunderground_last_failed_page.html` for
+  post-mortem
 - Cached days dated before today are dropped, and a cache that no longer covers
   today is rejected outright — serving it produces an all-dash row, not an error
 - Same daytime-daypart rule as weather_com for `precip_prob` / `condition`
@@ -269,6 +289,11 @@ The run log is the source of truth:
    which would enter the weighted average if it ever fell that far
 4. Run the provider standalone to see which link in the chain broke:
    `./venv/Scripts/python.exe -m duck_sun.providers.wunderground`
+5. For WUnderground specifically, `logs/wunderground_last_failed_page.html` is
+   the last page that came back without forecast arrays (header comment has
+   the timestamp, HTTP status, URL and fingerprint). Open it: a bot
+   interstitial, an empty `app-root-state`, and a real redesign all look
+   different there and identical in the log
 
 ## Google-First Policy (Jul 2026)
 
@@ -328,30 +353,40 @@ single per-call SKU:
 | Default rate limit | 6,000 queries/minute per project (adjustable in Cloud Console) |
 | Forecast horizon | `hours` = 1..240 on `forecast/hours:lookup`, independent of spend |
 
-Current usage: 10 paginated calls for Modesto + 10 for Portland = **20 per run**.
-At one run/day that's ~600/month against a 10,000 free allowance — about 6%, at
-no cost. Room for ~16 runs/day before billing starts. A pay-as-you-go project
+Current usage: 10 paginated calls for Modesto + 10 for Portland + 10 for
+Phoenix = **30 per run**. At one run/day that's ~900/month against a 10,000 free
+allowance — about 9%, at no cost. Room for ~11 runs/day before billing starts. A pay-as-you-go project
 needs billing *enabled* (a card on file) even while inside the free allowance;
 that is not a "tier", just Google's activation requirement.
 
-## Portland, OR Side Reference (Jul 2026)
+## Side Reference Temps: Portland, OR + Phoenix, AZ (Sep 2026)
 
-The Excel one-pager carries a single Portland, OR Hi/Lo line directly beneath the
-Modesto block and above the solar grid. It is a **reference only**:
+The Excel one-pager carries a **SIDE REFERENCE TEMPS** band directly beneath
+the Modesto block and above the solar grid: one shared banner, one repeated
+day-name row, then one Hi/Lo line per city. Both cities are **references
+only**:
 
-- Sourced from the same Google Weather (MetNet-3) API, 240-hour pull, at
-  45.5152 / -122.6784 via `GooglePortlandProvider`
+- Sourced from the same Google Weather (MetNet-3) API, 240-hour pull:
+  Portland at 45.5152 / -122.6784 via `GooglePortlandProvider`, Phoenix at
+  33.4484 / -112.0740 via `GooglePhoenixProvider`
 - Portland shares Modesto's Pacific timezone, so its calendar-day highs/lows
   line up column-for-column with the Modesto grid - no date shifting
-- **Never** enters the weighted average. The consensus formula still spans only
-  source rows 13-18; Portland lives on row 24
-- Carries its own repeated day-name row (row 23). By that point the reader is a
-  dozen rows below the Modesto header, so the labels are repeated rather than
-  making them scroll back up to map columns to days
-- Uses its own cache key (`google_portland`), so a Portland fetch can never
-  overwrite the Modesto Last Known Good data
-- Non-critical: a missing Portland forecast logs a warning and blanks the row
-  with `--`. It never triggers a report retry or blocks the Modesto forecast
+- Phoenix aggregates on `America/Phoenix` (Arizona never observes DST: level
+  with Modesto in summer, one hour ahead in winter). A one-hour offset never
+  moves an afternoon high or pre-dawn low across midnight, so its dates key
+  onto the same grid columns
+- **Never** enter the weighted average. The consensus formula still spans only
+  source rows 13-18; Portland lives on row 24 and Phoenix on row 25
+- The banner (row 22) and day-name row (row 23) are a neutral slate
+  (`44546A`) shared by both cities; Portland is teal (`1F6E6E` / `DCEDED`)
+  and Phoenix burnt orange (`B4530A` / `FBE5D0`) so two adjacent reference
+  rows never read as one source. The day names are repeated because by that
+  point the reader is a dozen rows below the Modesto header
+- Each city has its own cache key (`google_portland`, `google_phoenix`), so a
+  reference fetch can never overwrite the Modesto Last Known Good data
+- Non-critical: a missing reference forecast logs a warning and blanks that
+  city's row with `--`. It never triggers a report retry or blocks the Modesto
+  forecast, and one missing city never blanks the other
 
 ### Excel row map (`duck_sun/excel_report.py`)
 
@@ -361,9 +396,9 @@ Modesto block and above the solar grid. It is a **reference only**:
 | 10-12 | Condition descriptors, day names, dates |
 | 13-18 | The 6 Modesto sources (weighted-average formula range) |
 | 19-21 | Wtd. Average, PRECIP %, precip source note |
-| **22-24** | **Portland, OR banner + day names + Hi/Lo reference row** |
-| 26-41 | Solar forecast title, header, 7 days x 2 rows |
-| 43 | Solar legend |
+| **22-25** | **SIDE REFERENCE TEMPS banner + day names + Portland, OR (24) + Phoenix, AZ (25)** |
+| 27-42 | Solar forecast title, header, 7 days x 2 rows |
+| 44 | Solar legend |
 
 ## Removed Sources
 
@@ -393,5 +428,5 @@ PM2.5 input, so every hour scores `smoke_factor` 1.0. Do **not** reintroduce
 the provider without a fresh IT review.
 
 Row numbers 19 and 13-18 are asserted by `tests/test_excel_report_formulas.py`;
-the Portland band and the shifted solar block are asserted by
-`tests/test_portland_reference.py`.
+the side-reference band (both cities) and the shifted solar block are asserted
+by `tests/test_side_reference.py`.

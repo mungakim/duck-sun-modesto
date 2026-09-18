@@ -368,15 +368,17 @@ def generate_excel_report(
     precip_data: Optional[Dict] = None,
     noaa_daily_periods: Optional[Dict] = None,
     report_timestamp: Optional[datetime] = None,
-    portland_data: Optional[Dict] = None
+    portland_data: Optional[Dict] = None,
+    phoenix_data: Optional[Dict] = None
 ) -> Optional[Path]:
     """
     Generate Excel report with 7-source temperature grid and weighted consensus.
     CENTERED layout matching PDF format.
 
-    portland_data is the Google Weather payload for Portland, OR. It renders as
-    a single standalone reference row between the Modesto block and the solar
-    grid, and is deliberately excluded from the Modesto weighted average.
+    portland_data / phoenix_data are the Google Weather payloads for Portland,
+    OR and Phoenix, AZ. Each renders as one standalone reference row in the
+    SIDE REFERENCE TEMPS band between the Modesto block and the solar grid,
+    and both are deliberately excluded from the Modesto weighted average.
     """
     if not HAS_OPENPYXL:
         logger.error("[generate_excel_report] openpyxl not installed")
@@ -414,12 +416,17 @@ def generate_excel_report(
         google_daily = _extract_daily_high_low(google_data.get('daily', []))
         logger.info(f"[generate_excel_report] Google Weather processed: {len(google_daily)} days")
 
-    # Process Portland, OR reference data (Google Weather, separate location).
+    # Process the side-reference cities (Google Weather, separate locations).
     # Reference only - never merged into google_daily or the weighted average.
     portland_daily = {}
     if portland_data:
         portland_daily = _extract_daily_high_low(portland_data.get('daily', []))
         logger.info(f"[generate_excel_report] Portland reference processed: {len(portland_daily)} days")
+
+    phoenix_daily = {}
+    if phoenix_data:
+        phoenix_daily = _extract_daily_high_low(phoenix_data.get('daily', []))
+        logger.info(f"[generate_excel_report] Phoenix reference processed: {len(phoenix_daily)} days")
 
     # Process Weather.com data
     weather_com_daily = {}
@@ -1011,89 +1018,103 @@ def generate_excel_report(
     note_cell.alignment = Alignment(horizontal='right', vertical='center')
 
     # =====================
-    # PORTLAND, OR REFERENCE (rows 22-24)
-    # Deliberately its own three-row band with a teal palette so it reads as a
-    # separate location, not another Modesto source. Not in the weighted avg.
+    # SIDE REFERENCE TEMPS (rows 22-25): Portland, OR and Phoenix, AZ
+    # One shared banner and day-name row, then one Hi/Lo row per city. Each
+    # city has its own colour (teal / burnt orange) under a neutral slate
+    # header so the two rows never read as one source - and neither is a
+    # Modesto source: nothing in this band enters the weighted average.
     # The day-name row repeats row 11's labels: by this point the reader is a
     # dozen rows below the Modesto header and shouldn't have to scroll back up
     # to work out which column is which day.
     # =====================
-    PORTLAND_BANNER_ROW = 22
-    PORTLAND_DAYS_ROW = 23
+    SIDE_REF_BANNER_ROW = 22
+    SIDE_REF_DAYS_ROW = 23
     PORTLAND_DATA_ROW = 24
-    PORTLAND_DARK = "1F6E6E"
+    PHOENIX_DATA_ROW = 25
+    SIDE_REF_DARK = "44546A"     # slate - shared banner + day-name row
+    PORTLAND_DARK = "1F6E6E"     # teal
     PORTLAND_LIGHT = "DCEDED"
+    PHOENIX_DARK = "B4530A"      # burnt orange - deliberately nothing like the teal
+    PHOENIX_LIGHT = "FBE5D0"
 
-    ws.merge_cells(f'{col(1)}{PORTLAND_BANNER_ROW}:{col(18)}{PORTLAND_BANNER_ROW}')
-    portland_banner = ws[f'{col(1)}{PORTLAND_BANNER_ROW}']
-    portland_banner.value = (
-        "PORTLAND, OR - SIDE REFERENCE  (Google Weather / MetNet-3)  "
+    ws.merge_cells(f'{col(1)}{SIDE_REF_BANNER_ROW}:{col(18)}{SIDE_REF_BANNER_ROW}')
+    side_ref_banner = ws[f'{col(1)}{SIDE_REF_BANNER_ROW}']
+    side_ref_banner.value = (
+        "SIDE REFERENCE TEMPS  (Google Weather / MetNet-3)  "
         "Hi / Lo °F - not included in the Modesto consensus above"
     )
-    portland_banner.fill = PatternFill(start_color=PORTLAND_DARK, end_color=PORTLAND_DARK, fill_type="solid")
-    portland_banner.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
-    portland_banner.alignment = center_align
+    side_ref_banner.fill = PatternFill(start_color=SIDE_REF_DARK, end_color=SIDE_REF_DARK, fill_type="solid")
+    side_ref_banner.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
+    side_ref_banner.alignment = center_align
     for c in range(1, 19):
-        ws[f'{col(c)}{PORTLAND_BANNER_ROW}'].border = thin_border
+        ws[f'{col(c)}{SIDE_REF_BANNER_ROW}'].border = thin_border
 
     # Day-name row - same labels and column spans as the Modesto header (row 11)
-    ws.merge_cells(f'{col(1)}{PORTLAND_DAYS_ROW}:{col(2)}{PORTLAND_DAYS_ROW}')
-    portland_days_label = ws[f'{col(1)}{PORTLAND_DAYS_ROW}']
-    portland_days_label.value = "Hi / Lo °F"
-    portland_days_label.fill = PatternFill(start_color=PORTLAND_DARK, end_color=PORTLAND_DARK, fill_type="solid")
-    portland_days_label.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
-    portland_days_label.alignment = center_align
-    portland_days_label.border = thin_border
-    ws[f'{col(2)}{PORTLAND_DAYS_ROW}'].border = thin_border
+    ws.merge_cells(f'{col(1)}{SIDE_REF_DAYS_ROW}:{col(2)}{SIDE_REF_DAYS_ROW}')
+    side_ref_days_label = ws[f'{col(1)}{SIDE_REF_DAYS_ROW}']
+    side_ref_days_label.value = "Hi / Lo °F"
+    side_ref_days_label.fill = PatternFill(start_color=SIDE_REF_DARK, end_color=SIDE_REF_DARK, fill_type="solid")
+    side_ref_days_label.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
+    side_ref_days_label.alignment = center_align
+    side_ref_days_label.border = thin_border
+    ws[f'{col(2)}{SIDE_REF_DAYS_ROW}'].border = thin_border
 
     for i, day in enumerate(om_daily):
         label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
-        ws.merge_cells(f'{col_hi}{PORTLAND_DAYS_ROW}:{col_lo}{PORTLAND_DAYS_ROW}')
-        cell = ws[f'{col_hi}{PORTLAND_DAYS_ROW}']
+        ws.merge_cells(f'{col_hi}{SIDE_REF_DAYS_ROW}:{col_lo}{SIDE_REF_DAYS_ROW}')
+        cell = ws[f'{col_hi}{SIDE_REF_DAYS_ROW}']
         cell.value = label
-        cell.fill = PatternFill(start_color=PORTLAND_DARK, end_color=PORTLAND_DARK, fill_type="solid")
+        cell.fill = PatternFill(start_color=SIDE_REF_DARK, end_color=SIDE_REF_DARK, fill_type="solid")
         cell.font = Font(name='Arial', size=8, bold=True, color='FFFFFF')
         cell.alignment = center_align
         cell.border = thin_border
-        ws[f'{col_lo}{PORTLAND_DAYS_ROW}'].border = thin_border
+        ws[f'{col_lo}{SIDE_REF_DAYS_ROW}'].border = thin_border
 
-    ws.merge_cells(f'{col(1)}{PORTLAND_DATA_ROW}:{col(2)}{PORTLAND_DATA_ROW}')
-    portland_label = ws[f'{col(1)}{PORTLAND_DATA_ROW}']
-    portland_label.value = "PORTLAND, OR"
-    portland_label.fill = PatternFill(start_color=PORTLAND_DARK, end_color=PORTLAND_DARK, fill_type="solid")
-    portland_label.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
-    portland_label.alignment = center_align
-    portland_label.border = thin_border
-    ws[f'{col(2)}{PORTLAND_DATA_ROW}'].border = thin_border
+    def _render_reference_row(row: int, label: str, daily: Dict, dark: str, light: str) -> int:
+        """One city's Hi/Lo line keyed on the Modesto grid dates; returns populated day count."""
+        ws.merge_cells(f'{col(1)}{row}:{col(2)}{row}')
+        label_cell = ws[f'{col(1)}{row}']
+        label_cell.value = label
+        label_cell.fill = PatternFill(start_color=dark, end_color=dark, fill_type="solid")
+        label_cell.font = Font(name='Arial', size=7, bold=True, color='FFFFFF')
+        label_cell.alignment = center_align
+        label_cell.border = thin_border
+        ws[f'{col(2)}{row}'].border = thin_border
 
-    portland_rendered = 0
-    for i, day in enumerate(om_daily):
-        k = day.get('date', '')
-        vals = portland_daily.get(k, {})
-        hi, lo = vals.get('high_f'), vals.get('low_f')
-        if hi is not None or lo is not None:
-            portland_rendered += 1
+        rendered = 0
+        for i, day in enumerate(om_daily):
+            vals = daily.get(day.get('date', ''), {})
+            hi, lo = vals.get('high_f'), vals.get('low_f')
+            if hi is not None or lo is not None:
+                rendered += 1
 
-        for col_letter, value in ((col(3 + i * 2), hi), (col(4 + i * 2), lo)):
-            cell = ws[f'{col_letter}{PORTLAND_DATA_ROW}']
-            cell.value = int(round(float(value))) if value is not None else "--"
-            cell.fill = PatternFill(start_color=PORTLAND_LIGHT, end_color=PORTLAND_LIGHT, fill_type="solid")
-            cell.font = Font(name='Arial', size=9)
-            cell.alignment = center_align
-            cell.border = thin_border
+            for col_letter, value in ((col(3 + i * 2), hi), (col(4 + i * 2), lo)):
+                cell = ws[f'{col_letter}{row}']
+                cell.value = int(round(float(value))) if value is not None else "--"
+                cell.fill = PatternFill(start_color=light, end_color=light, fill_type="solid")
+                cell.font = Font(name='Arial', size=9)
+                cell.alignment = center_align
+                cell.border = thin_border
 
-    logger.info(
-        f"[generate_excel_report] Portland reference row: {portland_rendered}/{len(om_daily)} "
-        "day columns populated"
-    )
+        logger.info(
+            f"[generate_excel_report] {label} reference row: {rendered}/{len(om_daily)} "
+            "day columns populated"
+        )
+        return rendered
+
+    _render_reference_row(PORTLAND_DATA_ROW, "PORTLAND, OR", portland_daily, PORTLAND_DARK, PORTLAND_LIGHT)
+    _render_reference_row(PHOENIX_DATA_ROW, "PHOENIX, AZ", phoenix_daily, PHOENIX_DARK, PHOENIX_LIGHT)
 
     # =====================
     # SOLAR FORECAST GRID (also centered)
+    # One spacer row under the side-reference band; every row in the block is
+    # derived from SOLAR_TITLE_ROW so it can't drift into the band above.
     # =====================
-    grid_row = 26
+    SOLAR_TITLE_ROW = PHOENIX_DATA_ROW + 2   # 27
+    grid_row = SOLAR_TITLE_ROW
     ws[f'{col(2)}{grid_row}'] = "SOLAR FORECAST - W/m² Irradiance (Google MetNet-3)"
     ws[f'{col(2)}{grid_row}'].font = Font(name='Arial', size=10, bold=True, color='003C78')
 
@@ -1230,7 +1251,7 @@ def generate_excel_report(
     )
 
     # Solar header row (shifted right by 1 so DATE lands in wide col D)
-    SOLAR_HEADER_ROW = 27
+    SOLAR_HEADER_ROW = SOLAR_TITLE_ROW + 1   # 28
     grid_row = SOLAR_HEADER_ROW
     header_labels = ['DATE', '9AM', '10', '11', '12PM', '1', '2', '3', '4PM']
     for col_idx, label in enumerate(header_labels):

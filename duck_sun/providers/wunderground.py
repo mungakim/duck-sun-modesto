@@ -7,7 +7,11 @@ API key - the page is the only source, and everything below is built around
 parsing what it embeds.
 
 Fetch chain (first path that yields data wins):
-  1. wunderground.com page, parsing the forecast JSON embedded in its scripts
+  1. wunderground.com page, parsing the forecast JSON embedded in its scripts.
+     Up to MAX_FETCH_ATTEMPTS tries with backoff, rotating the page variant
+     and the browser fingerprint on every attempt. A 200 OK page with no
+     forecast arrays in it counts as a failed attempt - that is the
+     intermittent failure mode, not a network error (see _scrape)
   2. Local cache, but only when it is fresh (< 6h) AND still covers today
 
 Never returns stale data. A forecast whose dates no longer cover today would
@@ -21,9 +25,10 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Iterator, List, Optional, TypedDict
+from typing import Iterator, List, Optional, Tuple, TypedDict
 from zoneinfo import ZoneInfo
 
 try:
@@ -58,8 +63,35 @@ CACHE_MAX_AGE_HOURS = 6    # Cache is only usable while this fresh
 
 # Impersonation fingerprints, newest first. curl_cffi raises on a target its
 # build does not know, and wunderground.com can start refusing a fingerprint at
-# any time, so every target is tried in turn instead of hardcoding just one.
+# any time, so the fingerprint rotates on every attempt instead of being
+# hardcoded - a refused fingerprint costs one attempt, not the whole run.
 IMPERSONATE_TARGETS = ("firefox135", "chrome136", "chrome120", "chrome110")
+
+# Retry budget for the page scrape. The recurring blank-row failure is NOT a
+# network error: the site answers 200 OK with a page whose server-rendered
+# state is missing the forecast arrays (their forecast API timed out during
+# the render, or the page came from a cold edge cache / bot interstitial).
+# The very next request is usually rendered fresh, so the fix is to keep
+# asking for a little while rather than give up on the first empty page.
+# Worst case is ~30s of waiting on a day the site is genuinely down, which is
+# well inside what the daily run already tolerates for a provider retry.
+MAX_FETCH_ATTEMPTS = 6
+RETRY_DELAYS_SECONDS = (2, 4, 6, 8, 10)
+
+# Most recent page that came back without forecast arrays, kept for
+# post-mortem so the next "why was WUNDERGRND blank" has evidence. logs/ is
+# gitignored; outputs/ is not (run_and_push commits it), hence the location.
+FAILED_PAGE_PATH = Path("logs") / "wunderground_last_failed_page.html"
+FAILED_PAGE_MAX_BYTES = 2_000_000
+
+# Angular TransferState (`<script id="app-root-state">`) escapes the JSON it
+# embeds: & " ' < > become &a; &q; &s; &l; &g;  A regex written for raw JSON
+# sees `&q;temperatureMax&q;` and reads exactly like a client-rendered page.
+_TRANSFER_STATE_ESCAPES = {"a": "&", "q": '"', "s": "'", "l": "<", "g": ">"}
+_TRANSFER_STATE_RE = re.compile(r"&([aqslg]);")
+
+# Patched in tests so the retry loop doesn't actually wait.
+_sleep = time.sleep
 
 # Width of the report's temperature grid. Only used to flag short coverage in
 # the log - the row is drawn from whatever the page gives us.
@@ -82,6 +114,15 @@ def _to_int(value) -> Optional[int]:
         return int(str(value).strip().strip('"'))
     except ValueError:
         return None
+
+
+def _unescape_transfer_state(text: str) -> str:
+    """Undo Angular's TransferState escaping in one pass (no double-decoding)."""
+    return _TRANSFER_STATE_RE.sub(lambda m: _TRANSFER_STATE_ESCAPES[m.group(1)], text)
+
+
+class _UnsupportedTarget(Exception):
+    """curl_cffi does not know this impersonation fingerprint (no request made)."""
 
 
 def _array_pattern(key: str) -> str:
@@ -118,8 +159,19 @@ class WUndergroundProvider:
     Weight: 4.0 (commercial provider tier)
     """
 
-    # Modesto, CA ZIP code URL
+    # Modesto, CA ZIP code URL - the primary page, used on every even attempt
     URL = "https://www.wunderground.com/forecast/us/ca/modesto/95350"
+
+    # Sibling pages that embed the same TWC daily forecast, used on the odd
+    # attempts. When one page's server render shipped without its forecast
+    # state, a different page is rendered (and edge-cached) independently, so
+    # it is far more likely to carry the arrays than a re-request of the same
+    # URL a few seconds later. The /weather/ page may only carry the short
+    # summary strip - the parser keeps the longest result across attempts.
+    ALTERNATE_URLS = (
+        "https://www.wunderground.com/forecast/us/ca/modesto",
+        "https://www.wunderground.com/weather/us/ca/modesto/95350",
+    )
 
     def __init__(self):
         logger.info("[WUndergroundProvider] Initializing provider...")
@@ -498,50 +550,189 @@ class WUndergroundProvider:
     # Page fetch + parse
     # ------------------------------------------------------------------
 
-    def _fetch_page(self) -> Optional[str]:
-        """
-        Fetch the wunderground.com forecast page HTML.
+    def _url_for_attempt(self, attempt: int) -> str:
+        """Primary page on even attempts, alternates in turn on odd ones."""
+        if attempt % 2 == 0 or not self.ALTERNATE_URLS:
+            return self.URL
+        return self.ALTERNATE_URLS[(attempt // 2) % len(self.ALTERNATE_URLS)]
 
-        Tries each impersonation fingerprint in turn: curl_cffi raises on a
-        target its build does not support, and the site can start refusing an
-        individual fingerprint at any time.
+    def _fetch_page(self, url: str, target: str) -> Tuple[Optional[str], Optional[int]]:
+        """
+        One GET of `url` impersonating `target`.
+
+        Returns (html, status): html is the body of a 200 response and None
+        otherwise; status is None when the request itself failed (DNS, TLS,
+        timeout). Raises _UnsupportedTarget when curl_cffi doesn't know the
+        fingerprint, which the retry loop treats as "drop it, no attempt spent".
         """
         if not HAS_CURL_CFFI:
-            return None
+            return None, None
 
         from curl_cffi.requests import Session
 
         verify = get_ca_bundle_for_curl()
 
-        for target in IMPERSONATE_TARGETS:
+        try:
+            with Session(impersonate=target) as session:
+                response = session.get(url, timeout=30, verify=verify)
+        except Exception as e:
+            if "impersonat" in str(e).lower():
+                logger.warning(
+                    f"[WUndergroundProvider] curl_cffi build does not support impersonate={target}: {e}"
+                )
+                raise _UnsupportedTarget(target) from e
+            logger.warning(f"[WUndergroundProvider] Fetch failed ({url}, impersonate={target}): {e}")
+            return None, None
+
+        if response.status_code == 200:
+            return response.text, 200
+
+        logger.warning(
+            f"[WUndergroundProvider] HTTP {response.status_code} from {url} (impersonate={target})"
+        )
+        return None, response.status_code
+
+    def _scrape(self) -> Optional[List[WUndergroundDay]]:
+        """
+        Fetch and parse the forecast, retrying with backoff.
+
+        A 200 OK page that carries no forecast arrays is the intermittent
+        failure behind the blank WUNDERGRND row - it is treated exactly like a
+        failed request and retried. Both the page variant and the browser
+        fingerprint rotate on every attempt, and a short forecast (fewer days
+        than the grid) is kept as a fallback while later attempts try for the
+        full window.
+        """
+        targets = list(IMPERSONATE_TARGETS)
+        best: Optional[List[WUndergroundDay]] = None
+        attempt = 0
+
+        while attempt < MAX_FETCH_ATTEMPTS and targets:
+            url = self._url_for_attempt(attempt)
+            target = targets[attempt % len(targets)]
+            logger.info(
+                f"[WUndergroundProvider] Fetch attempt {attempt + 1}/{MAX_FETCH_ATTEMPTS}: "
+                f"{url} (impersonate={target})"
+            )
+
             try:
-                logger.info(f"[WUndergroundProvider] Fetching {self.URL} (impersonate={target})")
-                with Session(impersonate=target) as session:
-                    response = session.get(self.URL, timeout=30, verify=verify)
+                html, status = self._fetch_page(url, target)
+            except _UnsupportedTarget:
+                # Nothing was sent - don't spend an attempt or a delay on it
+                targets.remove(target)
+                continue
 
-                if response.status_code == 200:
-                    return response.text
+            attempt += 1
 
-                logger.warning(f"[WUndergroundProvider] HTTP {response.status_code} with {target}")
-            except Exception as e:
-                logger.warning(f"[WUndergroundProvider] Fetch with {target} failed: {e}")
+            if html:
+                days = self._parse_embedded_json(html)
+                if days:
+                    if len(days) >= GRID_DAYS:
+                        if attempt > 1:
+                            logger.info(
+                                f"[WUndergroundProvider] Recovered on attempt {attempt}: "
+                                f"{len(days)} days"
+                            )
+                        return days
+                    if best is None or len(days) > len(best):
+                        best = days
+                    logger.warning(
+                        f"[WUndergroundProvider] Only {len(days)} days on attempt {attempt} "
+                        f"(grid is {GRID_DAYS}) - keeping it, trying again for the full window"
+                    )
+                else:
+                    self._diagnose_empty_page(html, status, url, target)
 
-        logger.error("[WUndergroundProvider] All impersonation targets failed")
-        return None
+            if attempt < MAX_FETCH_ATTEMPTS:
+                delay = RETRY_DELAYS_SECONDS[min(attempt - 1, len(RETRY_DELAYS_SECONDS) - 1)]
+                logger.info(f"[WUndergroundProvider] Retrying in {delay}s...")
+                _sleep(delay)
+
+        if best is not None:
+            logger.warning(
+                f"[WUndergroundProvider] Exhausted {MAX_FETCH_ATTEMPTS} attempts - "
+                f"using the best short result ({len(best)} days)"
+            )
+        else:
+            logger.error(
+                f"[WUndergroundProvider] No forecast in any of {MAX_FETCH_ATTEMPTS} attempts "
+                f"(see {FAILED_PAGE_PATH} for the last page received)"
+            )
+        return best
+
+    def _diagnose_empty_page(self, html: str, status: Optional[int], url: str, target: str) -> None:
+        """
+        Log what the site actually sent when no forecast arrays were found.
+
+        Distinguishes an interstitial / bot check / stripped render from a real
+        layout change, and keeps the page on disk. Without this, every failure
+        looks identical in the log ("client-rendered or layout changed").
+        """
+        title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+        title = re.sub(r"\s+", " ", title_match.group(1)).strip()[:120] if title_match else ""
+
+        markers: List[str] = []
+        if "app-root-state" in html:
+            markers.append("app-root-state")
+        if "temperatureMax" in html:
+            markers.append("temperatureMax(raw)")
+        if "&q;temperatureMax" in html:
+            markers.append("temperatureMax(&q;)")
+        lowered = html.lower()
+        for needle, label in (
+            ("access denied", "access-denied"),
+            ("captcha", "captcha"),
+            ("just a moment", "cf-challenge"),
+            ("pardon our interruption", "bot-interstitial"),
+            ("request unsuccessful", "waf-block"),
+            ("enable javascript", "js-required"),
+        ):
+            if needle in lowered:
+                markers.append(label)
+
+        logger.warning(
+            f"[WUndergroundProvider] Page had no forecast arrays: HTTP {status}, "
+            f"{len(html):,} chars, title={title!r}, markers={markers or ['none']}, "
+            f"url={url}, impersonate={target}"
+        )
+        self._save_failed_page(html, status, url, target)
+
+    @staticmethod
+    def _save_failed_page(html: str, status: Optional[int], url: str, target: str) -> None:
+        """Keep the most recent empty page for post-mortem (best effort)."""
+        try:
+            FAILED_PAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            header = (
+                f"<!-- duck_sun wunderground: fetched {datetime.now().isoformat()} "
+                f"HTTP {status} {url} impersonate={target} -->\n"
+            )
+            with open(FAILED_PAGE_PATH, "w", encoding="utf-8", errors="replace") as f:
+                f.write(header)
+                f.write(html[:FAILED_PAGE_MAX_BYTES])
+        except Exception as e:
+            logger.debug(f"[WUndergroundProvider] Could not save failed page: {e}")
 
     @staticmethod
     def _candidate_blobs(html: str) -> Iterator[str]:
         """
         Yield forms of the page text the forecast JSON may appear in.
 
-        Weather Underground embeds its state as raw JSON in some builds and as
-        a JS string literal (`JSON.parse("{\\"dayOfWeek\\":...")`) in others.
-        The escaped form defeats a regex written for the raw one, which reads
-        downstream as "site changed, provider dead".
+        Weather Underground embeds its state as raw JSON in some builds, as a
+        JS string literal (`JSON.parse("{\\"dayOfWeek\\":...")`) in others,
+        and Angular's TransferState form (`&q;dayOfWeek&q;:[...]`) is the
+        framework's own serialisation. Any of them defeats a regex written for
+        one of the others, which reads downstream as "site changed, provider
+        dead" - so every form is tried.
         """
         yield html
         if '\\"' in html:
             yield html.replace('\\"', '"')
+        if '&q;' in html:
+            yield _unescape_transfer_state(html)
+        if '&quot;' in html:
+            yield html.replace('&quot;', '"')
+        if '\\u0022' in html:
+            yield html.replace('\\u0022', '"')
 
     def _parse_embedded_json(self, html: str) -> Optional[List[WUndergroundDay]]:
         """Parse the forecast arrays embedded in the page. None if absent."""
@@ -643,10 +834,10 @@ class WUndergroundProvider:
         """
         Synchronously fetch the 10-day forecast from Weather Underground.
 
-        Returns the scraped forecast, or fresh cache if the page is unreachable.
-        Returns None (never stale data) if both fail - the caller renders that
-        as an empty row rather than showing yesterday's forecast under today's
-        dates.
+        Returns the scraped forecast (retried, see _scrape), or fresh cache if
+        the page is unreachable. Returns None (never stale data) if both fail -
+        the caller renders that as an empty row rather than showing yesterday's
+        forecast under today's dates.
         """
         if not HAS_CURL_CFFI:
             logger.error("[WUndergroundProvider] Missing dependency: curl_cffi")
@@ -658,12 +849,10 @@ class WUndergroundProvider:
             if cached:
                 return cached
 
-        html = self._fetch_page()
-        if html:
-            days = self._parse_embedded_json(html)
-            if days:
-                self._save_cache(days)
-                return days
+        days = self._scrape()
+        if days:
+            self._save_cache(days)
+            return days
 
         cached = self._get_fresh_cache()
         if cached:
