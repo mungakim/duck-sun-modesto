@@ -2,12 +2,18 @@
 Weather.com Provider for Duck Sun Modesto
 
 Fetches 10-day forecast from Weather.com for Downtown Modesto, CA.
-Uses curl_cffi with Chrome impersonation for both API and scraping paths.
 
-Primary: TWC v3 internal API (JSON, requires TWC_API_KEY)
-Fallback: Web scraping of weather.com/weather/tenday page
+Source: TWC v3 API (JSON, requires TWC_API_KEY) - the same endpoint the
+weather.com page calls from the browser. There is no page-scraping fallback:
+since the Oct 2026 redesign the tenday page is rendered client-side and the
+server HTML carries no forecast at all, so no parser could read it.
 
-Rate limited to 6 curl_cffi requests/day (scraping-style endpoint).
+The key is weather.com's own public key, copied by hand from the site. It
+changes every few months; when it does the API answers 401/403. That is
+logged with the exact refresh steps (KEY_REFRESH_HELP), no cached data is
+served, and the report draws the WEATHER.COM row as red dashes.
+
+Rate limited to 6 curl_cffi requests/day.
 Cache is only used when rate-limited AND fresh (< 6 hours old).
 Stale cache is never served — rate limit is overridden if cache expires.
 
@@ -30,13 +36,6 @@ except ImportError:
     HAS_CURL_CFFI = False
     curl_requests = None
 
-try:
-    from bs4 import BeautifulSoup
-    HAS_BS4 = True
-except ImportError:
-    HAS_BS4 = False
-    BeautifulSoup = None
-
 # Import SSL helper for Windows certificate store support
 try:
     from duck_sun.ssl_helper import get_ca_bundle_for_curl
@@ -51,7 +50,19 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path("outputs")
 CACHE_FILE = CACHE_DIR / "weathercom_cache.json"
 CACHE_MAX_AGE_HOURS = 6  # Only use cache if less than 6 hours old
-DAILY_CALL_LIMIT = 6  # Cap curl_cffi requests per day (scraping-style endpoint)
+DAILY_CALL_LIMIT = 6  # Cap curl_cffi requests per day
+
+# A rejected key means weather.com changed its public apiKey. Retrying won't
+# help and cached data would hide the problem, so the row goes blank (red).
+KEY_REJECTED_STATUSES = (401, 403)
+KEY_REJECTED_ERROR = "TWC_API_KEY rejected"
+KEY_REFRESH_HELP = (
+    "weather.com has changed its API key. To refresh it: open weather.com in "
+    "Chrome -> F12 -> Network tab -> filter 'api.weather.com' -> copy the "
+    "apiKey= value from any request -> set TWC_API_KEY to it in BOTH "
+    "X:\\Operatns\\Pwrsched\\Weather\\.env and C:\\Projects\\duck-sun-modesto\\.env. "
+    "The WEATHER.COM row stays blank (red dashes) until then."
+)
 
 
 class WeatherComDay(TypedDict):
@@ -68,10 +79,14 @@ class WeatherComDay(TypedDict):
 
 class WeatherComProvider:
     """
-    Provider for Weather.com data via web scraping.
+    Provider for Weather.com data via the TWC v3 API.
 
     Uses curl_cffi with Chrome impersonation to bypass anti-bot protection.
     Returns 10-day forecast data compatible with ensemble weighting.
+
+    After fetch_sync(), key_rejected is True when the API refused the key (or
+    no key is set) - the scheduler reads it to blank the row instead of
+    falling back to cache.
 
     Weight: 4.0 (commercial provider tier)
     """
@@ -85,8 +100,7 @@ class WeatherComProvider:
         logger.info("[WeatherComProvider] Initializing provider...")
         if not HAS_CURL_CFFI:
             logger.warning("[WeatherComProvider] curl_cffi not installed - provider disabled")
-        if not HAS_BS4:
-            logger.warning("[WeatherComProvider] beautifulsoup4 not installed - provider disabled")
+        self.key_rejected = False
 
         # Ensure cache directory exists
         CACHE_DIR.mkdir(exist_ok=True)
@@ -189,17 +203,6 @@ class WeatherComProvider:
         except Exception:
             return None
 
-    def _parse_temp(self, temp_str: str) -> Optional[int]:
-        """Extract integer temperature from string like '60°' or '60'."""
-        if not temp_str:
-            return None
-        # Remove degree symbols, slashes, and whitespace
-        clean = re.sub(r'[°/\s]', '', temp_str)
-        try:
-            return int(clean)
-        except ValueError:
-            return None
-
     def _get_date_for_day(self, day_index: int) -> str:
         """Get YYYY-MM-DD date string for day index (0 = today)."""
         tz = ZoneInfo("America/Los_Angeles")
@@ -213,8 +216,10 @@ class WeatherComProvider:
 
         Fetching strategy:
         1. If rate limit reached AND cache is fresh (< 6h), use cache
-        2. Otherwise, always try API first, then scraping, then fresh cache
-        3. Never serve cache older than CACHE_MAX_AGE_HOURS
+        2. Otherwise, always call the API
+        3. Key missing or rejected (401/403) -> None, never cache; sets
+           key_rejected so the scheduler blanks the row
+        4. Any other failure -> fresh cache (< CACHE_MAX_AGE_HOURS) or None
 
         Returns:
             List of WeatherComDay dicts, or None on failure
@@ -230,11 +235,9 @@ class WeatherComProvider:
         # Try API endpoint first (requires TWC_API_KEY)
         api_key = os.getenv("TWC_API_KEY")
         if not api_key:
-            logger.warning("[WeatherComProvider] TWC_API_KEY not set - skipping API, trying scraping")
-            scraped = self._fetch_via_scraping()
-            if scraped:
-                return scraped
-            return self._get_fresh_cache()
+            logger.error(f"[WeatherComProvider] TWC_API_KEY is not set. {KEY_REFRESH_HELP}")
+            self.key_rejected = True
+            return None
         params = {
             "geocode": self.GEOCODE,
             "format": "json",
@@ -257,11 +260,16 @@ class WeatherComProvider:
                 }
                 response = session.get(url, headers=headers, timeout=30, verify=get_ca_bundle_for_curl())
 
+            if response.status_code in KEY_REJECTED_STATUSES:
+                logger.error(
+                    f"[WeatherComProvider] {KEY_REJECTED_ERROR} (HTTP {response.status_code}). "
+                    f"{KEY_REFRESH_HELP}"
+                )
+                self.key_rejected = True
+                return None
+
             if response.status_code != 200:
                 logger.error(f"[WeatherComProvider] API HTTP {response.status_code}")
-                scraped = self._fetch_via_scraping()
-                if scraped:
-                    return scraped
                 return self._get_fresh_cache()
 
             data = response.json()
@@ -281,9 +289,6 @@ class WeatherComProvider:
 
             if not temp_max or not temp_min:
                 logger.error("[WeatherComProvider] No temperature data in API response")
-                scraped = self._fetch_via_scraping()
-                if scraped:
-                    return scraped
                 return self._get_fresh_cache()
 
             results: List[WeatherComDay] = []
@@ -348,104 +353,10 @@ class WeatherComProvider:
 
         except Exception as e:
             logger.error(f"[WeatherComProvider] API fetch failed: {e}", exc_info=True)
-            # Try scraping fallback, then fresh cache as last resort
-            scraped = self._fetch_via_scraping()
-            if scraped:
-                return scraped
             cached = self._get_fresh_cache()
             if cached:
                 return cached
-            logger.error("[WeatherComProvider] All fetch methods failed and no fresh cache available")
-            return None
-
-    def _fetch_via_scraping(self) -> Optional[List[WeatherComDay]]:
-        """Fallback to web scraping if API fails."""
-        logger.info("[WeatherComProvider] Falling back to web scraping...")
-
-        scrape_url = "https://weather.com/weather/tenday/l/37.6393,-120.9969"
-
-        try:
-            from curl_cffi.requests import Session
-
-            # Use a session to handle cookies - first visit homepage to get session cookies
-            with Session(impersonate="chrome110") as session:
-                verify = get_ca_bundle_for_curl()
-                # First request to get cookies
-                logger.debug("[WeatherComProvider] Getting session cookies from homepage...")
-                home_resp = session.get("https://weather.com/", timeout=15, verify=verify)
-                logger.debug(f"[WeatherComProvider] Homepage status: {home_resp.status_code}")
-                # Now fetch the forecast page with cookies
-                response = session.get(scrape_url, timeout=30, verify=verify)
-
-            if response.status_code != 200:
-                logger.error(f"[WeatherComProvider] Scraping HTTP {response.status_code}")
-                return None
-
-            if not HAS_BS4:
-                logger.error("[WeatherComProvider] BeautifulSoup not available for scraping")
-                return None
-
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            day_names = soup.find_all(attrs={"data-testid": "daypartName"})
-            high_temps = soup.find_all(
-                class_=lambda x: x and 'highTempValue' in str(x) if x else False
-            )
-            low_temps = soup.find_all(attrs={"data-testid": "lowTempValue"})
-            precip_elems = soup.find_all(attrs={"data-testid": "PercentageValue"})
-            condition_elems = soup.find_all(attrs={"data-testid": "wxPhrase"})
-
-            if not high_temps or not low_temps:
-                logger.error("[WeatherComProvider] No forecast data found in page")
-                return None
-
-            results: List[WeatherComDay] = []
-            num_days = min(10, len(high_temps), len(low_temps))
-
-            for i in range(num_days):
-                high_f = self._parse_temp(high_temps[i].text)
-                low_f = self._parse_temp(low_temps[i].text.replace('/', ''))
-
-                if high_f is None or low_f is None:
-                    continue
-
-                high_c = (high_f - 32) * 5 / 9
-                low_c = (low_f - 32) * 5 / 9
-                day_name = day_names[i].text.strip()[:3] if i < len(day_names) else f"D{i}"
-                date_str = self._get_date_for_day(i)
-
-                # Extract precipitation percentage from scraped page
-                precip_prob = 0
-                if i < len(precip_elems):
-                    precip_text = precip_elems[i].text.strip().replace('%', '')
-                    try:
-                        precip_prob = int(precip_text)
-                    except ValueError:
-                        pass
-
-                # Extract condition text from scraped page
-                condition = "Unknown"
-                if i < len(condition_elems):
-                    condition = condition_elems[i].text.strip()
-
-                results.append({
-                    "date": date_str,
-                    "day_name": day_name,
-                    "high_f": float(high_f),
-                    "low_f": float(low_f),
-                    "high_c": round(high_c, 2),
-                    "low_c": round(low_c, 2),
-                    "condition": condition,
-                    "precip_prob": precip_prob
-                })
-
-            logger.info(f"[WeatherComProvider] [OK] Retrieved {len(results)} records via scraping")
-            if results:
-                self._save_cache(results)
-            return results if results else None
-
-        except Exception as e:
-            logger.error(f"[WeatherComProvider] Scraping failed: {e}")
+            logger.error("[WeatherComProvider] API failed and no fresh cache available")
             return None
 
     async def fetch_async(self) -> Optional[List[WeatherComDay]]:
@@ -461,6 +372,9 @@ class WeatherComProvider:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 60)

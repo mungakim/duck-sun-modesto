@@ -18,6 +18,7 @@ from duck_sun.solar_physics import (
 
 try:
     from openpyxl import Workbook
+    from openpyxl.comments import Comment
     from openpyxl.styles import (
         Font, PatternFill, Border, Side, Alignment,
         NamedStyle
@@ -30,6 +31,16 @@ except ImportError:
     Workbook = None
 
 logger = logging.getLogger(__name__)
+
+# WEATHER.COM row when its API key was rejected: dashes in red, plus a hover
+# note on the label saying what to do. A plain "--" row looks like any other
+# missing data; this one has a known two-minute fix.
+KEY_REJECTED_DASH_COLOR = 'C00000'
+KEY_REJECTED_NOTE = (
+    "weather.com API key rejected or missing. Refresh TWC_API_KEY: weather.com "
+    "-> F12 -> Network -> filter 'api.weather.com' -> copy apiKey= -> update "
+    ".env on X:\\ and C:\\Projects."
+)
 
 # Column offset for centering (start content at column C)
 COL_OFFSET = 2
@@ -361,6 +372,7 @@ def generate_excel_report(
     accu_data: Optional[List],
     google_data: Optional[Dict] = None,
     weather_com_data: Optional[List] = None,
+    weather_com_key_rejected: bool = False,
     wunderground_data: Optional[List] = None,
     df_analyzed: Any = None,
     output_path: Optional[Path] = None,
@@ -379,6 +391,10 @@ def generate_excel_report(
     OR and Phoenix, AZ. Each renders as one standalone reference row in the
     SIDE REFERENCE TEMPS band between the Modesto block and the solar grid,
     and both are deliberately excluded from the Modesto weighted average.
+
+    weather_com_key_rejected draws the WEATHER.COM row as red dashes with a
+    hover note on its label: the API refused TWC_API_KEY and it needs a manual
+    refresh.
     """
     if not HAS_OPENPYXL:
         logger.error("[generate_excel_report] openpyxl not installed")
@@ -880,6 +896,16 @@ def generate_excel_report(
         else:
             source_cell.font = Font(name='Arial', size=7, bold=True)
 
+        key_rejected_row = label == 'WEATHER.COM' and weather_com_key_rejected
+        if key_rejected_row:
+            source_cell.comment = Comment(KEY_REJECTED_NOTE, "Duck Sun")
+            logger.error("[generate_excel_report] WEATHER.COM: API key rejected - row drawn as RED dashes")
+        dash_font = Font(
+            name='Arial', size=9,
+            bold=key_rejected_row,
+            color=KEY_REJECTED_DASH_COLOR if key_rejected_row else None,
+        )
+
         for i, day in enumerate(om_daily):
             k = day.get('date', '')
             v1, v2 = getter(day, k)
@@ -901,7 +927,7 @@ def generate_excel_report(
             else:
                 cell_hi.value = "--"
             cell_hi.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
-            cell_hi.font = Font(name='Arial', size=9)
+            cell_hi.font = dash_font if cell_hi.value == "--" else Font(name='Arial', size=9)
             cell_hi.alignment = center_align
             cell_hi.border = thin_border
 
@@ -911,7 +937,7 @@ def generate_excel_report(
             else:
                 cell_lo.value = "--"
             cell_lo.fill = PatternFill(start_color=day_color, end_color=day_color, fill_type="solid")
-            cell_lo.font = Font(name='Arial', size=9)
+            cell_lo.font = dash_font if cell_lo.value == "--" else Font(name='Arial', size=9)
             cell_lo.alignment = center_align
             cell_lo.border = thin_border
 

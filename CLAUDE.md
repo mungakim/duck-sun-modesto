@@ -27,7 +27,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 |----------|-------------|------------------|--------|
 | **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **8x** |
 | **AccuWeather** | Official 5-day API | accuweather.com | 4x |
-| **Weather.com** | Web scraping (curl_cffi) | weather.com | 4x |
+| **Weather.com** | TWC v3 `/v3/wx/forecast/daily/10day` (curl_cffi, `TWC_API_KEY`) | weather.com | 4x |
 | **Weather Underground** | Web scraping (curl_cffi) | wunderground.com | 4x |
 | **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website | 3x |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) | 1x |
@@ -36,7 +36,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 The provider pulls the **full 240-hour (10-day) window**, which is the documented ceiling on `forecast/hours:lookup` (`hours` = 1..240, `pageSize` = 1..24, so a full pull is 10 paginated calls). Forecast length is **not** gated by billing tier - the Weather API is a single per-call SKU, so a cheaper plan limits call volume, not horizon. Before Jul 2026 the report only showed 4 days of Google data purely because the provider requested `hours=96`.
 
-**Weather.com & Weather Underground:** Both sources are scraped using curl_cffi with browser impersonation. They share data from The Weather Company (IBM) but may show slight variations. Note: Weather.com has aggressive anti-bot protection and may not work in all environments (cloud/container IPs are often blocked).
+**Weather.com & Weather Underground:** Both are fetched with curl_cffi browser impersonation and share data from The Weather Company (IBM), but may show slight variations. Weather.com calls the same TWC v3 API the weather.com page calls from the browser, using weather.com's own public key; WUnderground scrapes its page. Note: both sites have aggressive anti-bot protection and may not work in all environments (cloud/container IPs are often blocked).
 
 **NOAA Organic Sourcing:** The NOAA provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official weather.gov website exactly.
 
@@ -140,7 +140,7 @@ The PDF report includes:
 **11-Source Weighted Ensemble:**
 - **Google Weather:** MetNet-3 neural model via Maps Platform Weather API - Weight: 8x
 - **AccuWeather:** Direct API sourcing (matches accuweather.com) - Weight: 4x
-- **Weather.com:** Web scraping via curl_cffi - Weight: 4x
+- **Weather.com:** TWC v3 API via curl_cffi - Weight: 4x
 - **Weather Underground:** Web scraping via curl_cffi - Weight: 4x
 - **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov) - Weight: 3x
 - **Open-Meteo:** Independent physics model (provides "second opinion") - Weight: 1x
@@ -172,7 +172,26 @@ The PDF report includes:
 - Always attempts fresh API call (no premature cache returns)
 - Rate limit (6/day) only uses cache if cache is < 6 hours old
 - If rate limit reached AND cache is stale, rate limit is overridden — freshness always wins
-- Fallback chain: TWC API → web scraping → fresh cache (< 6h) → None
+- Fallback chain: TWC API → fresh cache (< 6h) → None. **No page-scraping
+  fallback**: since the Oct 2026 redesign the weather.com tenday page is
+  rendered client-side (`data-hydration="pending"`), and the server HTML holds
+  no forecast at all (no temps, no condition text, no `temperatureMax`). The
+  old scraper could never succeed, so it was removed
+- **API key rejected (401/403) or missing → red dashes, never cache.**
+  `TWC_API_KEY` is weather.com's own public key, copied by hand; it changes
+  every few months. When it does, the provider sets `key_rejected` and logs
+  `TWC_API_KEY rejected (HTTP 401)` with the refresh steps;
+  `scheduler.fetch_weather_com()` drops even a fresh LKG cache, and the Excel
+  row is drawn as red (`C00000`) dashes with a hover note on the WEATHER.COM
+  label. Other failures (timeouts, 5xx) still fall back to fresh cache.
+  Asserted by `tests/test_weather_com_key_rejected.py`
+- **Refreshing the key:** open weather.com in Chrome → F12 → Network → filter
+  `api.weather.com` → copy the `apiKey=` value from any request → set
+  `TWC_API_KEY` in **both** `X:\Operatns\Pwrsched\Weather\.env` (the exe reads
+  the `.env` in its own folder) and `C:\Projects\duck-sun-modesto\.env`. The
+  site itself may request `/daily/7day`; the same key works on `/10day`
+  (verified Oct 2026). Check with
+  `./venv/Scripts/python.exe -m duck_sun.providers.weather_com`
 - `precip_prob` extracted from `daypart[0].precipChance` daytime value (matches weather.com website display; was previously hardcoded to 0, then briefly used max(day,night) which inflated values)
 - `condition` extracted from `daypart[0].wxPhraseLong` (was previously truncated narrative)
 
@@ -255,7 +274,7 @@ If weather.com temps in the report don't match the website:
 1. Check for SSL errors in the terminal output (certificate verification failures)
 2. Compare report temps against `outputs/weathercom_cache.json` timestamp
 3. Compare against `outputs/cache/weather_com_lkg.json` timestamp
-4. If both are old, the API call is failing — check `TWC_API_KEY` and verify `pip-system-certs` is installed
+4. If both are old, the API call is failing — `TWC_API_KEY rejected (HTTP 401)` in the log means the key needs refreshing (see above); otherwise verify `pip-system-certs` is installed
 5. Both weather_com.py and wunderground.py use curl_cffi — if one fails, the other likely does too
 6. If firewall is blocking connections, contact IT Systems (Scott Bays) for domain whitelisting
 
