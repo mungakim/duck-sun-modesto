@@ -64,6 +64,8 @@ def _isolate_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(wu_module, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(wu_module, "CACHE_FILE", tmp_path / "wunderground_cache.json")
     monkeypatch.setattr(wu_module, "FAILED_PAGE_PATH", tmp_path / "wunderground_last_failed_page.html")
+    # No real key reaches the tests; API-path tests set their own.
+    monkeypatch.delenv("WU_API_KEY", raising=False)
 
 
 @pytest.fixture
@@ -432,10 +434,12 @@ def test_total_failure_returns_none_not_stale_data(monkeypatch):
          "high_c": 21.1, "low_c": 10.0, "condition": "Sunny", "precip_prob": 0}
         for d in _dates(3, start_offset=-7)
     ])
+    monkeypatch.setattr(provider, "_fetch_api", lambda: (None, False))
     monkeypatch.setattr(provider, "_fetch_page", lambda url, target: (None, None))
     monkeypatch.setattr(wu_module, "_sleep", lambda seconds: None)
 
     assert provider.fetch_sync() is None
+    assert provider.key_rejected is False
 
 
 def test_calendar_day_fills_null_high_for_today():
@@ -459,3 +463,122 @@ def test_calendar_day_fills_null_high_for_today():
 
     assert len(days) == 3
     assert days[0]["high_f"] == 69.0
+
+
+# ------------------------------------------------------------ TWC API path --
+# Since the Oct 2026 redesign most wunderground.com page loads no longer embed
+# the forecast; the page fetches it from api.weather.com with WUnderground's
+# own placeid and key. The provider makes that same request first.
+
+class _ApiResponse:
+    def __init__(self, status_code, text=""):
+        self.status_code = status_code
+        self.text = text
+
+
+def _api_session(monkeypatch, status_code, payload=None):
+    """Stub curl_cffi so the API answers status_code; returns the request log."""
+    requests_made = []
+    text = json.dumps(payload) if payload is not None else ""
+
+    class _Session:
+        def __init__(self, impersonate=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def get(self, url, headers=None, **kwargs):
+            requests_made.append((url, headers or {}))
+            return _ApiResponse(status_code, text)
+
+    monkeypatch.setattr("curl_cffi.requests.Session", _Session)
+    monkeypatch.setattr(wu_module, "get_ca_bundle_for_curl", lambda: True)
+    return requests_made
+
+
+def _fresh_cache(provider):
+    provider._save_cache([
+        {"date": d, "day_name": "Tue", "high_f": 70.0, "low_f": 50.0,
+         "high_c": 21.1, "low_c": 10.0, "condition": "Sunny", "precip_prob": 0}
+        for d in _dates(3)
+    ])
+
+
+def test_api_is_the_primary_source(monkeypatch, no_sleep):
+    monkeypatch.setenv("WU_API_KEY", "wu-key")
+    _api_session(monkeypatch, 200, _twc_payload())
+    provider = WUndergroundProvider()
+    calls = _scripted_fetch(monkeypatch, provider, [])
+
+    days = provider.fetch_sync()
+
+    assert [d["date"] for d in days] == _dates(3)
+    assert [d["high_f"] for d in days] == [70.0, 72.0, 73.0]
+    assert days[0]["precip_prob"] == 12          # daytime daypart, as on the page
+    assert calls == [], "the page must not be scraped when the API answered"
+
+
+def test_api_uses_wundergrounds_location_and_key_never_weather_coms(monkeypatch):
+    """Weather.com's geocode or key here would make WUNDERGRND a copy of the
+    WEATHER.COM row: two 4x votes for one forecast."""
+    monkeypatch.setenv("WU_API_KEY", "wu-key")
+    monkeypatch.setenv("TWC_API_KEY", "weathercom-key")
+    requests_made = _api_session(monkeypatch, 200, _twc_payload())
+
+    WUndergroundProvider()._fetch_api()
+
+    url, headers = requests_made[0]
+    assert f"placeid={wu_module.WU_PLACE_ID}" in url
+    assert "apiKey=wu-key" in url
+    assert "geocode" not in url and "weathercom-key" not in url
+    assert headers["Referer"] == "https://www.wunderground.com/"
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_rejected_key_still_tries_the_scrape(monkeypatch, no_sleep, status):
+    monkeypatch.setenv("WU_API_KEY", "dead-key")
+    _api_session(monkeypatch, status)
+    provider = WUndergroundProvider()
+    _scripted_fetch(monkeypatch, provider, [(_full_page(), 200)])
+
+    days = provider.fetch_sync()
+
+    assert len(days) == 10
+    assert provider.key_rejected is False   # the row has real data - not red
+
+
+def test_rejected_key_and_failed_scrape_skip_the_cache(monkeypatch, no_sleep):
+    monkeypatch.setenv("WU_API_KEY", "dead-key")
+    _api_session(monkeypatch, 401)
+    provider = WUndergroundProvider()
+    _fresh_cache(provider)
+    _scripted_fetch(monkeypatch, provider, [(EMPTY_PAGE, 200)] * wu_module.MAX_FETCH_ATTEMPTS)
+
+    assert provider.fetch_sync() is None
+    assert provider.key_rejected is True
+
+
+def test_missing_key_is_treated_as_rejected(monkeypatch, no_sleep):
+    provider = WUndergroundProvider()
+    _fresh_cache(provider)
+    _scripted_fetch(monkeypatch, provider, [(EMPTY_PAGE, 200)] * wu_module.MAX_FETCH_ATTEMPTS)
+
+    assert provider.fetch_sync() is None
+    assert provider.key_rejected is True
+
+
+def test_api_outage_still_falls_back_to_scrape_then_cache(monkeypatch, no_sleep):
+    monkeypatch.setenv("WU_API_KEY", "wu-key")
+    _api_session(monkeypatch, 503)
+    provider = WUndergroundProvider()
+    _fresh_cache(provider)
+    _scripted_fetch(monkeypatch, provider, [(EMPTY_PAGE, 200)] * wu_module.MAX_FETCH_ATTEMPTS)
+
+    days = provider.fetch_sync()
+
+    assert [d["date"] for d in days] == _dates(3)
+    assert provider.key_rejected is False

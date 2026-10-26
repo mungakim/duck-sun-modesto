@@ -28,7 +28,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 | **Google Weather** | Maps Platform Weather API (MetNet-3) | Neural/satellite fusion | **8x** |
 | **AccuWeather** | Official 5-day API | accuweather.com | 4x |
 | **Weather.com** | TWC v3 `/v3/wx/forecast/daily/10day` (curl_cffi, `TWC_API_KEY`) | weather.com | 4x |
-| **Weather Underground** | Web scraping (curl_cffi) | wunderground.com | 4x |
+| **Weather Underground** | TWC v3 `/v3/wx/forecast/daily/10day` with WU's `placeid` + `WU_API_KEY`; page scrape fallback | wunderground.com | 4x |
 | **NOAA** | `/gridpoints/{wfo}/{x},{y}/forecast` (Periods) | weather.gov website | 3x |
 | **Open-Meteo** | Hourly GFS/ICON/GEM models | Physics-based (independent) | 1x |
 
@@ -36,7 +36,7 @@ The project follows a **Source Replication** approach (not Model Approximation):
 
 The provider pulls the **full 240-hour (10-day) window**, which is the documented ceiling on `forecast/hours:lookup` (`hours` = 1..240, `pageSize` = 1..24, so a full pull is 10 paginated calls). Forecast length is **not** gated by billing tier - the Weather API is a single per-call SKU, so a cheaper plan limits call volume, not horizon. Before Jul 2026 the report only showed 4 days of Google data purely because the provider requested `hours=96`.
 
-**Weather.com & Weather Underground:** Both are fetched with curl_cffi browser impersonation and share data from The Weather Company (IBM), but may show slight variations. Weather.com calls the same TWC v3 API the weather.com page calls from the browser, using weather.com's own public key; WUnderground scrapes its page. Note: both sites have aggressive anti-bot protection and may not work in all environments (cloud/container IPs are often blocked).
+**Weather.com & Weather Underground:** Both are fetched with curl_cffi browser impersonation and share data from The Weather Company (IBM), but may show slight variations. Weather.com calls the same TWC v3 API the weather.com page calls from the browser, using weather.com's own public key; WUnderground likewise calls the API its own page calls, with WUnderground's location and key, and scrapes the page as a fallback. Note: both sites have aggressive anti-bot protection and may not work in all environments (cloud/container IPs are often blocked).
 
 **NOAA Organic Sourcing:** The NOAA provider uses the `/forecast` endpoint (human-curated Period data) rather than `/gridpoints` hourly model data. This ensures the PDF temperatures match the official weather.gov website exactly.
 
@@ -112,6 +112,8 @@ This project runs on Windows filesystem (`/mnt/c/...`) accessed via WSL. The vir
 Required in `.env`:
 - `GOOGLE_MAPS_API_KEY` - Google Maps Platform Weather API key (MetNet-3 neural model)
 - `ACCUWEATHER_API_KEY` - AccuWeather API key for forecast data
+- `TWC_API_KEY` - weather.com's public key, copied from weather.com's F12 Network tab (changes every few months)
+- `WU_API_KEY` - wunderground.com's public key, copied from wunderground.com's F12 Network tab (separate from `TWC_API_KEY`; changes every few months)
 - `LOG_LEVEL` (optional) - Defaults to INFO
 
 ## Key Concepts
@@ -141,7 +143,7 @@ The PDF report includes:
 - **Google Weather:** MetNet-3 neural model via Maps Platform Weather API - Weight: 8x
 - **AccuWeather:** Direct API sourcing (matches accuweather.com) - Weight: 4x
 - **Weather.com:** TWC v3 API via curl_cffi - Weight: 4x
-- **Weather Underground:** Web scraping via curl_cffi - Weight: 4x
+- **Weather Underground:** TWC v3 API (WU's placeid) via curl_cffi, page scrape fallback - Weight: 4x
 - **NOAA:** Organic alignment via `/forecast` Period API (matches weather.gov) - Weight: 3x
 - **Open-Meteo:** Independent physics model (provides "second opinion") - Weight: 1x
 
@@ -196,11 +198,36 @@ The PDF report includes:
 - `condition` extracted from `daypart[0].wxPhraseLong` (was previously truncated narrative)
 
 **Provider-level (wunderground.py):**
-- **There is no Weather Underground API key.** This provider is pure curl_cffi
-  page scraping, start to finish. Fetch chain: page scrape → fresh cache (< 6h
-  **and** still covering today) → None. Do not reintroduce an api.weather.com
-  call here — weather_com.py owns that endpoint, and routing WUnderground
-  through it would collapse two independent 4x sources into one
+- **Fetch chain: TWC API (WUnderground's placeid + `WU_API_KEY`) → page
+  scrape → fresh cache (< 6h and still covering today) → None.** Since the
+  Oct 2026 redesign most wunderground.com page loads are a new, client-rendered
+  build (no Angular, no `app-root-state`, no `temperatureMax`) and the browser
+  fetches `api.weather.com/v3/wx/forecast/daily/10day?placeid=…` itself. The
+  provider makes that same request first. Confirmed Oct 26 2026: 6 of 6 page
+  attempts empty at 09:01, while the API returned 11 days
+- **WUnderground's own location and key only — never weather.com's.**
+  `WU_PLACE_ID` (in `wunderground.py`) and `WU_API_KEY` are copied from
+  wunderground.com's own network requests. The response is the same JSON the
+  old page build embedded, so this row is exactly as independent of
+  WEATHER.COM as it always was (Oct 26: Wed 71/43 vs weather.com 70/44, Sat
+  64/44 vs 61/45). Routing it through weather.com's `geocode` or
+  `TWC_API_KEY` would collapse two 4x sources into one. Asserted by
+  `test_api_uses_wundergrounds_location_and_key_never_weather_coms`
+- **Key rejected (401/403) or missing → page scrape → red dashes, never
+  cache.** The scrape still works on the share of requests that get the old
+  build, so a dead key costs nothing while it does. When the scrape also
+  fails, the provider sets `key_rejected`, `scheduler.fetch_wunderground()`
+  drops even a fresh LKG cache, and the WUNDERGRND row is drawn as red dashes
+  with a refresh note on the label. Other API failures (timeouts, 5xx) still
+  fall through scrape → fresh cache
+- **Refreshing the key:** open
+  https://www.wunderground.com/forecast/us/ca/modesto/95350 in Chrome → F12 →
+  Network → filter `api.weather.com` → copy `apiKey=` from any request → set
+  `WU_API_KEY` in **both** `X:\Operatns\Pwrsched\Weather\.env` and
+  `C:\Projects\duck-sun-modesto\.env`. If the API starts answering 400/404,
+  the `placeid=` in the same request may have changed — update `WU_PLACE_ID`
+- **Page-scrape fallback** — the rules below still apply to it, and will be
+  removable once the old page build is gone entirely (as weather.com's was)
 - Embedded JSON is parsed in **every** form the site has shipped or could ship:
   raw (`"temperatureMax":[…]`), JS-escaped (`JSON.parse("{\"temperatureMax\":…")`),
   Angular TransferState (`&q;temperatureMax&q;:[…]` inside

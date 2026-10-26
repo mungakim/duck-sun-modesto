@@ -42,7 +42,10 @@ from duck_sun.providers.google_weather import (
 from duck_sun.providers.mid_org import MIDOrgProvider
 from duck_sun.providers.metar import MetarProvider
 from duck_sun.providers.weather_com import KEY_REJECTED_ERROR, WeatherComProvider
-from duck_sun.providers.wunderground import WUndergroundProvider
+from duck_sun.providers.wunderground import (
+    KEY_REJECTED_ERROR as WU_KEY_REJECTED_ERROR,
+    WUndergroundProvider,
+)
 
 # Processing
 from duck_sun.uncanniness import UncannyEngine
@@ -296,35 +299,51 @@ async def fetch_with_retry(
     return result
 
 
-async def fetch_weather_com(cache_mgr: CacheManager) -> FetchResult:
+async def _fetch_keyed_provider(
+    provider_name: str, provider: Any, key_rejected_error: str, cache_mgr: CacheManager
+) -> FetchResult:
     """
-    Fetch Weather.com, blanking the row outright when its API key is rejected.
+    Fetch a provider that runs on a hand-copied site API key (Weather.com,
+    WUnderground), blanking the row outright when the key is rejected.
 
     A rejected key won't fix itself, and the LKG cache (up to 18h) would keep
     the row looking healthy for most of a day while the key is dead. So no
-    cache: an empty result tagged KEY_REJECTED_ERROR, which the Excel report
-    draws as red dashes.
+    cache: an empty result tagged key_rejected_error, which the Excel report
+    draws as red dashes. The provider only sets key_rejected once its own
+    fallbacks (WUnderground's page scrape) have also come up empty.
     """
-    provider = WeatherComProvider()
-
     async def _fetch():
         return provider.fetch_sync()  # curl_cffi is sync
 
-    result = await fetch_with_retry("weather_com", _fetch, cache_mgr)
+    result = await fetch_with_retry(provider_name, _fetch, cache_mgr)
     if not provider.key_rejected:
         return result
 
     logger.error(
-        "[fetch_weather_com] API key rejected - ignoring any cached data; "
-        "WEATHER.COM row will be red dashes until TWC_API_KEY is refreshed"
+        f"[_fetch_keyed_provider] {provider_name}: API key rejected - ignoring any cached data; "
+        f"row will be red dashes until the key is refreshed"
     )
     return FetchResult(
-        provider="weather_com",
+        provider=provider_name,
         data=[],
         tier=CacheTier.DEFAULT,
         timestamp=datetime.now(),
         source="DEFAULT",
-        error_message=KEY_REJECTED_ERROR,
+        error_message=key_rejected_error,
+    )
+
+
+async def fetch_weather_com(cache_mgr: CacheManager) -> FetchResult:
+    """Weather.com - red dashes when TWC_API_KEY is rejected."""
+    return await _fetch_keyed_provider(
+        "weather_com", WeatherComProvider(), KEY_REJECTED_ERROR, cache_mgr
+    )
+
+
+async def fetch_wunderground(cache_mgr: CacheManager) -> FetchResult:
+    """WUnderground - red dashes when WU_API_KEY is rejected and the scrape fails."""
+    return await _fetch_keyed_provider(
+        "wunderground", WUndergroundProvider(), WU_KEY_REJECTED_ERROR, cache_mgr
     )
 
 
@@ -412,11 +431,7 @@ async def fetch_all_providers(cache_mgr: CacheManager) -> Dict[str, FetchResult]
     # 8. Weather Underground (commercial - weight 4x)
     logger.info("[fetch_all_providers] Fetching Weather Underground...")
 
-    async def _fetch_wunderground():
-        wunder = WUndergroundProvider()
-        return wunder.fetch_sync()  # curl_cffi is sync
-
-    results["wunderground"] = await fetch_with_retry("wunderground", _fetch_wunderground, cache_mgr)
+    results["wunderground"] = await fetch_wunderground(cache_mgr)
 
     # 9. MID.org (local ground truth - weight 2x)
     logger.info("[fetch_all_providers] Fetching MID.org...")
@@ -497,9 +512,7 @@ async def retry_single_provider(
         return await fetch_weather_com(cache_mgr)
 
     elif provider_name == "wunderground":
-        async def _fetch():
-            return WUndergroundProvider().fetch_sync()
-        return await fetch_with_retry(provider_name, _fetch, cache_mgr)
+        return await fetch_wunderground(cache_mgr)
 
     elif provider_name == "noaa":
         async def _fetch():
@@ -949,6 +962,7 @@ async def main():
             weather_com_data=weather_com_data,
             weather_com_key_rejected=results["weather_com"].error_message == KEY_REJECTED_ERROR,
             wunderground_data=wunderground_data,
+            wunderground_key_rejected=results["wunderground"].error_message == WU_KEY_REJECTED_ERROR,
             df_analyzed=df_analyzed,
             output_path=REPORT_DIR / start_time.strftime("%Y-%m") / start_time.strftime("%Y-%m-%d") / f"daily_forecast_{timestamp}.xlsx",
             mid_data=mid_data,

@@ -1,18 +1,22 @@
 """
 Weather Underground Provider for Duck Sun Modesto
 
-Scrapes the 10-day forecast for Modesto, CA (95350) from Weather Underground
-using curl_cffi with browser impersonation. There is no Weather Underground
-API key - the page is the only source, and everything below is built around
-parsing what it embeds.
+Fetches the 10-day forecast for Modesto, CA (95350) as wunderground.com
+shows it, using curl_cffi with browser impersonation.
 
 Fetch chain (first path that yields data wins):
-  1. wunderground.com page, parsing the forecast JSON embedded in its scripts.
+  1. TWC v3 daily forecast for WUnderground's own location (WU_PLACE_ID) with
+     WUnderground's own key (WU_API_KEY) - the request wunderground.com's page
+     makes in the browser. Since the Oct 2026 redesign most page loads no
+     longer embed the forecast, so this is the primary source now
+  2. wunderground.com page, parsing the forecast JSON embedded in its scripts.
      Up to MAX_FETCH_ATTEMPTS tries with backoff, rotating the page variant
      and the browser fingerprint on every attempt. A 200 OK page with no
      forecast arrays in it counts as a failed attempt - that is the
      intermittent failure mode, not a network error (see _scrape)
-  2. Local cache, but only when it is fresh (< 6h) AND still covers today
+  3. Local cache, but only when it is fresh (< 6h) AND still covers today -
+     EXCEPT when the API rejected the key: then the provider returns None and
+     sets key_rejected, and the report draws the row as red dashes
 
 Never returns stale data. A forecast whose dates no longer cover today would
 render as an all-dash row in the report (the grid is keyed by date), so it is
@@ -84,6 +88,27 @@ RETRY_DELAYS_SECONDS = (2, 4, 6, 8, 10)
 FAILED_PAGE_PATH = Path("logs") / "wunderground_last_failed_page.html"
 FAILED_PAGE_MAX_BYTES = 2_000_000
 
+# The TWC v3 request wunderground.com's own page makes: WUnderground's
+# location and WUnderground's key, both copied from the site's network tab.
+# The response is the same JSON the page used to embed, so the page parser
+# reads it unchanged. Never weather.com's geocode or TWC_API_KEY here - that
+# would make this row a copy of the WEATHER.COM row (two 4x votes, one source).
+API_URL = "https://api.weather.com/v3/wx/forecast/daily/10day"
+WU_PLACE_ID = "ca86a12f40fed7babfbc23c1fae919ec03f2f26a959ca5e9aade640da3e4f54c"
+
+# WU_API_KEY is wunderground.com's public key and changes every few months.
+# A rejection still tries the page scrape; if that fails too the row goes
+# blank (red dashes) instead of falling back to cache.
+KEY_REJECTED_STATUSES = (401, 403)
+KEY_REJECTED_ERROR = "WU_API_KEY rejected"
+KEY_REFRESH_HELP = (
+    "wunderground.com has changed its API key. To refresh it: open "
+    "https://www.wunderground.com/forecast/us/ca/modesto/95350 in Chrome -> F12 -> "
+    "Network tab -> filter 'api.weather.com' -> copy the apiKey= value from any "
+    "request -> set WU_API_KEY to it in BOTH X:\\Operatns\\Pwrsched\\Weather\\.env "
+    "and C:\\Projects\\duck-sun-modesto\\.env."
+)
+
 # Angular TransferState (`<script id="app-root-state">`) escapes the JSON it
 # embeds: & " ' < > become &a; &q; &s; &l; &g;  A regex written for raw JSON
 # sees `&q;temperatureMax&q;` and reads exactly like a client-rendered page.
@@ -150,11 +175,15 @@ class WUndergroundDay(TypedDict):
 
 class WUndergroundProvider:
     """
-    Provider for Weather Underground data via web scraping.
+    Provider for Weather Underground data: TWC API first, page scrape second.
 
-    Uses curl_cffi with browser impersonation to bypass anti-bot protection and
-    extracts the forecast arrays embedded in the page's script tags. No API key
-    is involved anywhere in this provider.
+    Uses curl_cffi with browser impersonation to bypass anti-bot protection.
+    Both paths yield the same TWC v3 arrays (the API returns them; the old
+    page build embedded them), parsed by _parse_daily_arrays.
+
+    After fetch_sync(), key_rejected is True when the API refused WU_API_KEY
+    (or none is set) AND the scrape fallback came up empty - the scheduler
+    reads it to blank the row in red instead of falling back to cache.
 
     Weight: 4.0 (commercial provider tier)
     """
@@ -179,6 +208,7 @@ class WUndergroundProvider:
             logger.warning("[WUndergroundProvider] curl_cffi not installed - provider disabled")
         if not HAS_BS4:
             logger.warning("[WUndergroundProvider] beautifulsoup4 not installed - page scraping degraded")
+        self.key_rejected = False
 
         # Ensure cache directory exists
         CACHE_DIR.mkdir(exist_ok=True)
@@ -550,6 +580,81 @@ class WUndergroundProvider:
     # Page fetch + parse
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # TWC API (primary)
+    # ------------------------------------------------------------------
+
+    def _fetch_api(self) -> Tuple[Optional[List[WUndergroundDay]], bool]:
+        """
+        Fetch the forecast wunderground.com's page loads in the browser.
+
+        Returns (days, key_rejected): key_rejected is True when WU_API_KEY is
+        missing or the API refused it, which the caller treats differently
+        from an ordinary outage (no cache fallback).
+        """
+        api_key = os.getenv("WU_API_KEY")
+        if not api_key:
+            logger.error(f"[WUndergroundProvider] WU_API_KEY is not set. {KEY_REFRESH_HELP}")
+            return None, True
+
+        url = (
+            f"{API_URL}?placeid={WU_PLACE_ID}&units=e&language=en-US"
+            f"&format=json&apiKey={api_key}"
+        )
+        headers = {
+            "Accept": "application/json",
+            "Referer": "https://www.wunderground.com/",
+            "Origin": "https://www.wunderground.com",
+        }
+        logger.info("[WUndergroundProvider] Fetching from TWC API (WUnderground placeid)")
+
+        from curl_cffi.requests import Session
+
+        response = None
+        for target in IMPERSONATE_TARGETS:
+            try:
+                with Session(impersonate=target) as session:
+                    response = session.get(
+                        url, headers=headers, timeout=30, verify=get_ca_bundle_for_curl()
+                    )
+                break
+            except Exception as e:
+                if "impersonat" in str(e).lower():
+                    continue  # this curl_cffi build doesn't know the target
+                logger.warning(f"[WUndergroundProvider] API request failed: {e}")
+                return None, False
+
+        if response is None:
+            logger.warning("[WUndergroundProvider] API skipped - no supported impersonation target")
+            return None, False
+
+        if response.status_code in KEY_REJECTED_STATUSES:
+            logger.error(
+                f"[WUndergroundProvider] {KEY_REJECTED_ERROR} (HTTP {response.status_code}). "
+                f"{KEY_REFRESH_HELP} Trying the page scrape meanwhile."
+            )
+            return None, True
+
+        if response.status_code != 200:
+            logger.warning(
+                f"[WUndergroundProvider] API HTTP {response.status_code} - trying the page scrape "
+                f"(a 400/404 can mean wunderground.com changed its placeid; copy placeid= "
+                f"from the same F12 request into WU_PLACE_ID)"
+            )
+            return None, False
+
+        days = self._parse_daily_arrays(response.text)
+        if not days:
+            logger.warning("[WUndergroundProvider] API response carried no daily forecast arrays")
+            return None, False
+
+        logger.info(f"[WUndergroundProvider] [OK] Retrieved {len(days)} days from API")
+        return days, False
+
+    # ------------------------------------------------------------------
+    # Page scrape (fallback)
+    # ------------------------------------------------------------------
+
     def _url_for_attempt(self, attempt: int) -> str:
         """Primary page on even attempts, alternates in turn on odd ones."""
         if attempt % 2 == 0 or not self.ALTERNATE_URLS:
@@ -834,10 +939,11 @@ class WUndergroundProvider:
         """
         Synchronously fetch the 10-day forecast from Weather Underground.
 
-        Returns the scraped forecast (retried, see _scrape), or fresh cache if
-        the page is unreachable. Returns None (never stale data) if both fail -
-        the caller renders that as an empty row rather than showing yesterday's
-        forecast under today's dates.
+        API first, then the page scrape (retried, see _scrape), then fresh
+        cache. Returns None (never stale data) if all fail - the caller renders
+        that as an empty row rather than showing yesterday's forecast under
+        today's dates. A rejected key skips the cache step and sets
+        key_rejected, so the row reads as broken until the key is refreshed.
         """
         if not HAS_CURL_CFFI:
             logger.error("[WUndergroundProvider] Missing dependency: curl_cffi")
@@ -849,17 +955,27 @@ class WUndergroundProvider:
             if cached:
                 return cached
 
-        days = self._scrape()
+        days, key_rejected = self._fetch_api()
+        if not days:
+            days = self._scrape()
         if days:
             self._save_cache(days)
             return days
+
+        if key_rejected:
+            self.key_rejected = True
+            logger.error(
+                "[WUndergroundProvider] API key rejected and the page scrape failed - "
+                "no cache used; the WUNDERGRND row will be RED dashes until WU_API_KEY is refreshed"
+            )
+            return None
 
         cached = self._get_fresh_cache()
         if cached:
             return cached
 
         logger.error(
-            "[WUndergroundProvider] Scrape failed and no fresh cache - "
+            "[WUndergroundProvider] API and scrape failed and no fresh cache - "
             "the WUNDERGRND row will be blank in this report"
         )
         return None
@@ -876,6 +992,9 @@ class WUndergroundProvider:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 60)

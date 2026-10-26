@@ -32,15 +32,22 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# WEATHER.COM row when its API key was rejected: dashes in red, plus a hover
-# note on the label saying what to do. A plain "--" row looks like any other
-# missing data; this one has a known two-minute fix.
+# WEATHER.COM / WUNDERGRND rows when their API key was rejected: dashes in
+# red, plus a hover note on the label saying what to do. A plain "--" row
+# looks like any other missing data; this one has a known two-minute fix.
 KEY_REJECTED_DASH_COLOR = 'C00000'
-KEY_REJECTED_NOTE = (
-    "weather.com API key rejected or missing. Refresh TWC_API_KEY: weather.com "
-    "-> F12 -> Network -> filter 'api.weather.com' -> copy apiKey= -> update "
-    ".env on X:\\ and C:\\Projects."
-)
+KEY_REJECTED_NOTES = {
+    'WEATHER.COM': (
+        "weather.com API key rejected or missing. Refresh TWC_API_KEY: weather.com "
+        "-> F12 -> Network -> filter 'api.weather.com' -> copy apiKey= -> update "
+        ".env on X:\\ and C:\\Projects."
+    ),
+    'WUNDERGRND': (
+        "wunderground.com API key rejected or missing, and the page scrape failed. "
+        "Refresh WU_API_KEY: wunderground.com -> F12 -> Network -> filter "
+        "'api.weather.com' -> copy apiKey= -> update .env on X:\\ and C:\\Projects."
+    ),
+}
 
 # Column offset for centering (start content at column C)
 COL_OFFSET = 2
@@ -374,6 +381,7 @@ def generate_excel_report(
     weather_com_data: Optional[List] = None,
     weather_com_key_rejected: bool = False,
     wunderground_data: Optional[List] = None,
+    wunderground_key_rejected: bool = False,
     df_analyzed: Any = None,
     output_path: Optional[Path] = None,
     mid_data: Optional[Dict] = None,
@@ -392,9 +400,9 @@ def generate_excel_report(
     SIDE REFERENCE TEMPS band between the Modesto block and the solar grid,
     and both are deliberately excluded from the Modesto weighted average.
 
-    weather_com_key_rejected draws the WEATHER.COM row as red dashes with a
-    hover note on its label: the API refused TWC_API_KEY and it needs a manual
-    refresh.
+    weather_com_key_rejected / wunderground_key_rejected draw that source row
+    as red dashes with a hover note on its label: the API refused the site key
+    (TWC_API_KEY / WU_API_KEY) and it needs a manual refresh.
     """
     if not HAS_OPENPYXL:
         logger.error("[generate_excel_report] openpyxl not installed")
@@ -896,10 +904,13 @@ def generate_excel_report(
         else:
             source_cell.font = Font(name='Arial', size=7, bold=True)
 
-        key_rejected_row = label == 'WEATHER.COM' and weather_com_key_rejected
+        key_rejected_row = (
+            (label == 'WEATHER.COM' and weather_com_key_rejected)
+            or (label == 'WUNDERGRND' and wunderground_key_rejected)
+        )
         if key_rejected_row:
-            source_cell.comment = Comment(KEY_REJECTED_NOTE, "Duck Sun")
-            logger.error("[generate_excel_report] WEATHER.COM: API key rejected - row drawn as RED dashes")
+            source_cell.comment = Comment(KEY_REJECTED_NOTES[label], "Duck Sun")
+            logger.error(f"[generate_excel_report] {label}: API key rejected - row drawn as RED dashes")
         dash_font = Font(
             name='Arial', size=9,
             bold=key_rejected_row,
