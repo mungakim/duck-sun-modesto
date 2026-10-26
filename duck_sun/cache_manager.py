@@ -148,11 +148,11 @@ class CacheManager:
             {"date": (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d"), "high_f": 58, "low_f": 43, "condition": "Default"},
             {"date": (datetime.now() + timedelta(days=4)).strftime("%Y-%m-%d"), "high_f": 59, "low_f": 44, "condition": "Default"},
         ],
-        "weather_com": [
-            {"date": datetime.now().strftime("%Y-%m-%d"), "high_f": 55, "low_f": 40, "condition": "Default"},
-            {"date": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"), "high_f": 56, "low_f": 41, "condition": "Default"},
-            {"date": (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"), "high_f": 57, "low_f": 42, "condition": "Default"},
-        ],
+        # No "weather_com" (or "wunderground") entry, deliberately: the lookup
+        # falls back to {} and the source row goes blank. Placeholder temps
+        # here were rendered as a real forecast at 4x weight - Oct 2026 the
+        # report carried 55/56/57 and "Default" for five days while the
+        # live fetch was failing. Blank is honest; a fabricated row is not.
         "mid_org": {
             "today": {"high": "55", "low": "40", "condition": "Default"},
             "yesterday": {"high": "54", "low": "39", "condition": "Default"}

@@ -283,10 +283,13 @@ The run log is the source of truth:
    provider actually succeeded. A months-old timestamp means the live fetch has
    been failing since then and nobody noticed
 3. The row goes blank rather than stale because `CacheManager` rejects cache
-   past `MAX_CACHE_HOURS` and `DEFAULT_VALUES` has **no** `wunderground` entry
-   (`{}` → falsy → blank row). That is deliberate: blank is honest, a fabricated
-   55/40 is not. Note `weather_com` **does** still carry placeholder defaults,
-   which would enter the weighted average if it ever fell that far
+   past `MAX_CACHE_HOURS` and `DEFAULT_VALUES` has **no** `wunderground` or
+   `weather_com` entry (`{}` → falsy → blank row). That is deliberate: blank is
+   honest, a fabricated 55/40 is not. `weather_com` used to carry placeholders
+   (55/40, 56/41, 57/42, condition `"Default"`); in Oct 2026 they sat in the
+   report at 4x weight for five days while the live fetch was failing, and
+   only looked wrong once real temps were ~13°F above them. Asserted by
+   `tests/test_weather_com_default.py`
 4. Run the provider standalone to see which link in the chain broke:
    `./venv/Scripts/python.exe -m duck_sun.providers.wunderground`
 5. For WUnderground specifically, `logs/wunderground_last_failed_page.html` is
