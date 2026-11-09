@@ -343,6 +343,59 @@ The run log is the source of truth:
    the timestamp, HTTP status, URL and fingerprint). Open it: a bot
    interstitial, an empty `app-root-state`, and a real redesign all look
    different there and identical in the log
+6. For NOAA, OPEN-METEO or HRRR, look for `Unusable response` or `TLS
+   connection corrupted` in the log - usually MID's firewall, not the API. See
+   **Network Interception** below
+
+### Network Interception (MID Firewall SSL Inspection, Nov 2026)
+
+MID's firewall decrypts and re-encrypts HTTPS: the certificate a work PC
+receives for `api.weather.gov` and `api.open-meteo.com` is issued by
+**`MID-FW-Trusted`**, not by the site's real CA. On Nov 6 and Nov 9 2026 it
+broke both hosts for hours at a time, and the NOAA, OPEN-METEO and HRRR rows
+went blank (Nov 9 is a Monday, so Friday's cache was past `MAX_CACHE_HOURS`
+and there was nothing to fall back to). It cleared by itself the same morning.
+What the report saw:
+
+- **HTTP 200 whose body isn't JSON**, returned in ~40ms. A real NOAA
+  `/forecast` answer is ~13KB. The old log said only `Expecting value: line 1
+  column 1 (char 0)`
+- **`[SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC]`** - TLS records altered in
+  transit
+
+What it was **not**: NOAA (its API answered normally from outside MID), a
+firewall block (PowerShell's `Invoke-WebRequest` got the full 13,043 bytes from
+the same PC), or a code change (none between Nov 5, which worked, and Nov 6).
+Google, AccuWeather, MID and METAR use the same `httpx` + `ssl_helper` stack and
+were fine in the same runs. Retries don't help - the report-level re-fetch at
++23s and +46s failed too.
+
+`duck_sun/http_diagnostics.py` now makes the log carry the evidence. Every
+NOAA (`noaa_forecast`, `noaa_gridpoint`), Open-Meteo and HRRR response parses
+through `json_or_explain()`, which on a non-JSON body logs:
+
+```
+[noaa_forecast] Unusable response (not JSON: ...): HTTP 200, 41ms, 0B, type=..., encoding=... - possible MID firewall SSL-inspection interference
+[noaa_forecast] Body starts: '...'
+```
+
+and saves the full response (URL, headers, body) to
+`logs/<source>_last_bad_response.txt`. TLS corruption errors anywhere in the
+retry layer, NOAA or HRRR log `TLS connection corrupted in transit`. Asserted
+by `tests/test_http_diagnostics.py`.
+
+**When it happens again:**
+1. Read `logs/<source>_last_bad_response.txt` - a firewall page, an empty body
+   and a real API error look different there
+2. Run `.\venv\Scripts\python.exe scripts\diag_http.py` from the repo root,
+   **while the problem is happening**. It prints the certificate issuer and
+   scores each host 5 ways x 5 attempts (httpx as the report does, no
+   compression, TLS 1.2 only, curl_cffi). A variant that scores 5/5 while
+   "as the exe does" fails is a code workaround; all-fail means IT
+3. Re-run the forecast once it clears - nothing needs resetting
+4. If it recurs, ask IT (Scott Bays) to exempt `api.weather.gov` and
+   `api.open-meteo.com` from SSL inspection, with the saved response files as
+   evidence
 
 ## Google-First Policy (Jul 2026)
 

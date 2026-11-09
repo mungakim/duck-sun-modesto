@@ -20,6 +20,8 @@ except ImportError:
     def get_httpx_ssl_context():
         return _ssl.create_default_context()
 
+from duck_sun.http_diagnostics import json_or_explain, log_if_tls_corruption
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,7 +127,7 @@ class NOAAProvider:
                     logger.warning(f"[NOAAProvider] {result['message']}")
                     return result
 
-                data = resp.json()
+                data = json_or_explain(resp, "noaa_points")
                 props = data.get('properties', {})
 
                 actual_grid_id = props.get('gridId')
@@ -156,6 +158,7 @@ class NOAAProvider:
                 return result
 
         except Exception as e:
+            log_if_tls_corruption("noaa_points", e)
             result['message'] = f"Verification failed: {e}"
             logger.warning(f"[NOAAProvider] {result['message']}")
             return result
@@ -178,7 +181,7 @@ class NOAAProvider:
                     logger.warning(f"[NOAAProvider] HTTP {resp.status_code}: {resp.text[:200]}")
                     return None
 
-                data = resp.json()
+                data = json_or_explain(resp, "noaa_gridpoint")
 
             # Extract temperature values from the gridpoint data
             temps: List[NOAATemperature] = []
@@ -213,6 +216,7 @@ class NOAAProvider:
             logger.warning("[NOAAProvider] Request timed out")
             return None
         except httpx.RequestError as e:
+            log_if_tls_corruption("noaa_gridpoint", e)
             logger.warning(f"[NOAAProvider] Request error: {e}")
             return None
         except Exception as e:
@@ -231,7 +235,7 @@ class NOAAProvider:
                     logger.warning(f"[NOAAProvider] HTTP {resp.status_code}")
                     return None
 
-                data = resp.json()
+                data = json_or_explain(resp, "noaa_gridpoint")
 
             temps: List[NOAATemperature] = []
             temp_data = data.get('properties', {}).get('temperature', {}).get('values', [])
@@ -262,6 +266,7 @@ class NOAAProvider:
             return temps
 
         except Exception as e:
+            log_if_tls_corruption("noaa_gridpoint", e)
             logger.warning(f"[NOAAProvider] Async fetch failed: {e}")
             return None
 
@@ -294,13 +299,14 @@ class NOAAProvider:
                     logger.warning(f"[NOAAProvider] Forecast API {resp.status_code}")
                     return None
 
-                data = resp.json()
+                data = json_or_explain(resp, "noaa_forecast")
                 periods = data.get('properties', {}).get('periods', [])
 
                 self.cached_periods = periods
                 logger.info(f"[NOAAProvider] Retrieved {len(periods)} forecast periods")
                 return periods
         except Exception as e:
+            log_if_tls_corruption("noaa_forecast", e)
             logger.error(f"[NOAAProvider] Period fetch failed: {e}", exc_info=True)
             return None
 

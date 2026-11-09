@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple, TypeVar
 
+from duck_sun.http_diagnostics import log_if_tls_corruption
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
@@ -211,6 +213,7 @@ def with_retry(
                 except Exception as e:
                     last_exception = e
                     error_type, error_msg = categorize_error(e)
+                    log_if_tls_corruption(provider_name, e)
 
                     logger.warning(
                         f"[{provider_name}] Attempt {attempt + 1} failed: "
