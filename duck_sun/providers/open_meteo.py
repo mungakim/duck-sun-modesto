@@ -29,6 +29,8 @@ except ImportError:
     def get_httpx_ssl_context():
         return _ssl.create_default_context()
 
+from duck_sun.http_diagnostics import json_or_explain, log_if_tls_corruption
+
 # Get logger (configuration is done in scheduler.py)
 logger = logging.getLogger(__name__)
 
@@ -149,7 +151,7 @@ async def fetch_open_meteo(days: int = 8) -> ForecastResult:
         resp = await client.get(url, params=params, timeout=30.0)
         logger.info(f"[fetch_open_meteo] Response status: {resp.status_code}")
         resp.raise_for_status()
-        data = resp.json()
+        data = json_or_explain(resp, "open_meteo")
     
     logger.info(f"[fetch_open_meteo] Received {len(data.get('hourly', {}).get('time', []))} hourly records")
     
@@ -379,7 +381,7 @@ async def fetch_hrrr_forecast(force_refresh: bool = False) -> Optional[HRRRForec
             resp = await client.get(url, params=params, timeout=30.0)
             logger.info(f"[HRRR] Response status: {resp.status_code}")
             resp.raise_for_status()
-            data = resp.json()
+            data = json_or_explain(resp, "hrrr")
 
         hourly = data.get("hourly", {})
         times = hourly.get("time", [])
@@ -446,6 +448,7 @@ async def fetch_hrrr_forecast(force_refresh: bool = False) -> Optional[HRRRForec
         logger.error(f"[HRRR] HTTP error: {e.response.status_code} - {e.response.text}")
         return None
     except Exception as e:
+        log_if_tls_corruption("hrrr", e)
         logger.error(f"[HRRR] Fetch failed: {e}")
         return None
 

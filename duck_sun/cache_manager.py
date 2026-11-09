@@ -204,7 +204,10 @@ class CacheManager:
         if cache_path.exists():
             try:
                 backup_path = cache_path.with_suffix('.json.bak')
-                cache_path.rename(backup_path)
+                # replace(), not rename(): on Windows rename() refuses to overwrite
+                # an existing .bak (WinError 183), so every invalidation after the
+                # first silently failed and left the cache in place.
+                cache_path.replace(backup_path)
                 logger.info(f"[CacheManager] Invalidated cache for {provider} (backed up to .bak)")
             except Exception as e:
                 logger.warning(f"[CacheManager] Failed to invalidate cache for {provider}: {e}")
