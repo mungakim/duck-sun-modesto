@@ -58,6 +58,41 @@ def col(n):
     return get_column_letter(n + COL_OFFSET)
 
 
+PACIFIC = ZoneInfo("America/Los_Angeles")
+GRID_DAYS = 8  # Temperature grid width: today + 7
+
+
+def grid_dates(report_time: Optional[datetime] = None, days: int = GRID_DAYS) -> List[str]:
+    """
+    The report's column dates: its own Pacific calendar day, then the next
+    days-1, as 'YYYY-MM-DD'.
+
+    Taken from the clock, never from a provider's payload. The grid used to
+    take its columns from Open-Meteo's daily list, so when that fetch failed
+    and the cache served yesterday's pull (Nov 13 2026: 23.9h old, inside the
+    24h limit), the first column read "TODAY 11-12" and every other source
+    dashed it. A cached payload now only costs its own row the days it lacks.
+
+    A naive report_time is taken as Pacific wall-clock (the machine's zone).
+    """
+    if report_time is None:
+        report_time = datetime.now(PACIFIC)
+    elif report_time.tzinfo is not None:
+        report_time = report_time.astimezone(PACIFIC)
+    start = report_time.date()
+    return [(start + timedelta(days=i)).isoformat() for i in range(days)]
+
+
+def _day_label(date_key: str, is_today: bool) -> str:
+    """'TODAY' for the first column, else the 3-letter weekday ('FRI')."""
+    if is_today:
+        return "TODAY"
+    try:
+        return datetime.fromisoformat(date_key).strftime('%a').upper()
+    except ValueError:
+        return ""
+
+
 def calculate_daily_stats_from_hourly(hourly_data: List[Dict], timezone: str = "America/Los_Angeles") -> Dict:
     """Calculate daily high/low from hourly data using calendar day (midnight-midnight)."""
     daily_stats = {}
@@ -410,9 +445,25 @@ def generate_excel_report(
 
     logger.info("[generate_excel_report] Starting Excel generation (CENTERED)...")
 
-    # Process data sources
-    om_daily = om_data.get('daily_forecast', [])[:8]
+    report_time = report_timestamp or datetime.now(PACIFIC)
 
+    # Grid columns come from the clock (see grid_dates), and Open-Meteo is a
+    # date-keyed row like every other source.
+    grid_keys = grid_dates(report_time)
+    om_by_date = {
+        d['date']: d
+        for d in (om_data or {}).get('daily_forecast', [])
+        if d.get('date')
+    }
+    om_past = sorted(k for k in om_by_date if k < grid_keys[0])
+    if om_past:
+        logger.warning(
+            f"[generate_excel_report] Open-Meteo data starts {om_past[0]}, before today "
+            f"{grid_keys[0]} (served from cache?) - {len(om_past)} past day(s) ignored; "
+            f"grid stays on {grid_keys[0]}..{grid_keys[-1]}"
+        )
+
+    # Process data sources
     if noaa_daily_periods:
         noaa_daily = noaa_daily_periods
     else:
@@ -495,11 +546,7 @@ def generate_excel_report(
     center_align = Alignment(horizontal='center', vertical='center')
     left_align = Alignment(horizontal='left', vertical='center')
 
-    # Use timestamp
-    if report_timestamp:
-        report_time = report_timestamp
-    else:
-        report_time = datetime.now(ZoneInfo("America/Los_Angeles"))
+    # Use timestamp (report_time is set at the top - it also fixes the grid dates)
     timestamp_str = report_time.strftime("%A, %B %d, %Y %H:%M:%S")
 
     # Set column widths - balanced to fit on one landscape page with readable text
@@ -717,9 +764,8 @@ def generate_excel_report(
     # Applied in reverse order so the highest-priority source overwrites last.
     daily_conditions = {}
 
-    # Step 1: Open-Meteo as base (always has 8 days from WMO weather codes)
-    for day_record in om_daily:
-        date_key = day_record.get('date', '')
+    # Step 1: Open-Meteo as base (8 days from WMO weather codes when live)
+    for date_key, day_record in om_by_date.items():
         condition = day_record.get('condition', 'Unknown')
         if condition and condition != 'Unknown':
             daily_conditions[date_key] = {'condition': condition, 'source': 'Open-Meteo'}
@@ -766,8 +812,7 @@ def generate_excel_report(
     ws[f'{col(1)}{grid_row}'] = ""
     # Merged col(1)+col(2) - no borders for this empty area
 
-    for i, day in enumerate(om_daily):
-        date_key = day.get('date', '')
+    for i, date_key in enumerate(grid_keys):
         condition_info = daily_conditions.get(date_key, {'condition': 'Unknown'})
         condition = condition_info['condition']
         display_text, bg_color = get_daily_condition_display(condition)
@@ -794,8 +839,8 @@ def generate_excel_report(
     empty_header.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
-    for i, day in enumerate(om_daily):
-        label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
+    for i, date_key in enumerate(grid_keys):
+        label = _day_label(date_key, i == 0)
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
@@ -820,8 +865,8 @@ def generate_excel_report(
     source_header.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
-    for i, day in enumerate(om_daily):
-        date_str = day.get('date', '')[5:]
+    for i, date_key in enumerate(grid_keys):
+        date_str = date_key[5:]
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
@@ -838,10 +883,9 @@ def generate_excel_report(
     # Pre-calculate excluded highs (auto-marks OPEN-METEO with "-" when it is
     # the max of the ensemble; the weighted-avg formula's ISNUMBER skips text)
     excluded_highs = {}
-    for i, day in enumerate(om_daily):
-        k = day.get('date', '')
+    for i, k in enumerate(grid_keys):
         hi_vals = [
-            day.get('high_f'),
+            om_by_date.get(k, {}).get('high_f'),
             noaa_daily.get(k, {}).get('high_f'),
             accu_daily.get(k, {}).get('high_f'),
             weather_com_daily.get(k, {}).get('high_f'),
@@ -860,32 +904,38 @@ def generate_excel_report(
             excluded_highs[i] = set()
 
     # Source rows
+    # Every source, Open-Meteo included, is a dict keyed by date and looked up
+    # on the clock's grid dates.
     sources = [
-        ('OPEN-METEO', lambda d, k: (d.get('high_f'), d.get('low_f')), 0),
-        ('NOAA (GOV)', lambda d, k: (noaa_daily.get(k, {}).get('high_f'), noaa_daily.get(k, {}).get('low_f')), 1),
-        ('ACCUWEATHER', lambda d, k: (accu_daily.get(k, {}).get('high_f'), accu_daily.get(k, {}).get('low_f')), 2),
-        ('WEATHER.COM', lambda d, k: (weather_com_daily.get(k, {}).get('high_f'), weather_com_daily.get(k, {}).get('low_f')), 3),
-        ('WUNDERGRND', lambda d, k: (wunderground_daily.get(k, {}).get('high_f'), wunderground_daily.get(k, {}).get('low_f')), 4),
-        ('GOOGLE (AI)', lambda d, k: (google_daily.get(k, {}).get('high_f'), google_daily.get(k, {}).get('low_f')), 5),
+        ('OPEN-METEO', om_by_date, 0),
+        ('NOAA (GOV)', noaa_daily, 1),
+        ('ACCUWEATHER', accu_daily, 2),
+        ('WEATHER.COM', weather_com_daily, 3),
+        ('WUNDERGRND', wunderground_daily, 4),
+        ('GOOGLE (AI)', google_daily, 5),
     ]
+
+    def _hi_lo(daily: Dict, k: str) -> Tuple[Any, Any]:
+        vals = daily.get(k, {})
+        return vals.get('high_f'), vals.get('low_f')
 
     # Coverage check before anything is drawn. A source row renders "--" both
     # when the provider returned nothing AND when it returned a forecast whose
     # dates no longer line up with the grid (stale cache, timezone drift), and
     # the two are indistinguishable in the finished spreadsheet. Say which
     # happened here, in the run log, while the inputs are still in hand.
-    for label, getter, _ in sources:
-        covered = sum(1 for day in om_daily if getter(day, day.get('date', ''))[0] is not None)
+    for label, daily, _ in sources:
+        covered = sum(1 for k in grid_keys if _hi_lo(daily, k)[0] is not None)
         if covered == 0:
             logger.error(
-                f"[generate_excel_report] {label}: 0/{len(om_daily)} grid days - "
+                f"[generate_excel_report] {label}: 0/{len(grid_keys)} grid days - "
                 f"row will be ALL DASHES (no data, or its dates miss the grid window "
-                f"{om_daily[0].get('date') if om_daily else '?'}..)"
+                f"{grid_keys[0]}..{grid_keys[-1]})"
             )
-        elif covered < len(om_daily):
-            logger.warning(f"[generate_excel_report] {label}: {covered}/{len(om_daily)} grid days")
+        elif covered < len(grid_keys):
+            logger.warning(f"[generate_excel_report] {label}: {covered}/{len(grid_keys)} grid days")
 
-    for src_idx, (label, getter, source_index) in enumerate(sources):
+    for src_idx, (label, daily, source_index) in enumerate(sources):
         grid_row = 13 + src_idx
 
         # MERGED col(1)+col(2) for wider source label (no weight shown, centered)
@@ -917,9 +967,8 @@ def generate_excel_report(
             color=KEY_REJECTED_DASH_COLOR if key_rejected_row else None,
         )
 
-        for i, day in enumerate(om_daily):
-            k = day.get('date', '')
-            v1, v2 = getter(day, k)
+        for i, k in enumerate(grid_keys):
+            v1, v2 = _hi_lo(daily, k)
             is_excluded_high = source_index in excluded_highs.get(i, set())
 
             day_color = DAY_COLORS[i % len(DAY_COLORS)]
@@ -987,7 +1036,7 @@ def generate_excel_report(
             "0),\"--\")"
         )
 
-    for i, day in enumerate(om_daily):
+    for i in range(len(grid_keys)):
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
@@ -1016,13 +1065,12 @@ def generate_excel_report(
     precip_cell.border = thin_border
     ws[f'{col(2)}{grid_row}'].border = thin_border
 
-    for i, day in enumerate(om_daily):
-        k = day.get('date', '')
+    for i, k in enumerate(grid_keys):
         precip_pct = 0
         if precip_data and k in precip_data:
             precip_pct = precip_data[k].get('consensus', 0)
         else:
-            precip_pct = day.get('precip_prob', 0)
+            precip_pct = om_by_date.get(k, {}).get('precip_prob') or 0
 
         if precip_pct >= 50:
             fill_color = "6496FF"
@@ -1096,8 +1144,8 @@ def generate_excel_report(
     side_ref_days_label.border = thin_border
     ws[f'{col(2)}{SIDE_REF_DAYS_ROW}'].border = thin_border
 
-    for i, day in enumerate(om_daily):
-        label = "TODAY" if i == 0 else day.get('day_name', '')[:3].upper()
+    for i, date_key in enumerate(grid_keys):
+        label = _day_label(date_key, i == 0)
         col_hi = col(3 + i * 2)
         col_lo = col(4 + i * 2)
 
@@ -1122,9 +1170,8 @@ def generate_excel_report(
         ws[f'{col(2)}{row}'].border = thin_border
 
         rendered = 0
-        for i, day in enumerate(om_daily):
-            vals = daily.get(day.get('date', ''), {})
-            hi, lo = vals.get('high_f'), vals.get('low_f')
+        for i, k in enumerate(grid_keys):
+            hi, lo = _hi_lo(daily, k)
             if hi is not None or lo is not None:
                 rendered += 1
 
@@ -1137,7 +1184,7 @@ def generate_excel_report(
                 cell.border = thin_border
 
         logger.info(
-            f"[generate_excel_report] {label} reference row: {rendered}/{len(om_daily)} "
+            f"[generate_excel_report] {label} reference row: {rendered}/{len(grid_keys)} "
             "day columns populated"
         )
         return rendered
@@ -1160,10 +1207,8 @@ def generate_excel_report(
     # 8-day temperature grid to keep the one-pager compact; Google's 240-hour
     # pull could cover 10, so this is a layout choice, not a data limit.
     SOLAR_FORECAST_DAYS = 7
-    forecast_dates = [
-        (datetime.now(tz) + timedelta(days=i)).strftime('%Y-%m-%d')
-        for i in range(0, SOLAR_FORECAST_DAYS)
-    ]
+    # Same clock as the temperature grid, so the two can't disagree on "today"
+    forecast_dates = grid_dates(report_time, SOLAR_FORECAST_DAYS)
 
     # Build duck curve data
     duck_data = {d: [] for d in forecast_dates}

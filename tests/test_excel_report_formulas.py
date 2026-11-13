@@ -1,10 +1,15 @@
 """Regression tests for excel_report integer rounding + weighted-avg formulas."""
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 
 from duck_sun.excel_report import generate_excel_report
+
+# The grid's dates come from the report clock, so pin it to the fixtures' first day
+REPORT_TIME = datetime(2026, 5, 26, 5, 30, tzinfo=ZoneInfo("America/Los_Angeles"))
 
 
 def _basic_inputs():
@@ -65,6 +70,7 @@ def test_source_row_values_are_integers_not_floats(tmp_path: Path):
         accu_data=accu_data,
         google_data=google_data,
         output_path=out,
+        report_timestamp=REPORT_TIME,
     )
 
     wb = load_workbook(out)
@@ -99,6 +105,7 @@ def test_weighted_avg_row_emits_excel_formula(tmp_path: Path):
         accu_data=accu_data,
         google_data=google_data,
         output_path=out,
+        report_timestamp=REPORT_TIME,
     )
 
     wb = load_workbook(out)
@@ -214,6 +221,7 @@ def test_weighted_avg_formula_has_both_high_and_low_columns(tmp_path: Path):
         accu_data=accu_data,
         google_data=google_data,
         output_path=out,
+        report_timestamp=REPORT_TIME,
     )
 
     wb = load_workbook(out)
