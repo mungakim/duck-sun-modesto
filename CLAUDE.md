@@ -397,6 +397,23 @@ by `tests/test_http_diagnostics.py`.
    `api.open-meteo.com` from SSL inspection, with the saved response files as
    evidence
 
+### Grid Dates Come From the Clock (Nov 2026)
+
+The 8 temperature columns (and the 7 solar days) are dated by
+`excel_report.grid_dates()`: the report's own Pacific calendar day + 7. They
+used to be taken from Open-Meteo's daily list. On **Nov 13 2026 05:24** the
+Open-Meteo fetch failed (`Request error:` x3), `CacheManager` served the
+11/12 05:29 pull (23.9h old, inside the 24h limit), and the sheet read
+**"TODAY 11-12"**: every other source dashed that column (`7/8 grid days`),
+11/20 fell off the right edge, and the solar grid below said 11-13.
+
+Open-Meteo is now a date-keyed row like the other five. A cached payload
+costs only its own row the days it lacks, and the log says so:
+`Open-Meteo data starts 2026-11-12, before today 2026-11-13 (served from
+cache?)` then `OPEN-METEO: 7/8 grid days`. Never key the grid on a
+provider's dates again. Asserted by `tests/test_grid_dates.py`; tests with
+fixed fixture dates pass a matching `report_timestamp`.
+
 ## Google-First Policy (Jul 2026)
 
 Google Weather (MetNet-3) is the preferred source **everywhere on the report

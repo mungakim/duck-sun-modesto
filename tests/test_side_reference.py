@@ -5,11 +5,16 @@ day-name row. Both are references only: own visual band, own colours, and
 explicitly NOT part of the Modesto weighted consensus.
 """
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 
 from duck_sun.excel_report import generate_excel_report
+
+# The grid's dates come from the report clock, so pin it to the fixtures' first day
+REPORT_TIME = datetime(2026, 8, 1, 5, 30, tzinfo=ZoneInfo("America/Los_Angeles"))
 
 SIDE_REF_BANNER_ROW = 22
 SIDE_REF_DAYS_ROW = 23
@@ -76,6 +81,7 @@ def _render(tmp_path: Path, portland_data, phoenix_data, days=8):
         portland_data=portland_data,
         phoenix_data=phoenix_data,
         output_path=out,
+        report_timestamp=REPORT_TIME,
     )
     return load_workbook(out).active
 
