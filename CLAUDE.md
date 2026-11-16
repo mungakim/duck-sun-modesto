@@ -70,6 +70,10 @@ This script:
 
 # Install dependencies
 ./venv/Scripts/pip.exe install -r requirements.txt
+
+# Run the test suite (pytest.ini limits it to tests/; scripts/ are
+# assert-free diagnostics, run them directly by name)
+./venv/Scripts/python.exe -m pytest -q
 ```
 
 ### Shipping a New Version (Code Deploy to X:\)
