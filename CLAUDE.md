@@ -414,6 +414,26 @@ cache?)` then `OPEN-METEO: 7/8 grid days`. Never key the grid on a
 provider's dates again. Asserted by `tests/test_grid_dates.py`; tests with
 fixed fixture dates pass a matching `report_timestamp`.
 
+**No Open-Meteo data at all → row 13 is hidden, nothing stands in.** Until
+Nov 2026 the scheduler "synthesized" an Open-Meteo baseline from Google /
+AccuWeather / NOAA and the report drew it as the OPEN-METEO row - another
+source's numbers under Open-Meteo's name, counted twice in the Wtd. Average.
+That synthesis is deleted. The physics engine never used it (it reads
+`daily_summary`, which the synthesized payload didn't have, and builds its own
+Google/NOAA timeline). Now an empty payload logs `[main] Open-Meteo data
+unavailable - OPEN-METEO left out of the report` and `OPEN-METEO: 0/8 grid
+days - row will be HIDDEN`, and row 13 is hidden (not deleted): every other
+row keeps its number, the formula stays `13:18`, and its `--` cells are
+already skipped. A partial row (cache, 7/8) stays visible. Asserted by
+`tests/test_open_meteo_missing.py`, which drives `scheduler.main()` end to end.
+
+**A blank `Request error:` names its cause.** Nov 13's failures logged
+`Request error: ` with nothing after it - httpx errors can stringify to "".
+`http_diagnostics.describe_exception()` gives the type and cause chain
+(`ReadError (no message) <- ConnectionResetError: [Errno 10054] ...`) on every
+retry line, the final `All N attempts failed` line, HRRR, and the AccuWeather,
+Google, METAR and NOAA request-error lines.
+
 ## Google-First Policy (Jul 2026)
 
 Google Weather (MetNet-3) is the preferred source **everywhere on the report

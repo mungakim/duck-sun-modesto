@@ -57,7 +57,7 @@ def _todays_google():
     }
 
 
-def _render(tmp_path: Path, om_data) -> "Worksheet":  # noqa: F821
+def _render(tmp_path: Path, om_data):
     out = tmp_path / "report.xlsx"
     generate_excel_report(
         om_data=om_data,
@@ -108,6 +108,7 @@ def test_stale_open_meteo_cache_costs_only_its_own_row(tmp_path, monkeypatch):
     # and nothing for 11/20. Its 11/12 day is simply not on the grid.
     om = [ws[f"{c}{OPEN_METEO_ROW}"].value for c in DAY_HI_COLS]
     assert om == [61, 62, 63, 64, 65, 66, 67, "--"]
+    assert not ws.row_dimensions[OPEN_METEO_ROW].hidden, "a partial row stays visible"
 
 
 def test_solar_grid_and_temperature_grid_agree_on_today(tmp_path, monkeypatch):
@@ -122,6 +123,7 @@ def test_grid_is_dated_even_with_no_open_meteo_data(tmp_path):
     assert ws[f"E{DATE_ROW}"].value == "11-13"
     assert ws[f"S{DATE_ROW}"].value == "11-20"
     assert ws[f"E{GOOGLE_ROW}"].value == 70
+    assert ws.row_dimensions[OPEN_METEO_ROW].hidden is True, "no data at all -> row hidden"
 
 
 def test_grid_dates_use_the_pacific_calendar_day():

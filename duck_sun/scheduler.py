@@ -21,7 +21,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -543,162 +543,6 @@ def _om_payload_is_empty(d) -> bool:
     return not d.get('daily_forecast') and not d.get('daily_summary') and not d.get('hourly')
 
 
-def _c_to_f(c):
-    return None if c is None else round(c * 9 / 5 + 32)
-
-
-def _day_name_from_date(date_str: str) -> str:
-    try:
-        return datetime.fromisoformat(date_str).strftime('%A')
-    except Exception:
-        return ''
-
-
-def _aggregate_hourly_to_daily(
-    hourly_data: List[Dict],
-    source_label: str,
-    time_field: str = 'time',
-) -> List[Dict]:
-    """Aggregate hourly temperature records into per-date high/low dicts.
-
-    Used by synthesis to turn NOAA hourly timelines into the
-    same shape that excel_report iterates over (`om_daily`).
-    """
-    from collections import defaultdict
-    daily_temps: Dict[str, List[float]] = defaultdict(list)
-
-    for record in hourly_data:
-        time_str = record.get(time_field) or record.get('valid_time') or record.get('time') or ''
-        temp_c = record.get('temp_c')
-        if time_str and temp_c is not None:
-            daily_temps[time_str[:10]].append(temp_c)
-
-    result: List[Dict] = []
-    for date_key in sorted(daily_temps.keys()):
-        temps = daily_temps[date_key]
-        if not temps:
-            continue
-        hi_c = max(temps)
-        lo_c = min(temps)
-        result.append({
-            'date': date_key,
-            'day_name': _day_name_from_date(date_key),
-            'high_c': hi_c,
-            'low_c': lo_c,
-            'high_f': _c_to_f(hi_c),
-            'low_f': _c_to_f(lo_c),
-            'precip_prob': 0,
-            'condition': 'Unknown',
-            'source': f'{source_label} (fallback)',
-        })
-    return result
-
-
-def _synthesize_baseline_from_alternates(
-    google_data: Optional[Dict],
-    accu_data: Optional[List],
-    noaa_data: Optional[List],
-) -> Optional[Dict]:
-    """
-    Synthesize baseline data from alternate providers when Open-Meteo fails.
-
-    Builds an `om_daily`-compatible structure progressively, preferring the
-    highest-accuracy source per date and extending the timeline with
-    NOAA aggregates so the 8-day grid is always filled when any
-    source is healthy.
-
-    Per-date priority: Google > AccuWeather > NOAA aggregate.
-    """
-    daily_forecast: List[Dict] = []
-    hourly: List[Dict] = []
-    seen_dates: set = set()
-
-    def _add_entry(entry: Optional[Dict]) -> None:
-        if not entry:
-            return
-        date_key = entry.get('date')
-        if not date_key or date_key in seen_dates or len(daily_forecast) >= 8:
-            return
-        seen_dates.add(date_key)
-        daily_forecast.append(entry)
-
-    # Phase 1: Google (highest weight; typically ~4 days)
-    if google_data and isinstance(google_data, dict):
-        for day in google_data.get('daily', []) or []:
-            date_str = day.get('date') or ''
-            high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
-            low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
-            _add_entry({
-                'date': date_str,
-                'day_name': day.get('day_name') or _day_name_from_date(date_str),
-                'high_c': day.get('high_c'),
-                'low_c': day.get('low_c'),
-                'high_f': high_f,
-                'low_f': low_f,
-                'precip_prob': day.get('precip_prob', 0),
-                'condition': day.get('condition', 'Unknown'),
-                'source': 'Google (fallback)',
-            })
-        google_hours = 0
-        for hour in google_data.get('hourly', []) or []:
-            hourly.append({
-                'time': hour.get('time'),
-                'temp_c': hour.get('temp_c'),
-                'cloud_cover': hour.get('cloud_cover', 0),
-                'precip_prob': hour.get('precip_prob', 0),
-                'source': 'Google (fallback)',
-            })
-            google_hours += 1
-        if google_hours:
-            logger.info(f"[synthesize] Pulled {google_hours} hourly records from Google")
-
-    # Phase 2: AccuWeather (~5 days; native Fahrenheit)
-    if accu_data and isinstance(accu_data, list):
-        for day in accu_data:
-            date_str = day.get('date') or ''
-            high_f = day.get('high_f') if day.get('high_f') is not None else _c_to_f(day.get('high_c'))
-            low_f = day.get('low_f') if day.get('low_f') is not None else _c_to_f(day.get('low_c'))
-            _add_entry({
-                'date': date_str,
-                'day_name': day.get('day_name') or _day_name_from_date(date_str),
-                'high_c': day.get('high_c'),
-                'low_c': day.get('low_c'),
-                'high_f': high_f,
-                'low_f': low_f,
-                'precip_prob': day.get('precip_prob', 0),
-                'condition': day.get('condition', 'Unknown'),
-                'source': 'AccuWeather (fallback)',
-            })
-
-    # Phase 3: NOAA hourly aggregate (extends toward 8 days)
-    if len(daily_forecast) < 8 and noaa_data and isinstance(noaa_data, list):
-        for entry in _aggregate_hourly_to_daily(noaa_data, 'NOAA', time_field='valid_time'):
-            if len(daily_forecast) >= 8:
-                break
-            _add_entry(entry)
-
-    if not daily_forecast:
-        logger.error("[synthesize] No alternate provider data available for baseline synthesis")
-        return None
-
-    # Sort by date so excel_report renders columns left-to-right chronologically
-    daily_forecast.sort(key=lambda d: d.get('date') or '')
-
-    # Log source mix
-    source_counts: Dict[str, int] = {}
-    for entry in daily_forecast:
-        src = entry.get('source', 'Unknown')
-        source_counts[src] = source_counts.get(src, 0) + 1
-    logger.info(f"[synthesize] Composed {len(daily_forecast)}-day baseline from: {source_counts}")
-
-    return {
-        'daily_forecast': daily_forecast,
-        'hourly': hourly,
-        'generated_at': datetime.now().isoformat(),
-        'source': 'Synthesized fallback (Open-Meteo unavailable)'
-    }
-
-
 async def main():
     """Main scheduler entry point - Full Provider Edition."""
     pacific = ZoneInfo("America/Los_Angeles")
@@ -774,19 +618,19 @@ async def main():
         mid_data = results["mid_org"].data
         metar_data = results["metar"].data
 
-        # Check critical provider - attempt fallback if Open-Meteo unavailable
-        # (treat CacheManager DEFAULT empty payload as unavailable too)
+        # Open-Meteo unavailable (fetch failed and no cache inside 24h, so
+        # CacheManager's DEFAULT empty payload): nothing stands in for it.
+        # The grid is dated by the clock and the physics engine builds its own
+        # Google/NOAA timeline, so the report needs no Open-Meteo baseline.
+        # Until Nov 2026 a "synthesized baseline" copied Google / AccuWeather /
+        # NOAA numbers into the OPEN-METEO row at weight 1 - a fabricated row,
+        # like the WEATHER.COM placeholders removed in Oct 2026.
         if _om_payload_is_empty(om_data):
-            logger.warning("Open-Meteo data unavailable - attempting fallback synthesis")
-            om_data = _synthesize_baseline_from_alternates(
-                google_data=google_data,
-                accu_data=accu_data,
-                noaa_data=noaa_data
+            logger.warning(
+                "[main] Open-Meteo data unavailable - OPEN-METEO left out of the report; "
+                "other sources unaffected"
             )
-            if om_data is None:
-                logger.error("CRITICAL: No baseline data available from any provider - cannot continue")
-                return 1
-            logger.info("Successfully synthesized baseline data from alternate providers")
+            om_data = om_data if isinstance(om_data, dict) else {}
 
         # --- SPECIAL HANDLING FOR NOAA PERIOD DATA ---
         # Fetch the Period-based forecast for website alignment
@@ -860,7 +704,12 @@ async def main():
         logger.info(f"[main] Saving raw data to {json_path}")
 
         consensus_data = {
-            "generated_at": om_data.get("generated_at", timestamp) if isinstance(om_data, dict) else timestamp,
+            # CacheManager's empty Open-Meteo payload carries generated_at "DEFAULT"
+            "generated_at": (
+                om_data.get("generated_at")
+                if om_data.get("generated_at") not in (None, "DEFAULT")
+                else timestamp
+            ),
             "location": "Modesto, CA",
             "sources": active_sources,
             "provider_count": len(active_sources),
