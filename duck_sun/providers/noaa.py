@@ -20,7 +20,7 @@ except ImportError:
     def get_httpx_ssl_context():
         return _ssl.create_default_context()
 
-from duck_sun.http_diagnostics import json_or_explain, log_if_tls_corruption
+from duck_sun.http_diagnostics import describe_exception, json_or_explain, log_if_tls_corruption
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ class NOAAProvider:
             return None
         except httpx.RequestError as e:
             log_if_tls_corruption("noaa_gridpoint", e)
-            logger.warning(f"[NOAAProvider] Request error: {e}")
+            logger.warning(f"[NOAAProvider] Request error: {describe_exception(e)}")
             return None
         except Exception as e:
             logger.error(f"[NOAAProvider] Unexpected error: {e}", exc_info=True)

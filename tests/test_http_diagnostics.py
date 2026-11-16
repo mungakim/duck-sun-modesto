@@ -18,6 +18,7 @@ import pytest
 from duck_sun import http_diagnostics
 from duck_sun.http_diagnostics import (
     bad_response_path,
+    describe_exception,
     is_tls_corruption,
     json_or_explain,
 )
@@ -139,3 +140,61 @@ def test_retry_layer_labels_tls_corruption(caplog):
 
     asyncio.run(_fetch())
     assert "[open_meteo] TLS connection corrupted in transit" in caplog.text
+
+
+# --- a failure whose message is blank (Nov 13 2026) ---------------------------
+#
+# Open-Meteo and HRRR each failed three times, ~10s per attempt, and the log
+# read "Request error: " with nothing after it: httpx errors can stringify to
+# "". The type name and the cause chain are what say what happened.
+
+RESET = "An existing connection was forcibly closed by the remote host"
+
+
+def _blank_read_error() -> httpx.ReadError:
+    err = httpx.ReadError("")
+    err.__cause__ = ConnectionResetError(10054, RESET)
+    return err
+
+
+def test_blank_error_is_named_with_its_cause():
+    text = describe_exception(_blank_read_error())
+    assert text.startswith("ReadError (no message) <- ConnectionResetError: ")
+    assert RESET in text
+
+
+def test_httpx_and_httpcore_repeating_each_other_is_said_once():
+    outer = httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+    outer.__cause__ = httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+    assert describe_exception(outer) == "ConnectError: [Errno 11001] getaddrinfo failed"
+
+
+def test_retry_layer_names_a_blank_error_on_every_line(caplog):
+    caplog.set_level(logging.WARNING)
+
+    @with_retry(config=RetryConfig(max_retries=0), provider_name="open_meteo")
+    async def _fetch():
+        raise _blank_read_error()
+
+    asyncio.run(_fetch())
+    attempt = [r.message for r in caplog.records if "Attempt 1 failed" in r.message][0]
+    final = [r.message for r in caplog.records if "All 1 attempts failed" in r.message][0]
+    for line in (attempt, final):
+        assert "Request error: ReadError (no message) <- ConnectionResetError" in line, line
+        assert RESET in line
+
+
+def test_hrrr_names_a_blank_error(monkeypatch, caplog):
+    caplog.set_level(logging.ERROR)
+
+    def handler(request):
+        raise _blank_read_error()
+
+    class _Client(httpx.AsyncClient):
+        def __init__(self, *args, **kwargs):
+            kwargs.pop("verify", None)
+            super().__init__(*args, transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    assert asyncio.run(open_meteo.fetch_hrrr_forecast(force_refresh=True)) is None
+    assert "[HRRR] Fetch failed: ReadError (no message) <- ConnectionResetError" in caplog.text

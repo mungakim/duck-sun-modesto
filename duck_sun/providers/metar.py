@@ -16,6 +16,8 @@ import re
 from datetime import datetime
 from typing import Optional, TypedDict
 
+from duck_sun.http_diagnostics import describe_exception
+
 # SSL: Use OS certificate store for PyInstaller exe compatibility
 try:
     from duck_sun.ssl_helper import get_httpx_ssl_context
@@ -79,7 +81,7 @@ class MetarProvider:
             logger.warning("[MetarProvider] Request timed out")
             return None
         except httpx.RequestError as e:
-            logger.warning(f"[MetarProvider] Request error: {e}")
+            logger.warning(f"[MetarProvider] Request error: {describe_exception(e)}")
             return None
         except Exception as e:
             logger.error(f"[MetarProvider] Unexpected error: {e}", exc_info=True)

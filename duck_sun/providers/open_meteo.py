@@ -29,7 +29,7 @@ except ImportError:
     def get_httpx_ssl_context():
         return _ssl.create_default_context()
 
-from duck_sun.http_diagnostics import json_or_explain, log_if_tls_corruption
+from duck_sun.http_diagnostics import describe_exception, json_or_explain, log_if_tls_corruption
 
 # Get logger (configuration is done in scheduler.py)
 logger = logging.getLogger(__name__)
@@ -449,7 +449,7 @@ async def fetch_hrrr_forecast(force_refresh: bool = False) -> Optional[HRRRForec
         return None
     except Exception as e:
         log_if_tls_corruption("hrrr", e)
-        logger.error(f"[HRRR] Fetch failed: {e}")
+        logger.error(f"[HRRR] Fetch failed: {describe_exception(e)}")
         return None
 
 

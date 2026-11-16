@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple, TypeVar
 
-from duck_sun.http_diagnostics import log_if_tls_corruption
+from duck_sun.http_diagnostics import describe_exception, log_if_tls_corruption
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,9 @@ def categorize_error(exception: Exception) -> Tuple[ErrorType, str]:
     import httpx
     import json
 
-    error_msg = str(exception)[:200]  # Truncate long messages
+    # Type name + cause chain, never a bare str(): httpx errors can stringify
+    # to "" and the log then read "Request error: " (Nov 13 2026).
+    error_msg = describe_exception(exception)
 
     if isinstance(exception, httpx.TimeoutException):
         return (ErrorType.TIMEOUT, f"Timeout: {error_msg}")
@@ -237,7 +239,7 @@ def with_retry(
 
             logger.error(
                 f"[{provider_name}] All {config.max_retries + 1} attempts failed "
-                f"({elapsed:.2f}s total). Last error: {error_type.value}"
+                f"({elapsed:.2f}s total). Last error: {error_type.value} - {error_msg}"
             )
 
             return None
