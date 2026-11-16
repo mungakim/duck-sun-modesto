@@ -31,7 +31,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from duck_sun.verification import (
     TruthTracker,
     fetch_yesterday_actuals,
-    fetch_and_log_yesterday_actuals,
     extract_daily_high_low_from_hourly,
     DB_PATH
 )
@@ -74,10 +73,15 @@ class TestTruthTracker:
         columns = {row[1]: row[2] for row in cursor.fetchall()}
         logger.info(f"[TEST] Forecasts table columns: {columns}")
         
-        expected_columns = ['id', 'source', 'run_date', 'target_date', 
-                          'days_out', 'pred_high_c', 'pred_low_c']
+        expected_columns = ['id', 'source', 'run_timestamp', 'target_date',
+                            'days_out', 'temp_high', 'temp_low', 'precip_prob']
         for col in expected_columns:
             assert col in columns, f"Column {col} should exist in forecasts table"
+
+        cursor.execute("PRAGMA table_info(observations)")
+        obs_columns = {row[1] for row in cursor.fetchall()}
+        for col in ['date', 'actual_high', 'actual_low', 'observed_weather', 'precip_mm']:
+            assert col in obs_columns, f"Column {col} should exist in observations table"
         
         logger.info("[TEST] Database schema test PASSED")
     
@@ -93,8 +97,8 @@ class TestTruthTracker:
         tracker.log_forecast(
             source="Open-Meteo",
             target_date=tomorrow,
-            high_c=15.5,
-            low_c=5.2
+            high=15.5,
+            low=5.2
         )
         
         # Log a forecast for NWS
@@ -102,8 +106,8 @@ class TestTruthTracker:
         tracker.log_forecast(
             source="NWS",
             target_date=tomorrow,
-            high_c=14.8,
-            low_c=6.0
+            high=14.8,
+            low=6.0
         )
         
         # Verify forecasts were stored
@@ -118,7 +122,7 @@ class TestTruthTracker:
         assert len(results) == 2, "Should have 2 forecast records"
         
         # Check values
-        cursor.execute("SELECT source, pred_high_c, pred_low_c FROM forecasts WHERE source = 'Open-Meteo'")
+        cursor.execute("SELECT source, temp_high, temp_low FROM forecasts WHERE source = 'Open-Meteo'")
         om_row = cursor.fetchone()
         logger.info(f"[TEST] Open-Meteo row: {om_row}")
         assert om_row[1] == 15.5, "High temp should be 15.5"
@@ -126,23 +130,20 @@ class TestTruthTracker:
         
         logger.info("[TEST] Forecast logging test PASSED")
     
-    def test_log_forecast_skip_past_dates(self, tracker):
-        """Test that past dates are not logged."""
-        logger.info("[TEST] Testing past date skipping...")
-        
+    def test_log_forecast_past_date_gets_negative_days_out(self, tracker):
+        """A past target date is logged, with days_out < 0.
+
+        An older TruthTracker skipped past dates; the current one records
+        them, and the leaderboard only reads days_out = 1, so they never
+        affect scoring.
+        """
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        
-        # Should return False for past dates
-        result = tracker.log_forecast("Open-Meteo", yesterday, 15.0, 5.0)
-        assert result == False, "Should return False for past dates"
-        
+
+        assert tracker.log_forecast("Open-Meteo", yesterday, 15.0, 5.0) is True
+
         cursor = tracker.conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM forecasts WHERE target_date = ?", (yesterday,))
-        count = cursor.fetchone()[0]
-        
-        assert count == 0, "Should have no forecasts for past dates"
-        
-        logger.info("[TEST] Past date skipping test PASSED")
+        cursor.execute("SELECT days_out FROM forecasts WHERE target_date = ?", (yesterday,))
+        assert cursor.fetchall() == [(-1,)]
     
     def test_ingest_actuals(self, tracker):
         """Test that actuals/observations are logged correctly."""
@@ -152,8 +153,9 @@ class TestTruthTracker:
         
         tracker.ingest_actuals(
             date_str=yesterday,
-            high_c=16.2,
-            low_c=4.8,
+            high=16.2,
+            low=4.8,
+            condition="Clear",
             precip_mm=0.0
         )
         
@@ -176,13 +178,13 @@ class TestTruthTracker:
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         
         # First insert
-        tracker.ingest_actuals(yesterday, 15.0, 5.0, 0.0)
+        tracker.ingest_actuals(yesterday, 15.0, 5.0, "Clear", 0.0)
         
         # Upsert with new values
-        tracker.ingest_actuals(yesterday, 16.0, 4.0, 1.5)
+        tracker.ingest_actuals(yesterday, 16.0, 4.0, "Rain", 1.5)
         
         cursor = tracker.conn.cursor()
-        cursor.execute("SELECT actual_high_c, actual_low_c, actual_precip_mm FROM observations WHERE date = ?", (yesterday,))
+        cursor.execute("SELECT actual_high, actual_low, precip_mm, observed_weather FROM observations WHERE date = ?", (yesterday,))
         result = cursor.fetchone()
         
         logger.info(f"[TEST] Upsert result: {result}")
@@ -190,6 +192,7 @@ class TestTruthTracker:
         assert result[0] == 16.0, "High should be updated to 16.0"
         assert result[1] == 4.0, "Low should be updated to 4.0"
         assert result[2] == 1.5, "Precip should be updated to 1.5"
+        assert result[3] == "Rain", "Condition should be updated to Rain"
         
         logger.info("[TEST] Actuals upsert test PASSED")
     
@@ -242,29 +245,29 @@ class TestTruthTracker:
         # Simulated: forecasts made 2 days ago predicting yesterday (days_out=1)
         # Open-Meteo predicted 15C high, 5C low
         cursor.execute('''
-            INSERT INTO forecasts (source, run_date, target_date, days_out, pred_high_c, pred_low_c)
+            INSERT INTO forecasts (source, run_timestamp, target_date, days_out, temp_high, temp_low)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', ("Open-Meteo", two_days_ago, yesterday, 1, 15.0, 5.0))
+        ''', ("Open-Meteo", f"{two_days_ago}_05", yesterday, 1, 15.0, 5.0))
         
         # NWS predicted 14C high, 6C low
         cursor.execute('''
-            INSERT INTO forecasts (source, run_date, target_date, days_out, pred_high_c, pred_low_c)
+            INSERT INTO forecasts (source, run_timestamp, target_date, days_out, temp_high, temp_low)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', ("NWS", two_days_ago, yesterday, 1, 14.0, 6.0))
+        ''', ("NWS", f"{two_days_ago}_05", yesterday, 1, 14.0, 6.0))
         
-        # Met.no predicted 16C high, 4C low
+        # Google predicted 16C high, 4C low
         cursor.execute('''
-            INSERT INTO forecasts (source, run_date, target_date, days_out, pred_high_c, pred_low_c)
+            INSERT INTO forecasts (source, run_timestamp, target_date, days_out, temp_high, temp_low)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', ("Met.no", two_days_ago, yesterday, 1, 16.0, 4.0))
+        ''', ("Google", f"{two_days_ago}_05", yesterday, 1, 16.0, 4.0))
         
         tracker.conn.commit()
         
         # Actual for yesterday: 14.5C high, 5.5C low
-        tracker.ingest_actuals(yesterday, 14.5, 5.5, 0.0)
+        tracker.ingest_actuals(yesterday, 14.5, 5.5, "Clear", 0.0)
         
         # Get leaderboard
-        leaderboard = tracker.get_leaderboard(days_out=1)
+        leaderboard = tracker.get_leaderboard(days_back=30)
         logger.info(f"[TEST] Leaderboard results: {leaderboard}")
         
         assert len(leaderboard) == 3, "Should have 3 sources in leaderboard"
@@ -278,11 +281,11 @@ class TestTruthTracker:
         # Check errors (absolute)
         # Open-Meteo: |15.0 - 14.5| = 0.5 high, |5.0 - 5.5| = 0.5 low
         # NWS: |14.0 - 14.5| = 0.5 high, |6.0 - 5.5| = 0.5 low
-        # Met.no: |16.0 - 14.5| = 1.5 high, |4.0 - 5.5| = 1.5 low
+        # Google: |16.0 - 14.5| = 1.5 high, |4.0 - 5.5| = 1.5 low
         
         assert abs(scores["Open-Meteo"]["high_err"] - 0.5) < 0.01, f"Open-Meteo high error should be ~0.5, got {scores['Open-Meteo']['high_err']}"
         assert abs(scores["NWS"]["high_err"] - 0.5) < 0.01, f"NWS high error should be ~0.5, got {scores['NWS']['high_err']}"
-        assert abs(scores["Met.no"]["high_err"] - 1.5) < 0.01, f"Met.no high error should be ~1.5, got {scores['Met.no']['high_err']}"
+        assert abs(scores["Google"]["high_err"] - 1.5) < 0.01, f"Google high error should be ~1.5, got {scores['Google']['high_err']}"
         
         logger.info("[TEST] Leaderboard calculation test PASSED")
     
@@ -297,21 +300,22 @@ class TestTruthTracker:
         
         # Add forecasts
         cursor.execute('''
-            INSERT INTO forecasts (source, run_date, target_date, days_out, pred_high_c, pred_low_c)
+            INSERT INTO forecasts (source, run_timestamp, target_date, days_out, temp_high, temp_low)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', ("Open-Meteo", two_days_ago, yesterday, 1, 15.0, 5.0))
+        ''', ("Open-Meteo", f"{two_days_ago}_05", yesterday, 1, 15.0, 5.0))
         
         tracker.conn.commit()
         
         # Add actuals
-        tracker.ingest_actuals(yesterday, 14.5, 5.5, 0.0)
+        tracker.ingest_actuals(yesterday, 14.5, 5.5, "Clear", 0.0)
         
         # Get report
-        report = tracker.get_verification_report(days_out=1)
+        report = tracker.get_verification_report(days_back=30)
         logger.info(f"[TEST] Verification report: {report}")
         
-        assert "verified_days" in report
-        assert "sources" in report
+        assert report["verified_days"] == 1
+        assert report["sources"]["Open-Meteo"]["comparisons"] == 1
+        assert abs(report["sources"]["Open-Meteo"]["high_mae"] - 0.5) < 0.01
         
         logger.info("[TEST] Verification report test PASSED")
 
