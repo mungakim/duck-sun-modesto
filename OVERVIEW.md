@@ -47,15 +47,16 @@ The system fetches weather data from multiple providers and combines them using 
 
 2. **Resilience & Caching**
    - Every provider has Last Known Good (LKG) cache
-   - Report NEVER shows "--" - always falls back to cached or default data
+   - Falls back to cached data within each provider's max age; past that, the row shows "--" rather than made-up values
    - Tiered staleness: FRESH (<10min) → ACCEPTABLE (<6hr) → STALE (<24hr) → DEFAULT
 
 3. **Rate Limiting (Web Scraping)**
    - Weather.com and Weather Underground limited to 3 calls/day each
    - Returns cached data when limit reached
 
-4. **Fallback Synthesis**
-   - If Open-Meteo (baseline) fails, synthesizes data from Google → AccuWeather → NOAA
+4. **No Stand-In Data**
+   - If Open-Meteo returns nothing, its row is hidden; no other source's numbers are copied in (the old "fallback synthesis" was removed Nov 2026)
+   - The grid's dates come from the clock, not from any provider
 
 ---
 

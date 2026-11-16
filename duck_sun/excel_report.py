@@ -924,9 +924,16 @@ def generate_excel_report(
     # dates no longer line up with the grid (stale cache, timezone drift), and
     # the two are indistinguishable in the finished spreadsheet. Say which
     # happened here, in the run log, while the inputs are still in hand.
+    coverage = {}
     for label, daily, _ in sources:
         covered = sum(1 for k in grid_keys if _hi_lo(daily, k)[0] is not None)
-        if covered == 0:
+        coverage[label] = covered
+        if covered == 0 and label == 'OPEN-METEO':
+            logger.warning(
+                f"[generate_excel_report] OPEN-METEO: 0/{len(grid_keys)} grid days - "
+                f"row will be HIDDEN"
+            )
+        elif covered == 0:
             logger.error(
                 f"[generate_excel_report] {label}: 0/{len(grid_keys)} grid days - "
                 f"row will be ALL DASHES (no data, or its dates miss the grid window "
@@ -1000,6 +1007,13 @@ def generate_excel_report(
             cell_lo.font = dash_font if cell_lo.value == "--" else Font(name='Arial', size=9)
             cell_lo.alignment = center_align
             cell_lo.border = thin_border
+
+        # No Open-Meteo data at all: hide its row instead of showing eight
+        # columns of dashes. Hidden rows don't print, every other row keeps
+        # its number, and the Wtd. Average formula already skips this row's
+        # "--" cells. A partial row (served from cache, 7/8 days) stays visible.
+        if label == 'OPEN-METEO' and coverage[label] == 0:
+            ws.row_dimensions[grid_row].hidden = True
 
     # Weighted Averages row - emit Excel formulas so the user can edit any
     # source cell (or clear it) and see the average update live in the sheet.

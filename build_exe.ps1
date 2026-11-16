@@ -16,7 +16,7 @@ if (Test-Path $exePath) {
 # --- Step 2: Build exe ---
 Write-Host ""
 Write-Host "=== Building exe ===" -ForegroundColor Cyan
-& .\venv\Scripts\pyinstaller.exe --onefile --name DuckSunForecast --collect-data certifi --hidden-import truststore --hidden-import jinja2 run_forecast_cli.py
+& .\venv\Scripts\pyinstaller.exe --onefile --name DuckSunForecast --collect-data certifi --hidden-import truststore run_forecast_cli.py
 
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exePath)) {
     Write-Host "ERROR: PyInstaller build failed." -ForegroundColor Red

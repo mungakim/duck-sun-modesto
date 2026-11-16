@@ -111,6 +111,39 @@ def json_or_explain(resp: httpx.Response, source: str) -> Any:
         raise
 
 
+MAX_DESCRIPTION_CHARS = 400
+
+
+def describe_exception(exc: BaseException) -> str:
+    """Name an exception and everything under it, even when its message is blank.
+
+    httpx raises RequestError subclasses whose str() can be empty. On Nov 13
+    2026 Open-Meteo and HRRR each failed three times, ~10s per attempt, and
+    the log said only "Request error: " with nothing after it. The answer is
+    in the type name (ConnectError vs ReadError vs RemoteProtocolError) and
+    the cause chain underneath (httpx -> httpcore -> OSError / ssl.SSLError,
+    where a WinError number or an OpenSSL reason lives), e.g.
+
+        ReadError (no message) <- OSError: [WinError 10054] An existing
+        connection was forcibly closed by the remote host
+    """
+    parts = []
+    seen = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        msg = str(current).strip()
+        name = type(current).__name__
+        part = f"{name}: {msg}" if msg else f"{name} (no message)"
+        if not parts or part != parts[-1]:  # httpx and httpcore repeat each other
+            parts.append(part)
+        current = current.__cause__ or current.__context__
+    text = " <- ".join(parts)
+    if len(text) > MAX_DESCRIPTION_CHARS:
+        text = text[:MAX_DESCRIPTION_CHARS - 3] + "..."
+    return text
+
+
 def is_tls_corruption(exc: BaseException) -> bool:
     """True for TLS errors that mean the connection was altered in transit.
 

@@ -38,6 +38,8 @@ from pathlib import Path
 from typing import List, Optional, TypedDict, Dict, Any
 from zoneinfo import ZoneInfo
 
+from duck_sun.http_diagnostics import describe_exception
+
 logger = logging.getLogger(__name__)
 
 # Cache configuration
@@ -418,7 +420,7 @@ class GoogleWeatherProvider:
             logger.error(f"{self.log_prefix} Request timed out")
             return self._get_stale_cache_fallback()
         except httpx.RequestError as e:
-            logger.error(f"{self.log_prefix} Request error: {e}")
+            logger.error(f"{self.log_prefix} Request error: {describe_exception(e)}")
             return self._get_stale_cache_fallback()
         except Exception as e:
             logger.error(f"{self.log_prefix} Fetch failed: {e}", exc_info=True)

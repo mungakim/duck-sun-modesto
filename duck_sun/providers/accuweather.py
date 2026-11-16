@@ -19,6 +19,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, TypedDict
 
+from duck_sun.http_diagnostics import describe_exception
+
 logger = logging.getLogger(__name__)
 
 # Cache configuration
@@ -345,7 +347,7 @@ class AccuWeatherProvider:
             # Return None - let CacheManager handle fallback with proper staleness tier
             return None
         except httpx.RequestError as e:
-            logger.error(f"[AccuWeatherProvider] Request error: {e}")
+            logger.error(f"[AccuWeatherProvider] Request error: {describe_exception(e)}")
             # Return None - let CacheManager handle fallback with proper staleness tier
             return None
         except Exception as e:
