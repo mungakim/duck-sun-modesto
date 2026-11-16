@@ -147,7 +147,10 @@ def _report(tmp_path: Path, **overrides):
         google_data={
             "daily": [{"date": d, "high_f": 97, "low_f": 63, "condition": "Sunny"} for d in dates],
             "hourly": [
-                {"time": f"{d}T{h:02d}:00:00-07:00", "temp_c": 30.0, "cloud_cover": 10,
+                # Real Pacific offset for each date: a fixed -07:00 (PDT) put
+                # every winter hour one hour early, so HE16 never appeared
+                {"time": datetime.fromisoformat(d).replace(hour=h, tzinfo=tz).isoformat(),
+                 "temp_c": 30.0, "cloud_cover": 10,
                  "precip_prob": 0, "condition": "Sunny", "is_daytime": True}
                 for d in dates for h in range(9, 17)
             ],
